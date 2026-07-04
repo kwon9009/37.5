@@ -1,0 +1,10 @@
+requests==2.32.3
+pyserial==3.5
+python-dotenv==1.0.1
+
+# ===== 낙상 감지(카메라 + 비전 AI) 사용 시 =====
+opencv-python==4.10.0.84
+# 자세추정 모델은 아래 중 하나 선택 (라즈베리파이에선 설치가 무거우니 실제 기기에서):
+# mediapipe            # 가볍고 단일 인물에 적합
+# ultralytics          # YOLOv8n-pose (자료·생태계 풍부)
+# tflite-runtime       # MoveNet 등 TFLite 모델용

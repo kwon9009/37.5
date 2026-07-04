@@ -1,0 +1,33 @@
+# ===== Python =====
+__pycache__/
+*.py[cod]
+venv/
+.venv/
+env/
+*.egg-info/
+
+# ===== Node / React =====
+node_modules/
+dist/
+build/
+.vite/
+npm-debug.log*
+
+# ===== 환경변수 (절대 커밋 금지) =====
+.env
+.env.local
+.env.*.local
+
+# ===== OS / IDE =====
+.DS_Store
+Thumbs.db
+.idea/
+*.swp
+
+# .vscode는 공용 설정만 공유
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+
+# Claude Code 개인 메모 (팀 공유 X)
+CLAUDE.local.md
