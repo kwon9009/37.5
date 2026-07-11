@@ -9,6 +9,7 @@ from app.models.base import BaseModel
 
 if TYPE_CHECKING:
     from app.models.patient_guardian import PatientGuardian
+    from app.models.alert import Alert
 
 
 class Guardian(BaseModel):
@@ -47,7 +48,9 @@ class Guardian(BaseModel):
         back_populates="guardian",
         passive_deletes=True,
     )
-    alerts = relationship(back_populates="guardian")
+    alerts: Mapped[list["Alert"]] = relationship(
+        back_populates="guardian",
+    )
 
     def __repr__(self) -> str:
         return f"Guardian(" f"guardian_id={self.guardian_id}, " f"name='{self.name}')"

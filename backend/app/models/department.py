@@ -24,7 +24,6 @@ class Department(BaseModel):
         BigInteger,
         ForeignKey(
             "hospitals.hospital_id",
-            ondelete="CASCADE",
         ),
         nullable=False,
     )
