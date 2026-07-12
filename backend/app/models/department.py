@@ -11,6 +11,7 @@ if TYPE_CHECKING:
     from app.models.hospital import Hospital
     from app.models.patient import Patient
     from app.models.alert import Alert
+    from app.models.user import User
 
 
 class Department(BaseModel):
@@ -18,6 +19,15 @@ class Department(BaseModel):
 
     department_id: Mapped[int] = mapped_column(
         BigInteger, primary_key=True, autoincrement=True
+    )
+
+    user_id: Mapped[int] = mapped_column(
+        BigInteger,
+        ForeignKey(
+            "users.user_id",
+        ),
+        unique=True,
+        nullable=False,
     )
 
     hospital_id: Mapped[int] = mapped_column(
@@ -28,13 +38,14 @@ class Department(BaseModel):
         nullable=False,
     )
 
-    login_id: Mapped[str] = mapped_column(String(50), unique=True, nullable=False)
-
-    password: Mapped[str] = mapped_column(String(255), nullable=False)
-
     name: Mapped[str] = mapped_column(String(20), nullable=False)
 
     # Relationship
+    user: Mapped["User"] = relationship(
+        "User",
+        back_populates="department",
+    )
+
     hospital: Mapped["Hospital"] = relationship(
         "Hospital", back_populates="departments"
     )
@@ -49,6 +60,7 @@ class Department(BaseModel):
         return (
             f"Department("
             f"department_id={self.department_id}, "
+            f"user_id={self.user_id}, "
             f"name='{self.name}'"
             f")"
         )

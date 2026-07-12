@@ -1,7 +1,7 @@
 from sqlalchemy import create_engine
 from typing import Generator
 from sqlalchemy.orm import DeclarativeBase, sessionmaker, Session
-from app.core.settings import settings
+from app.core.config import settings
 
 # Engine 생성
 engine = create_engine(

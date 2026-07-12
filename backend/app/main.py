@@ -5,6 +5,7 @@ FastAPI 진입점 - "동작하는 뼈대" 버전.
 실행:  uvicorn app.main:app --reload
 확인:  http://localhost:8000/docs
 """
+
 import asyncio
 import json
 from datetime import datetime
@@ -12,8 +13,10 @@ from datetime import datetime
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from sse_starlette.sse import EventSourceResponse
+from app.api.auth import router as auth_router
 
 app = FastAPI(title="37.5 SmartCare API")
+app.include_router(auth_router)
 
 # 프론트(다른 포트)에서 접근 가능하게 CORS 허용 (개발용: 전체 허용)
 app.add_middleware(
@@ -46,6 +49,7 @@ async def receive_vitals(data: dict):
 @app.get("/api/stream/{patient_id}")
 async def stream(patient_id: str):
     """프론트가 구독하는 실시간 스트림(SSE). 최신값을 1초마다 밀어줌."""
+
     async def event_generator():
         while True:
             if patient_id in latest_vitals:

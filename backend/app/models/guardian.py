@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from sqlalchemy import String, BigInteger
+from sqlalchemy import String, BigInteger, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import BaseModel
@@ -10,6 +10,7 @@ from app.models.base import BaseModel
 if TYPE_CHECKING:
     from app.models.patient_guardian import PatientGuardian
     from app.models.alert import Alert
+    from app.models.user import User
 
 
 class Guardian(BaseModel):
@@ -20,15 +21,13 @@ class Guardian(BaseModel):
         primary_key=True,
         autoincrement=True,
     )
-
-    login_id: Mapped[str] = mapped_column(
-        String(50),
+    user_id: Mapped[int] = mapped_column(
+        BigInteger,
+        ForeignKey(
+            "users.user_id",
+            ondelete="CASCADE",
+        ),
         unique=True,
-        nullable=False,
-    )
-
-    password: Mapped[str] = mapped_column(
-        String(255),
         nullable=False,
     )
 
@@ -43,6 +42,11 @@ class Guardian(BaseModel):
     )
 
     # Relationship
+    user: Mapped["User"] = relationship(
+        "User",
+        back_populates="guardian",
+    )
+
     patient_guardians: Mapped[list["PatientGuardian"]] = relationship(
         "PatientGuardian",
         back_populates="guardian",
@@ -53,4 +57,10 @@ class Guardian(BaseModel):
     )
 
     def __repr__(self) -> str:
-        return f"Guardian(" f"guardian_id={self.guardian_id}, " f"name='{self.name}')"
+        return (
+            f"Guardian("
+            f"guardian_id={self.guardian_id}, "
+            f"user_id={self.user_id}, "
+            f"name='{self.name}'"
+            f")"
+        )
