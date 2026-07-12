@@ -21,3 +21,9 @@ class VitalStatus(str, Enum):
     NORMAL = "NORMAL"
     WARNING = "WARNING"
     DANGER = "DANGER"
+
+
+class UserRole(str, Enum):
+    ADMIN = "ADMIN"
+    DEPARTMENT = "DEPARTMENT"
+    GUARDIAN = "GUARDIAN"

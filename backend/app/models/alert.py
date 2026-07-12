@@ -45,7 +45,6 @@ class Alert(Base):
 
     is_read: Mapped[bool] = mapped_column(
         Boolean,
-        default=False,
         nullable=False,
     )
 
