@@ -31,7 +31,7 @@ class PatientGuardian(Base):
         nullable=False,
     )
 
-    relationship: Mapped[str] = mapped_column(
+    relation: Mapped[str] = mapped_column(
         String(20),
         nullable=False,
     )

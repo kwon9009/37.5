@@ -9,6 +9,7 @@ FastAPI 진입점 - "동작하는 뼈대" 버전.
 import asyncio
 import json
 from datetime import datetime
+import app.models
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
