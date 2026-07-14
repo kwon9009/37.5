@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from sqlalchemy import BigInteger, Boolean, Enum, String
+from sqlalchemy import BigInteger, Boolean, Enum, String, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import BaseModel
@@ -42,6 +42,7 @@ class User(BaseModel):
         Boolean,
         nullable=False,
         default=True,
+        server_default=text("1"),
     )
 
     # Relationship
