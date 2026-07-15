@@ -4,5 +4,6 @@
   "[javascript]": { "editor.defaultFormatter": "esbenp.prettier-vscode" },
   "[javascriptreact]": { "editor.defaultFormatter": "esbenp.prettier-vscode" },
   "[json]": { "editor.defaultFormatter": "esbenp.prettier-vscode" },
-  "files.eol": "\n"
+  "files.eol": "\n",
+  "python-envs.defaultEnvManager": "ms-python.python:venv"
 }
