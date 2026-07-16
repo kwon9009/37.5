@@ -1,11 +1,13 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import logo from "../../../components/icon/37.5.png";
+import PasswordStrengthMeter from "../../../components/password-strength-meter/password-strength-meter.jsx";
+import { getPasswordStrength } from "../../../utils/password-strength.js";
 
 function FindPassword() {
   const [step, setStep] = useState(1);
   const [loginId, setLoginId] = useState("");
-  const [hospitalCode, setHospitalCode] = useState("");
+  const [email, setEmail] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState("");
@@ -15,8 +17,8 @@ function FindPassword() {
     event.preventDefault();
     setError("");
 
-    if (!loginId.trim() || !hospitalCode.trim()) {
-      setError("아이디와 병원 코드를 모두 입력해 주세요.");
+    if (!loginId.trim() || !email.trim()) {
+      setError("아이디와 이메일을 모두 입력해 주세요.");
       return;
     }
 
@@ -27,8 +29,8 @@ function FindPassword() {
     event.preventDefault();
     setError("");
 
-    if (newPassword.length < 4) {
-      setError("비밀번호는 4자 이상 입력해 주세요.");
+    if (!getPasswordStrength(newPassword).isValid) {
+      setError("비밀번호가 조건을 충족하지 않습니다. (8자 이상, 영문/숫자/특수문자 중 2종류 이상)");
       return;
     }
     if (newPassword !== confirmPassword) {
@@ -53,7 +55,7 @@ function FindPassword() {
               <img src={logo} alt="37.5" className="h-12 w-12 object-contain" />
               <p className="text-[22px] font-extrabold text-[#1E2A3A]">37.5℃</p>
               <p className="text-base font-bold text-[#1E2A3A]">비밀번호 찾기</p>
-              <p className="text-[13px] text-[#5A6B80]">아이디와 소속 병원 코드로 본인 확인을 해주세요</p>
+              <p className="text-[13px] text-[#5A6B80]">아이디와 가입 시 등록한 이메일로 본인 확인을 해주세요</p>
             </div>
 
             <div className="find-password__fields flex flex-col gap-4">
@@ -76,18 +78,19 @@ function FindPassword() {
               </div>
 
               <div className="find-password__field flex flex-col gap-[7px]">
-                <label htmlFor="hospitalCode" className="text-xs font-bold tracking-wide text-[#5A6B80]">
-                  병원 코드
+                <label htmlFor="email" className="text-xs font-bold tracking-wide text-[#5A6B80]">
+                  이메일
                 </label>
                 <div className="find-password__input flex h-12 items-center gap-[10px] rounded-lg border border-[#DCE3EC] px-[14px]">
                   <input
-                    id="hospitalCode"
-                    name="hospitalCode"
-                    type="text"
-                    placeholder="예: SNUH"
-                    value={hospitalCode}
-                    onChange={(event) => setHospitalCode(event.target.value.toUpperCase())}
-                    className="w-full border-0 bg-transparent text-[15px] uppercase text-[#1E2A3A] placeholder:normal-case placeholder:text-[#5A6B80] focus:outline-none"
+                    id="email"
+                    name="email"
+                    type="email"
+                    autoComplete="email"
+                    placeholder="가입 시 등록한 이메일"
+                    value={email}
+                    onChange={(event) => setEmail(event.target.value)}
+                    className="w-full border-0 bg-transparent text-[15px] text-[#1E2A3A] placeholder:text-[#5A6B80] focus:outline-none"
                   />
                 </div>
               </div>
@@ -134,6 +137,7 @@ function FindPassword() {
                     className="w-full border-0 bg-transparent text-[15px] text-[#1E2A3A] placeholder:text-[#5A6B80] focus:outline-none"
                   />
                 </div>
+                <PasswordStrengthMeter password={newPassword} />
               </div>
 
               <div className="find-password__field flex flex-col gap-[7px]">
@@ -159,7 +163,8 @@ function FindPassword() {
 
             <button
               type="submit"
-              className="find-password__submit h-[52px] w-full rounded-lg bg-[#2B6FE3] text-[15px] font-bold tracking-wide text-white transition-colors hover:bg-[#2560c9]"
+              disabled={!getPasswordStrength(newPassword).isValid}
+              className="find-password__submit h-[52px] w-full rounded-lg bg-[#2B6FE3] text-[15px] font-bold tracking-wide text-white transition-colors hover:bg-[#2560c9] disabled:cursor-not-allowed disabled:opacity-60"
             >
               비밀번호 변경하기
             </button>

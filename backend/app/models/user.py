@@ -28,6 +28,13 @@ class User(BaseModel):
         nullable=False,
     )
 
+    # 부서(병원 스태프) 계정은 회원가입 시 필수로 받지만, 보호자 등 다른 역할은 아직 이메일이 없어 nullable
+    email: Mapped[str | None] = mapped_column(
+        String(100),
+        unique=True,
+        nullable=True,
+    )
+
     password: Mapped[str] = mapped_column(
         String(255),
         nullable=False,
