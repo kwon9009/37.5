@@ -28,8 +28,9 @@ const PATIENT_INFO_ROWS = [
   ["부착 장치", "VG-302-A2", true],
 ];
 
-function TrendChart({ title, subtitle, yAxisLabels, xAxisLabels, data, min, max, lineColor = "#2B6FE3", markerIndex, markerColor }) {
+function TrendChart({ title, subtitle, yAxisLabels, ranges, lineColor = "#2B6FE3", markerColor }) {
   const [range, setRange] = useState("6시간");
+  const { xAxisLabels, data, min, max, markerIndex } = ranges[range];
   const width = 600;
   const height = 160;
   const step = width / (data.length - 1);
@@ -171,22 +172,56 @@ function PatientDetail() {
                 title="심박수 추이"
                 subtitle="1분 평균 · vital_logs"
                 yAxisLabels={[120, 100, 80, 60]}
-                xAxisLabels={["09:00", "10:00", "11:00", "12:00", "13:00", "14:00", "15:00"]}
-                data={[88, 92, 95, 101, 108, 111, 104]}
-                min={60}
-                max={120}
-                markerIndex={5}
                 markerColor="#E8A13B"
+                ranges={{
+                  "1시간": {
+                    xAxisLabels: ["14:00", "14:10", "14:20", "14:30", "14:40", "14:50"],
+                    data: [98, 102, 106, 109, 111, 104],
+                    min: 60,
+                    max: 120,
+                    markerIndex: 4,
+                  },
+                  "6시간": {
+                    xAxisLabels: ["09:00", "10:00", "11:00", "12:00", "13:00", "14:00", "15:00"],
+                    data: [88, 92, 95, 101, 108, 111, 104],
+                    min: 60,
+                    max: 120,
+                    markerIndex: 5,
+                  },
+                  "24시간": {
+                    xAxisLabels: ["00:00", "04:00", "08:00", "12:00", "16:00", "20:00", "24:00"],
+                    data: [70, 66, 74, 92, 104, 111, 96],
+                    min: 60,
+                    max: 120,
+                    markerIndex: 5,
+                  },
+                }}
               />
 
               <TrendChart
                 title="호흡수 추이"
                 subtitle="1분 평균 · vital_logs"
                 yAxisLabels={[24, 18, 12, 6]}
-                xAxisLabels={["09:00", "10:00", "11:00", "12:00", "13:00", "14:00", "15:00"]}
-                data={[15, 16, 17, 16, 18, 19, 18]}
-                min={6}
-                max={24}
+                ranges={{
+                  "1시간": {
+                    xAxisLabels: ["14:00", "14:10", "14:20", "14:30", "14:40", "14:50"],
+                    data: [16, 17, 18, 19, 18, 18],
+                    min: 6,
+                    max: 24,
+                  },
+                  "6시간": {
+                    xAxisLabels: ["09:00", "10:00", "11:00", "12:00", "13:00", "14:00", "15:00"],
+                    data: [15, 16, 17, 16, 18, 19, 18],
+                    min: 6,
+                    max: 24,
+                  },
+                  "24시간": {
+                    xAxisLabels: ["00:00", "04:00", "08:00", "12:00", "16:00", "20:00", "24:00"],
+                    data: [14, 13, 15, 17, 18, 19, 16],
+                    min: 6,
+                    max: 24,
+                  },
+                }}
               />
             </div>
 

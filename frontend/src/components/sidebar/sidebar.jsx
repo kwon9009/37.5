@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import Icon from "../icon/icon.jsx";
+import logo from "../icon/37.5.png";
 
 const NAV_ITEMS = [
   { key: "dashboard", to: "/dashboard", icon: "layout-dashboard", label: "대시보드" },
@@ -14,10 +15,8 @@ function Sidebar({ active = "dashboard" }) {
   return (
     <aside className="sidebar flex min-h-screen w-[240px] shrink-0 flex-col bg-[#1E2A3A]">
       <div className="sidebar__logo flex items-center gap-[10px] px-5 py-6">
-        <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-[#E60012]">
-          <Icon name="plus" size={18} className="text-white" />
-        </span>
-        <span className="text-base font-extrabold text-white">VITALGUARD</span>
+        <img src={logo} alt="37.5" className="h-7 w-7 object-contain" />
+        <span className="text-base font-extrabold text-white">37.5℃</span>
       </div>
 
       <nav className="sidebar__nav flex flex-col gap-[2px] py-3">

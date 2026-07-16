@@ -1,17 +1,30 @@
 import { useVitals } from "../../api/useVitals";
 
 function DevVitals() {
-  const vitals = useVitals("test-001");
+  const { vitals, status } = useVitals("test-001");
 
   return (
     <main className="app">
       <section className="panel">
         <p className="label">Patient test-001</p>
         <h1>Heart Rate</h1>
-        <div className="metric">
-          <span>{vitals?.heart_rate ?? "--"}</span>
-          <small>bpm</small>
-        </div>
+
+        {status === "loading" && <p className="label">연결 중...</p>}
+
+        {status === "error" && (
+          <p className="label" style={{ color: "#E0442E" }}>
+            서버 연결에 실패했습니다. 잠시 후 다시 시도해 주세요.
+          </p>
+        )}
+
+        {status === "connected" && vitals == null && <p className="label">수신된 데이터가 없습니다.</p>}
+
+        {status === "connected" && vitals != null && (
+          <div className="metric">
+            <span>{vitals.heart_rate ?? "--"}</span>
+            <small>bpm</small>
+          </div>
+        )}
       </section>
     </main>
   );

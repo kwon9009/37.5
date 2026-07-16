@@ -21,11 +21,11 @@ export const DEVICES = [
 
 export const USERS = [
   { id: "김도현", name: "김도현", email: "dohyun.kim@smc.kr", role: "시스템관리자", hospital: "서울중앙병원", lastLogin: "2026-07-02 09:14", active: true },
-  { id: "이수진", name: "이수진", email: "sujin.lee@hde.kr", role: "의사", hospital: "부산해운대병원", lastLogin: "2026-07-02 08:47", active: true },
-  { id: "박준영", name: "박준영", email: "jy.park@dcmc.kr", role: "의사", hospital: "대구가톨릭병원", lastLogin: "2026-07-01 21:03", active: true },
-  { id: "최민아", name: "최민아", email: "mina.choi@isb.kr", role: "간호사", hospital: "인천송도병원", lastLogin: "2026-07-02 07:20", active: true },
-  { id: "정하늘", name: "정하늘", email: "haneul.jung@gmd.kr", role: "간호사", hospital: "광주무등병원", lastLogin: "2026-06-30 18:55", active: false },
+  { id: "이수진", name: "이수진", email: "sujin.lee@hde.kr", role: "의료진", hospital: "부산해운대병원", lastLogin: "2026-07-02 08:47", active: true },
+  { id: "박준영", name: "박준영", email: "jy.park@dcmc.kr", role: "의료진", hospital: "대구가톨릭병원", lastLogin: "2026-07-01 21:03", active: true },
+  { id: "최민아", name: "최민아", email: "mina.choi@isb.kr", role: "의료진", hospital: "인천송도병원", lastLogin: "2026-07-02 07:20", active: true },
+  { id: "정하늘", name: "정하늘", email: "haneul.jung@gmd.kr", role: "의료진", hospital: "광주무등병원", lastLogin: "2026-06-30 18:55", active: false },
   { id: "한지우", name: "한지우", email: "jiwoo.han@djh.kr", role: "보호자", hospital: "대전한밭병원", lastLogin: "2026-07-02 06:10", active: true },
-  { id: "오세훈", name: "오세훈", email: "sehun.oh@uhd.kr", role: "의사", hospital: "울산현대병원", lastLogin: "2026-06-29 14:32", active: false },
+  { id: "오세훈", name: "오세훈", email: "sehun.oh@uhd.kr", role: "의료진", hospital: "울산현대병원", lastLogin: "2026-06-29 14:32", active: false },
   { id: "윤서아", name: "윤서아", email: "seoa.yoon@smc.kr", role: "시스템관리자", hospital: "서울중앙병원", lastLogin: "2026-07-02 09:01", active: true },
 ];

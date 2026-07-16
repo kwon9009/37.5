@@ -6,26 +6,20 @@ import PatientCard from "../../components/patient-card/patient-card.jsx";
 import Icon from "../../components/icon/icon.jsx";
 
 const KPIS = [
-  { label: "전체 환자", value: 42, color: "#1E2A3A", bg: "#FFFFFF" },
-  { label: "정상", value: 28, color: "#2FA35C", bg: "#FFFFFF" },
-  { label: "주의", value: 8, color: "#E8A13B", bg: "#FFFFFF" },
-  { label: "경고", value: 4, color: "#E8762B", bg: "#FFFFFF" },
-  { label: "응급", value: 2, color: "#E0442E", bg: "#FDEDEA" },
+  { key: "all", label: "전체 환자", value: 42, color: "#1E2A3A", bg: "#FFFFFF" },
+  { key: "normal", label: "정상", value: 28, color: "#2FA35C", bg: "#FFFFFF" },
+  { key: "caution", label: "주의", value: 8, color: "#E8A13B", bg: "#FFFFFF" },
+  { key: "warning", label: "경고", value: 4, color: "#E8762B", bg: "#FFFFFF" },
+  { key: "emergency", label: "응급", value: 2, color: "#E0442E", bg: "#FDEDEA" },
 ];
 
-const PATIENT_ROWS = [
-  [
-    { name: "정수빈", room: "305호 · B-3", severity: "emergency", heartRate: 118, respirationRate: 23, sensorStatus: "신호 이상", timestamp: "14:24:11" },
-    { name: "박민준", room: "302호 · A-4", severity: "warning", heartRate: 104, respirationRate: 21, sensorStatus: "연결됨", timestamp: "14:31:52" },
-  ],
-  [
-    { name: "최지우", room: "308호 · C-2", severity: "caution", heartRate: 88, respirationRate: 18, sensorStatus: "신호 약함", timestamp: "14:28:33" },
-    { name: "이영희", room: "302호 · A-2", severity: "normal", heartRate: 78, respirationRate: 16, sensorStatus: "연결됨", timestamp: "14:32:08" },
-  ],
-  [
-    { name: "김철수", room: "305호 · B-1", severity: "normal", heartRate: 72, respirationRate: 15, sensorStatus: "연결됨", timestamp: "14:32:05" },
-    { name: "한서연", room: "308호 · C-4", severity: "normal", heartRate: 69, respirationRate: 14, sensorStatus: "연결됨", timestamp: "14:31:47" },
-  ],
+const ALL_PATIENTS = [
+  { name: "정수빈", room: "305호 · B-3", severity: "emergency", heartRate: 118, respirationRate: 23, sensorStatus: "신호 이상", timestamp: "14:24:11" },
+  { name: "박민준", room: "302호 · A-4", severity: "warning", heartRate: 104, respirationRate: 21, sensorStatus: "연결됨", timestamp: "14:31:52" },
+  { name: "최지우", room: "308호 · C-2", severity: "caution", heartRate: 88, respirationRate: 18, sensorStatus: "신호 약함", timestamp: "14:28:33" },
+  { name: "이영희", room: "302호 · A-2", severity: "normal", heartRate: 78, respirationRate: 16, sensorStatus: "연결됨", timestamp: "14:32:08" },
+  { name: "김철수", room: "305호 · B-1", severity: "normal", heartRate: 72, respirationRate: 15, sensorStatus: "연결됨", timestamp: "14:32:05" },
+  { name: "한서연", room: "308호 · C-4", severity: "normal", heartRate: 69, respirationRate: 14, sensorStatus: "연결됨", timestamp: "14:31:47" },
 ];
 
 const RECENT_ALERTS = [
@@ -85,11 +79,15 @@ function ListPanel({ title, count, items }) {
 function Dashboard() {
   const navigate = useNavigate();
   const [now, setNow] = useState(() => new Date());
+  const [activeFilter, setActiveFilter] = useState("all");
 
   useEffect(() => {
     const interval = setInterval(() => setNow(new Date()), 1000);
     return () => clearInterval(interval);
   }, []);
+
+  const visiblePatients =
+    activeFilter === "all" ? ALL_PATIENTS : ALL_PATIENTS.filter((patient) => patient.severity === activeFilter);
 
   return (
     <div className="dashboard flex min-h-screen bg-[#F5F7FA]">
@@ -108,30 +106,50 @@ function Dashboard() {
           </div>
 
           <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
-            {KPIS.map((kpi) => (
-              <div
-                key={kpi.label}
-                className="flex overflow-hidden rounded-xl border border-[#DCE3EC] shadow-[0_2px_3px_rgba(30,42,58,0.08)]"
-                style={{ backgroundColor: kpi.bg }}
-              >
-                <span className="w-1 shrink-0" style={{ backgroundColor: kpi.color }} />
-                <div className="flex flex-col gap-2 p-6">
-                  <p className="text-xs font-bold tracking-wide text-[#5A6B80]">{kpi.label}</p>
-                  <p className="text-[32px] font-extrabold" style={{ color: kpi.color }}>
-                    {kpi.value}
-                  </p>
-                </div>
-              </div>
-            ))}
+            {KPIS.map((kpi) => {
+              const isActive = activeFilter === kpi.key;
+              return (
+                <button
+                  key={kpi.key}
+                  type="button"
+                  onClick={() => setActiveFilter(kpi.key)}
+                  aria-pressed={isActive}
+                  className={`flex overflow-hidden rounded-xl border text-left shadow-[0_2px_3px_rgba(30,42,58,0.08)] transition-shadow ${
+                    isActive ? "border-[#2B6FE3] ring-2 ring-[#2B6FE3]" : "border-[#DCE3EC]"
+                  }`}
+                  style={{ backgroundColor: kpi.bg }}
+                >
+                  <span className="w-1 shrink-0" style={{ backgroundColor: kpi.color }} />
+                  <div className="flex flex-col gap-2 p-6">
+                    <p className="text-xs font-bold tracking-wide text-[#5A6B80]">{kpi.label}</p>
+                    <p className="text-[32px] font-extrabold" style={{ color: kpi.color }}>
+                      {kpi.value}
+                    </p>
+                  </div>
+                </button>
+              );
+            })}
           </div>
 
-          <p className="text-xs font-semibold text-[#5A6B80]">↓ 응급도순 정렬 · 응급 → 경고 → 주의 → 정상</p>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="text-xs font-semibold text-[#5A6B80]">↓ 응급도순 정렬 · 응급 → 경고 → 주의 → 정상</p>
+            {activeFilter !== "all" && (
+              <button
+                type="button"
+                onClick={() => setActiveFilter("all")}
+                className="flex items-center gap-1 text-xs font-bold text-[#2B6FE3]"
+              >
+                <Icon name="x" size={12} />
+                {KPIS.find((kpi) => kpi.key === activeFilter)?.label} 필터 해제
+              </button>
+            )}
+          </div>
 
           <div className="flex flex-col gap-6 xl:flex-row">
             <div className="flex w-full flex-col gap-5">
-              {PATIENT_ROWS.map((row, index) => (
-                <div key={index} className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                  {row.map((patient) => (
+              {visiblePatients.length > 0 ? (
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  {visiblePatients.map((patient) => (
                     <PatientCard
                       key={patient.name}
                       {...patient}
@@ -139,7 +157,11 @@ function Dashboard() {
                     />
                   ))}
                 </div>
-              ))}
+              ) : (
+                <div className="flex flex-col items-center justify-center gap-2 rounded-xl border border-[#DCE3EC] bg-white p-10 text-center shadow-[0_2px_3px_rgba(30,42,58,0.08)]">
+                  <p className="text-sm font-semibold text-[#5A6B80]">해당 상태의 환자가 없습니다.</p>
+                </div>
+              )}
             </div>
 
             <div className="flex w-full flex-col gap-5 xl:w-[340px] xl:shrink-0">

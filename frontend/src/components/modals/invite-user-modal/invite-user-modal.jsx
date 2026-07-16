@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import Icon from "../../icon/icon.jsx";
 import { HOSPITALS } from "../../../data/admin.js";
 
-const ROLE_OPTIONS = ["시스템관리자", "의사", "간호사", "보호자"];
+const ROLE_OPTIONS = ["시스템관리자", "의료진", "보호자"];
 
 const INITIAL_FORM = { name: "", email: "", role: ROLE_OPTIONS[1], hospital: HOSPITALS[0]?.name ?? "" };
 

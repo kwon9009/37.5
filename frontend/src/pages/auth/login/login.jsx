@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import logo from "../../../components/icon/37.5.png";
 
 function Login() {
   const [hospitalId, setHospitalId] = useState("");
@@ -22,25 +23,8 @@ function Login() {
           <div className="login__divider h-px bg-[#DCE3EC]" />
           <form className="login__body flex flex-col gap-5 p-8" onSubmit={handleSubmit}>
             <div className="login__brand flex flex-col items-center gap-3">
-              <div className="login__brand-mark flex h-12 w-12 items-center justify-center rounded-xl bg-[#E60012]">
-                <svg
-                  aria-hidden="true"
-                  focusable="false"
-                  width="30"
-                  height="30"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  className="text-white"
-                >
-                  <path d="M5 12h14" />
-                  <path d="M12 5v14" />
-                </svg>
-              </div>
-              <p className="text-[22px] font-extrabold text-[#1E2A3A]">VITALGUARD</p>
+              <img src={logo} alt="37.5" className="h-12 w-12 object-contain" />
+              <p className="text-[22px] font-extrabold text-[#1E2A3A]">37.5℃</p>
               <p className="text-[13px] text-[#5A6B80]">비접촉 환자 모니터링 시스템</p>
             </div>
 
@@ -146,7 +130,7 @@ function Login() {
 
         <footer className="login__footer flex flex-col items-center gap-[6px] text-center">
           <p className="text-[11px] text-[#62666D]">병원 관계자 전용 시스템 · 무단 접근 금지</p>
-          <p className="font-mono text-[10px] text-[#62666D]">VITALGUARD · v2.4.1</p>
+          <p className="font-mono text-[10px] text-[#62666D]">37.5℃ · v2.4.1</p>
         </footer>
       </div>
     </main>

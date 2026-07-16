@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import Icon from "../icon/icon.jsx";
+import logo from "../icon/37.5.png";
 
 const NAV_ITEMS = [
   { key: "hospitals", to: "/admin/hospitals", icon: "building-2", label: "병원 관리" },
@@ -13,10 +14,8 @@ function AdminSidebar({ active = "hospitals" }) {
     <aside className="admin-sidebar flex min-h-screen w-[240px] shrink-0 flex-col bg-[#15111F]">
       <div className="admin-sidebar__logo flex flex-col gap-[10px] px-5 py-6">
         <div className="flex items-center gap-[10px]">
-          <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-[#7C5CFC]">
-            <Icon name="shield" size={16} className="text-white" />
-          </span>
-          <span className="text-base font-extrabold text-white">VITALGUARD</span>
+          <img src={logo} alt="37.5" className="h-7 w-7 object-contain" />
+          <span className="text-base font-extrabold text-white">37.5℃</span>
         </div>
         <span className="w-fit rounded px-[7px] py-[3px] font-mono text-[10px] font-extrabold tracking-wide text-[#7C5CFC]" style={{ backgroundColor: "#7C5CFC33" }}>
           ADMIN CONSOLE

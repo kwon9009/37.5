@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import HospitalSearchModal from "../../../components/modals/search-modal/search-modal.jsx";
+import logo from "../../../components/icon/37.5.png";
 
 function Signup() {
   const [departmentName, setDepartmentName] = useState("");
@@ -24,25 +25,8 @@ function Signup() {
 
         <form className="signup__body flex flex-col gap-5 p-8" onSubmit={handleSubmit}>
           <div className="signup__brand flex flex-col items-center gap-[10px]">
-            <div className="signup__brand-mark flex h-12 w-12 items-center justify-center rounded-xl bg-[#E60012]">
-              <svg
-                aria-hidden="true"
-                focusable="false"
-                width="30"
-                height="30"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                className="text-white"
-              >
-                <path d="M5 12h14" />
-                <path d="M12 5v14" />
-              </svg>
-            </div>
-            <p className="text-[22px] font-extrabold text-[#1E2A3A]">VITALGUARD</p>
+            <img src={logo} alt="37.5" className="h-12 w-12 object-contain" />
+            <p className="text-[22px] font-extrabold text-[#1E2A3A]">37.5℃</p>
             <p className="text-base font-bold text-[#1E2A3A]">병원 부서 회원가입</p>
             <p className="text-[13px] text-[#5A6B80]">부서 계정 정보를 입력해 주세요</p>
           </div>
@@ -255,7 +239,7 @@ function Signup() {
 
         <div className="signup__footer flex flex-col items-center gap-[6px] pt-5 pb-6 text-center">
           <p className="text-[11px] text-[#62666D]">병원 관계자 전용 시스템 · 무단 접근 금지</p>
-          <p className="font-mono text-[10px] text-[#62666D]">VITALGUARD · v2.4.1</p>
+          <p className="font-mono text-[10px] text-[#62666D]">37.5℃ · v2.4.1</p>
         </div>
       </section>
 

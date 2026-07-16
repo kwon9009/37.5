@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import Icon from "../../../components/icon/icon.jsx";
+import logo from "../../../components/icon/37.5.png";
 
 function AdminLogin() {
   const [adminId, setAdminId] = useState("");
@@ -22,10 +23,8 @@ function AdminLogin() {
 
         <form className="admin-login__body flex flex-col gap-5 p-8" onSubmit={handleSubmit}>
           <div className="admin-login__brand flex flex-col items-center gap-3">
-            <div className="admin-login__brand-mark flex h-12 w-12 items-center justify-center rounded-xl bg-[#7C5CFC]">
-              <Icon name="shield" size={30} className="text-white" />
-            </div>
-            <p className="text-[22px] font-extrabold text-[#1E2A3A]">VITALGUARD</p>
+            <img src={logo} alt="37.5" className="h-12 w-12 object-contain" />
+            <p className="text-[22px] font-extrabold text-[#1E2A3A]">37.5℃</p>
             <p className="text-[13px] text-[#5A6B80]">관리자 콘솔 전용 접근</p>
           </div>
 

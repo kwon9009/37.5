@@ -5,7 +5,7 @@ import Icon from "../../../components/icon/icon.jsx";
 import InviteUserModal from "../../../components/modals/invite-user-modal/invite-user-modal.jsx";
 import { USERS as INITIAL_USERS, HOSPITALS } from "../../../data/admin.js";
 
-const ROLES = ["시스템관리자", "의사", "간호사", "보호자"];
+const ROLES = ["시스템관리자", "의료진", "보호자"];
 const STATUS_TABS = ["전체", "활성", "비활성"];
 const PAGE_SIZE = 5;
 
