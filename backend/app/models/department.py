@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from sqlalchemy import ForeignKey, String, BigInteger
+from sqlalchemy import ForeignKey, String, BigInteger, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import BaseModel
@@ -16,6 +16,7 @@ if TYPE_CHECKING:
 
 class Department(BaseModel):
     __tablename__ = "departments"
+    __table_args__ = (UniqueConstraint("hospital_id", "name", name="uk_department_hospital_name"),)
 
     department_id: Mapped[int] = mapped_column(
         BigInteger, primary_key=True, autoincrement=True

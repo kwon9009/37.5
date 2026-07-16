@@ -1,3 +1,5 @@
+from app.models.admin import Admin
+from app.models.admin_hospital import AdminHospital
 from app.models.alert import Alert
 from app.models.department import Department
 from app.models.device import Device
