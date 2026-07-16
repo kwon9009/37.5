@@ -1,13 +1,16 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import HospitalSearchModal from "../../../components/modals/search-modal/search-modal.jsx";
+import PasswordStrengthMeter from "../../../components/password-strength-meter/password-strength-meter.jsx";
 import logo from "../../../components/icon/37.5.png";
 import { apiClient } from "../../../api/client.js";
+import { getPasswordStrength } from "../../../utils/password-strength.js";
 
 function Signup() {
   const [departmentName, setDepartmentName] = useState("");
   const [hospital, setHospital] = useState(null);
   const [departmentLoginId, setDepartmentLoginId] = useState("");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [isHospitalSearchOpen, setIsHospitalSearchOpen] = useState(false);
@@ -23,6 +26,14 @@ function Signup() {
       setError("소속 병원을 검색해서 선택해 주세요.");
       return;
     }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      setError("올바른 이메일 주소를 입력해 주세요.");
+      return;
+    }
+    if (!getPasswordStrength(password).isValid) {
+      setError("비밀번호가 조건을 충족하지 않습니다. (8자 이상, 영문/숫자/특수문자 중 2종류 이상)");
+      return;
+    }
     if (password !== confirmPassword) {
       setError("비밀번호가 일치하지 않습니다.");
       return;
@@ -35,6 +46,7 @@ function Signup() {
         area: hospital.area,
         department_name: departmentName,
         login_id: departmentLoginId,
+        email,
         password,
       });
 
@@ -185,6 +197,40 @@ function Signup() {
             </div>
 
             <div className="signup__field flex flex-col gap-[7px]">
+              <label htmlFor="email" className="text-xs font-bold tracking-wide text-[#5A6B80]">
+                이메일
+              </label>
+              <div className="signup__input flex h-12 items-center gap-[10px] rounded-lg border border-[#DCE3EC] px-[14px]">
+                <svg
+                  aria-hidden="true"
+                  focusable="false"
+                  width="18"
+                  height="18"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="shrink-0 text-[#5A6B80]"
+                >
+                  <rect width="20" height="16" x="2" y="4" rx="2" />
+                  <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
+                </svg>
+                <input
+                  id="email"
+                  name="email"
+                  type="email"
+                  autoComplete="email"
+                  placeholder="비밀번호 찾기 등에 사용할 이메일"
+                  value={email}
+                  onChange={(event) => setEmail(event.target.value)}
+                  className="w-full border-0 bg-transparent text-[15px] text-[#1E2A3A] placeholder:text-[#5A6B80] focus:outline-none"
+                />
+              </div>
+            </div>
+
+            <div className="signup__field flex flex-col gap-[7px]">
               <label htmlFor="password" className="text-xs font-bold tracking-wide text-[#5A6B80]">
                 비밀번호
               </label>
@@ -216,6 +262,7 @@ function Signup() {
                   className="w-full border-0 bg-transparent text-[15px] text-[#1E2A3A] placeholder:text-[#5A6B80] focus:outline-none"
                 />
               </div>
+              <PasswordStrengthMeter password={password} />
             </div>
 
             <div className="signup__field flex flex-col gap-[7px]">
@@ -257,7 +304,7 @@ function Signup() {
 
           <button
             type="submit"
-            disabled={isSubmitting}
+            disabled={isSubmitting || !getPasswordStrength(password).isValid}
             className="signup__submit h-[52px] w-full rounded-lg bg-[#2B6FE3] text-[15px] font-bold tracking-wide text-white transition-colors hover:bg-[#2560c9] disabled:cursor-not-allowed disabled:opacity-60"
           >
             {isSubmitting ? "가입 중..." : "회원가입"}
