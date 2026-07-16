@@ -9,6 +9,7 @@ from app.models.base import BaseModel
 from app.models.enums import UserRole
 
 if TYPE_CHECKING:
+    from app.models.admin import Admin
     from app.models.department import Department
     from app.models.guardian import Guardian
 
@@ -63,6 +64,13 @@ class User(BaseModel):
 
     guardian: Mapped["Guardian | None"] = relationship(
         "Guardian",
+        back_populates="user",
+        uselist=False,
+        passive_deletes=True,
+    )
+
+    admin: Mapped["Admin | None"] = relationship(
+        "Admin",
         back_populates="user",
         uselist=False,
         passive_deletes=True,

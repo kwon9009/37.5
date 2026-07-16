@@ -1,0 +1,159 @@
+-- 37.5 SmartCare DB 스키마 (source of truth)
+-- 이 저장소에 DDL 파일이 없어서 실제 DB(human_exe)에 적용된 내용을 기준으로 여기에 커밋해둠.
+-- DB 구조를 바꿀 때는 이 파일도 함께 수정할 것. (참고: docs/FRONTEND_DB_REQUESTS.md)
+
+CREATE DATABASE IF NOT EXISTS human_exe
+DEFAULT CHARACTER SET utf8mb4
+DEFAULT COLLATE utf8mb4_unicode_ci;
+USE human_exe;
+
+CREATE TABLE hospitals (
+    hospital_id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(50) NOT NULL,
+    area VARCHAR(20) NOT NULL,
+    hospital_code VARCHAR(50) NOT NULL UNIQUE,
+    UNIQUE KEY uk_hospital_name_area (name, area)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE users (
+ user_id BIGINT AUTO_INCREMENT PRIMARY KEY,
+ login_id VARCHAR(50) NOT NULL UNIQUE,
+ email VARCHAR(100) NULL UNIQUE, -- 2026-07-16 추가: 부서 계정 비밀번호 찾기용. 보호자 등은 아직 없어서 nullable
+ password VARCHAR(255) NOT NULL,
+ is_active BOOLEAN NOT NULL DEFAULT TRUE,
+ role ENUM('ADMIN','DEPARTMENT','GUARDIAN') NOT NULL,
+ created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+ updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE admins (
+ admin_id BIGINT AUTO_INCREMENT PRIMARY KEY,
+ user_id BIGINT NOT NULL UNIQUE,
+ name VARCHAR(20) NOT NULL,
+ email VARCHAR(50) NOT NULL,
+ phone VARCHAR(20) NOT NULL,
+ created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+ updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+ CONSTRAINT fk_admin_user FOREIGN KEY(user_id) REFERENCES users(user_id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE admin_hospitals (
+    admin_hospital_id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    admin_id BIGINT NOT NULL,
+    hospital_id BIGINT NOT NULL,
+    UNIQUE KEY uk_admin_hospital (admin_id, hospital_id),
+    FOREIGN KEY(admin_id) REFERENCES admins(admin_id) ON DELETE CASCADE,
+    FOREIGN KEY(hospital_id) REFERENCES hospitals(hospital_id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE departments (
+ department_id BIGINT AUTO_INCREMENT PRIMARY KEY,
+ hospital_id BIGINT NOT NULL,
+ user_id BIGINT NOT NULL UNIQUE,
+ name VARCHAR(20) NOT NULL,
+ created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+ updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+ UNIQUE KEY uk_department_hospital_name (hospital_id, name),
+ CONSTRAINT fk_department_hospital FOREIGN KEY(hospital_id) REFERENCES hospitals(hospital_id) ON DELETE CASCADE,
+ CONSTRAINT fk_department_user FOREIGN KEY(user_id) REFERENCES users(user_id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE guardians (
+ guardian_id BIGINT AUTO_INCREMENT PRIMARY KEY,
+ user_id BIGINT NOT NULL UNIQUE,
+ name VARCHAR(20) NOT NULL,
+ phone VARCHAR(20) NOT NULL,
+ created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+ updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+ CONSTRAINT fk_guardian_user FOREIGN KEY(user_id) REFERENCES users(user_id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE patients (
+ patient_id BIGINT AUTO_INCREMENT PRIMARY KEY,
+ department_id BIGINT NOT NULL,
+ patient_no VARCHAR(20) NOT NULL UNIQUE,
+ name VARCHAR(20) NOT NULL,
+ birthdate DATE NOT NULL,
+ gender ENUM('MALE','FEMALE') NOT NULL,
+ ward VARCHAR(20) NOT NULL,
+ room_num INT NOT NULL,
+ bed_num INT NOT NULL,
+ special_notes TEXT NOT NULL,
+ status ENUM('ADMITTED','DISCHARGED') NOT NULL,
+ admission_date DATE NOT NULL,
+ discharge_date DATE NULL,
+ created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+ updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+ CONSTRAINT fk_patient_department FOREIGN KEY(department_id) REFERENCES departments(department_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE patient_guardians (
+ patient_guardian_id BIGINT AUTO_INCREMENT PRIMARY KEY,
+ patient_id BIGINT NOT NULL,
+ guardian_id BIGINT NOT NULL,
+ relation VARCHAR(20) NOT NULL,
+ UNIQUE KEY uk_patient_guardian (patient_id, guardian_id),
+ FOREIGN KEY(patient_id) REFERENCES patients(patient_id) ON DELETE CASCADE,
+ FOREIGN KEY(guardian_id) REFERENCES guardians(guardian_id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE devices (
+ device_id BIGINT AUTO_INCREMENT PRIMARY KEY,
+ patient_id BIGINT NOT NULL,
+ status ENUM('ACTIVE','OFFLINE','ERROR') NOT NULL,
+ serial_num VARCHAR(20) NOT NULL UNIQUE,
+ created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+ updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+ FOREIGN KEY(patient_id) REFERENCES patients(patient_id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE vital_checks (
+ vital_check_id BIGINT AUTO_INCREMENT PRIMARY KEY,
+ patient_id BIGINT NOT NULL,
+ heart_rate INT NOT NULL,
+ resp_rate INT NOT NULL,
+ status ENUM('NORMAL','WARNING','DANGER') NOT NULL,
+ created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+ updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+ FOREIGN KEY(patient_id) REFERENCES patients(patient_id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE vital_logs (
+ vital_log_id BIGINT AUTO_INCREMENT PRIMARY KEY,
+ patient_id BIGINT NOT NULL,
+ avg_heart_rate INT NOT NULL,
+ avg_resp_rate INT NOT NULL,
+ recorded_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+ FOREIGN KEY(patient_id) REFERENCES patients(patient_id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE emergency_logs (
+ emergency_log_id BIGINT AUTO_INCREMENT PRIMARY KEY,
+ patient_id BIGINT NOT NULL,
+ heart_rate INT NOT NULL,
+ resp_rate INT NOT NULL,
+ event_type VARCHAR(50) NOT NULL,
+ created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+ FOREIGN KEY(patient_id) REFERENCES patients(patient_id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE alerts (
+ alert_id BIGINT AUTO_INCREMENT PRIMARY KEY,
+ patient_id BIGINT NOT NULL,
+ department_id BIGINT NULL,
+ guardian_id BIGINT NULL,
+ message VARCHAR(100) NOT NULL,
+ is_read BOOLEAN NOT NULL DEFAULT FALSE,
+ sent_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+ FOREIGN KEY(patient_id) REFERENCES patients(patient_id) ON DELETE CASCADE,
+ FOREIGN KEY(department_id) REFERENCES departments(department_id) ON DELETE SET NULL,
+ FOREIGN KEY(guardian_id) REFERENCES guardians(guardian_id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+INSERT INTO hospitals(name, area, hospital_code)
+VALUES
+('서울대학교병원','서울','SNUH'),
+('삼성서울병원','서울','SSMC'),
+('대전병원','대전','DJH'),
+('부산대학교병원','부산','PNUH'),
+('전남대학교병원','광주','CNUH');
