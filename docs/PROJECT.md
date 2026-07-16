@@ -10,11 +10,15 @@ CLAUDE.md는 짧은 지침서이고, 이 파일은 자세한 배경입니다.
   병원 대시보드에 붉은 팝업+경보 -> 보호자에게 푸시/문자 -> 119 호출·상급병원 이송(골든타임 4분 내).
 
 ## 2. ERD 테이블 (요약)
-hospitals, departments, patients, guardians, relationships(환자<->보호자 다대다),
-alerts, devices, vital_checks(현재 상태), vital_logs(1분 평균 이력), emergency_logs(응급 정밀 로그).
+hospitals, admins, admin_hospitals, departments, patients, guardians,
+patient_guardians(환자<->보호자 다대다), alerts, devices, vital_checks(현재 상태),
+vital_logs(1분 평균 이력), emergency_logs(응급 정밀 로그).
 - 낙상 이벤트는 emergency_logs.event_type = "FALL" 로 저장(심박 이상과 구분).
 - 로그 테이블엔 (patient_id, created_at) 인덱스 권장.
 - ERD/플로우차트/시나리오 원본 이미지는 이 docs/ 폴더에 넣어두세요.
+- **실제 DDL/컬럼 단위 스키마는 저장소에 올리지 않고 노션에서 관리함.** 프론트 작업 중 필요해서
+  바뀐 내용(예: users.email 추가, admins/admin_hospitals 모델 반영)이 있으면 노션 스키마 문서를
+  갱신할 것 — 자세한 변경 이력은 대화/커밋 로그 참고, 별도 md 파일로 저장소에 남기지 않는다.
 
 ## 3. 하드웨어 상세 세팅
 ### MR60BHA2 (심박·호흡)
