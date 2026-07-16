@@ -62,3 +62,33 @@ h1 {
   color: #60717d;
   font-size: 18px;
 }
+
+@keyframes emergency-screen-blink {
+  0%,
+  100% {
+    background-color: #7a1414;
+  }
+  50% {
+    background-color: #e0442e;
+  }
+}
+
+@keyframes emergency-screen-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.08);
+    opacity: 0.75;
+  }
+}
+
+.emergency-screening-overlay {
+  animation: emergency-screen-blink 1s ease-in-out infinite;
+}
+
+.emergency-screening-overlay__icon {
+  animation: emergency-screen-pulse 1s ease-in-out infinite;
+}

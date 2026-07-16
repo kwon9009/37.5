@@ -22,6 +22,8 @@ class Hospital(Base):
 
     area: Mapped[str] = mapped_column(String(20), nullable=False)
 
+    hospital_code: Mapped[str] = mapped_column(String(50), nullable=False)
+
     # Relationship
     departments: Mapped[list["Department"]] = relationship(
         "Department",

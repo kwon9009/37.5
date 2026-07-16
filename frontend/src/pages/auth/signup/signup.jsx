@@ -1,18 +1,49 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import HospitalSearchModal from "../../../components/modals/search-modal/search-modal.jsx";
 import logo from "../../../components/icon/37.5.png";
+import { apiClient } from "../../../api/client.js";
 
 function Signup() {
   const [departmentName, setDepartmentName] = useState("");
-  const [hospital, setHospital] = useState("");
+  const [hospital, setHospital] = useState(null);
   const [departmentLoginId, setDepartmentLoginId] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [isHospitalSearchOpen, setIsHospitalSearchOpen] = useState(false);
+  const [error, setError] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const navigate = useNavigate();
 
-  const handleSubmit = (event) => {
+  const handleSubmit = async (event) => {
     event.preventDefault();
+    setError("");
+
+    if (!hospital) {
+      setError("소속 병원을 검색해서 선택해 주세요.");
+      return;
+    }
+    if (password !== confirmPassword) {
+      setError("비밀번호가 일치하지 않습니다.");
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      await apiClient.post("/auth/register/department", {
+        hospital_name: hospital.name,
+        area: hospital.area,
+        department_name: departmentName,
+        login_id: departmentLoginId,
+        password,
+      });
+
+      navigate("/login", { state: { registered: true } });
+    } catch (err) {
+      setError(err.response?.data?.detail ?? "회원가입 중 오류가 발생했습니다.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -95,7 +126,7 @@ function Signup() {
                     <path d="m21 21-4.3-4.3" />
                   </svg>
                   <span className={`text-[15px] ${hospital ? "text-[#1E2A3A]" : "text-[#5A6B80]"}`}>
-                    {hospital || "병원명 또는 주소로 검색"}
+                    {hospital ? hospital.name : "병원명 또는 주소로 검색"}
                   </span>
                 </span>
                 <svg
@@ -222,11 +253,14 @@ function Signup() {
             </div>
           </div>
 
+          {error && <p className="signup__error text-xs font-semibold text-[#E0435D]">{error}</p>}
+
           <button
             type="submit"
-            className="signup__submit h-[52px] w-full rounded-lg bg-[#2B6FE3] text-[15px] font-bold tracking-wide text-white transition-colors hover:bg-[#2560c9]"
+            disabled={isSubmitting}
+            className="signup__submit h-[52px] w-full rounded-lg bg-[#2B6FE3] text-[15px] font-bold tracking-wide text-white transition-colors hover:bg-[#2560c9] disabled:cursor-not-allowed disabled:opacity-60"
           >
-            회원가입
+            {isSubmitting ? "가입 중..." : "회원가입"}
           </button>
 
           <p className="signup__back-to-login flex items-center justify-center gap-1 text-[13px]">

@@ -1,24 +1,19 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-
-const HOSPITALS = [
-  { name: "서울중앙병원", address: "서울특별시 중구 세종대로 110", region: "수도권" },
-  { name: "인천송도병원", address: "인천광역시 연수구 송도과학로 32", region: "수도권" },
-  { name: "대전한밭병원", address: "대전광역시 서구 둔산로 100", region: "충청권" },
-  { name: "대구가톨릭병원", address: "대구광역시 남구 명덕로 258", region: "영남권" },
-  { name: "부산해운대병원", address: "부산광역시 해운대구 centum중앙로 55", region: "영남권" },
-  { name: "광주무등병원", address: "광주광역시 동구 무등로 240", region: "호남권" },
-  { name: "울산현대병원", address: "울산광역시 남구 삼산로 83", region: "영남권" },
-];
+import { apiClient } from "../../../api/client.js";
 
 function HospitalSearchModal({ isOpen, onClose, onSelect }) {
   const [query, setQuery] = useState("");
+  const [results, setResults] = useState([]);
+  const [status, setStatus] = useState("idle"); // "idle" | "loading" | "done" | "error"
   const searchInputRef = useRef(null);
   const navigate = useNavigate();
 
   useEffect(() => {
     if (isOpen) {
       setQuery("");
+      setResults([]);
+      setStatus("idle");
       searchInputRef.current?.focus();
     }
   }, [isOpen]);
@@ -32,9 +27,33 @@ function HospitalSearchModal({ isOpen, onClose, onSelect }) {
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, [isOpen, onClose]);
 
-  if (!isOpen) return null;
+  useEffect(() => {
+    if (!isOpen) return;
+    const trimmed = query.trim();
+    if (trimmed === "") {
+      setResults([]);
+      setStatus("idle");
+      return;
+    }
 
-  const normalizedQuery = query.trim().toLowerCase();
+    setStatus("loading");
+    const timeoutId = setTimeout(() => {
+      apiClient
+        .get("/hospitals", { params: { query: trimmed } })
+        .then(({ data }) => {
+          setResults(data);
+          setStatus("done");
+        })
+        .catch(() => {
+          setResults([]);
+          setStatus("error");
+        });
+    }, 300);
+
+    return () => clearTimeout(timeoutId);
+  }, [isOpen, query]);
+
+  if (!isOpen) return null;
 
   return (
     <div
@@ -97,37 +116,41 @@ function HospitalSearchModal({ isOpen, onClose, onSelect }) {
           <input
             ref={searchInputRef}
             type="text"
-            placeholder="병원명, 지역, 주소로 검색"
+            placeholder="병원명으로 검색"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             className="w-full border-0 bg-transparent text-[15px] text-[#1E2A3A] placeholder:text-[#5A6B80] focus:outline-none"
           />
         </div>
         <p className="search-modal__helper -mt-2 text-xs text-[#5A6B80]">
-          병원명, 지역, 주소로 검색할 수 있어요
+          병원명으로 검색할 수 있어요
         </p>
 
         <ul className="search-modal__results flex flex-col overflow-y-auto rounded-xl border border-[#DCE3EC]">
-          {HOSPITALS.map((hospital, index) => {
-            const isMatch = normalizedQuery !== "" && hospital.name.toLowerCase().includes(normalizedQuery);
-            return (
-              <li key={hospital.name} className={index > 0 ? "border-t border-[#DCE3EC]" : ""}>
+          {status === "idle" && (
+            <li className="px-4 py-8 text-center text-sm text-[#5A6B80]">검색어를 입력해 주세요.</li>
+          )}
+          {status === "loading" && (
+            <li className="px-4 py-8 text-center text-sm text-[#5A6B80]">검색 중...</li>
+          )}
+          {status === "error" && (
+            <li className="px-4 py-8 text-center text-sm text-[#E0435D]">검색 중 오류가 발생했습니다.</li>
+          )}
+          {status === "done" && results.length === 0 && (
+            <li className="px-4 py-8 text-center text-sm text-[#5A6B80]">일치하는 병원이 없습니다.</li>
+          )}
+          {status === "done" &&
+            results.map((hospital, index) => (
+              <li key={hospital.hospital_id} className={index > 0 ? "border-t border-[#DCE3EC]" : ""}>
                 <button
                   type="button"
                   onClick={() => {
-                    onSelect(hospital.name);
+                    onSelect(hospital);
                     onClose();
                   }}
-                  className={`flex w-full items-center gap-3 px-4 py-3 text-left ${
-                    isMatch ? "bg-[#EAF1FD]" : "bg-white hover:bg-[#F5F7FA]"
-                  }`}
+                  className="flex w-full items-center gap-3 px-4 py-3 text-left bg-white hover:bg-[#F5F7FA]"
                 >
-                  <span className={`h-9 w-1 shrink-0 rounded-sm ${isMatch ? "bg-[#2B6FE3]" : "bg-transparent"}`} />
-                  <span
-                    className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${
-                      isMatch ? "bg-[#D6E4FB] text-[#2B6FE3]" : "bg-[#EDF1F6] text-[#5A6B80]"
-                    }`}
-                  >
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#EDF1F6] text-[#5A6B80]">
                     <svg
                       aria-hidden="true"
                       focusable="false"
@@ -151,15 +174,13 @@ function HospitalSearchModal({ isOpen, onClose, onSelect }) {
                   </span>
                   <span className="flex min-w-0 flex-1 flex-col gap-[2px]">
                     <span className="truncate text-sm font-bold text-[#1E2A3A]">{hospital.name}</span>
-                    <span className="truncate text-xs text-[#5A6B80]">{hospital.address}</span>
                   </span>
                   <span className="shrink-0 rounded-full bg-[#EDF1F6] px-[10px] py-1 text-[11px] font-bold text-[#5A6B80]">
-                    {hospital.region}
+                    {hospital.area}
                   </span>
                 </button>
               </li>
-            );
-          })}
+            ))}
         </ul>
 
         <p className="search-modal__footer flex items-center justify-center gap-1 pt-1 text-xs">
@@ -172,7 +193,7 @@ function HospitalSearchModal({ isOpen, onClose, onSelect }) {
             }}
             className="font-bold text-[#2B6FE3] hover:underline"
           >
-            병원 코드로 직접 등록하기
+            병원 직접 등록하기
           </button>
         </p>
       </div>

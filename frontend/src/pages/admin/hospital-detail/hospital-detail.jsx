@@ -4,12 +4,11 @@ import AdminSidebar from "../../../components/admin-sidebar/admin-sidebar.jsx";
 import AdminHeader from "../../../components/admin-header/admin-header.jsx";
 import Icon from "../../../components/icon/icon.jsx";
 import StatusBadge from "../../../components/status-badge/status-badge.jsx";
+import AddHospitalModal from "../../../components/modals/add-hospital-modal/add-hospital-modal.jsx";
 
-const KPIS = [
-  { label: "총 병상 수", value: 820, accent: "#1E2A3A" },
+const OTHER_KPIS = [
   { label: "연결 장치", value: 342, accent: "#2B6FE3" },
   { label: "재실 환자", value: 705, accent: "#2FA35C" },
-  { label: "낙상 위험 환자", value: 6, accent: "#E8A13B" },
 ];
 
 const WARDS = [
@@ -35,8 +34,24 @@ const RECENT_ACTIVITY = [
 
 function HospitalDetail() {
   const { hospitalId } = useParams();
-  const hospitalName = hospitalId ? decodeURIComponent(hospitalId) : "서울중앙병원";
+  const initialName = hospitalId ? decodeURIComponent(hospitalId) : "서울중앙병원";
   const [active, setActive] = useState(true);
+  const [isEditOpen, setIsEditOpen] = useState(false);
+  const [hospitalInfo, setHospitalInfo] = useState({
+    name: initialName,
+    region: "수도권",
+    beds: 820,
+    manager: "김도현",
+  });
+
+  const kpis = [
+    { label: "총 병상 수", value: hospitalInfo.beds, accent: "#1E2A3A" },
+    ...OTHER_KPIS,
+  ];
+
+  const handleEditSubmit = (form) => {
+    setHospitalInfo({ name: form.name, region: form.region, beds: form.beds, manager: form.manager });
+  };
 
   return (
     <div className="hospital-detail flex min-h-screen bg-[#F5F7FA]">
@@ -58,10 +73,10 @@ function HospitalDetail() {
               </span>
               <div className="flex flex-col gap-2">
                 <div className="flex flex-wrap items-center gap-[10px]">
-                  <p className="text-2xl font-bold text-[#1E2A3A]">{hospitalName}</p>
+                  <p className="text-2xl font-bold text-[#1E2A3A]">{hospitalInfo.name}</p>
                   <span className="flex items-center gap-[6px] rounded-full bg-[#EDF1F6] px-[10px] py-1">
                     <Icon name="map-pin" size={12} className="text-[#5A6B80]" />
-                    <span className="text-xs font-bold text-[#5A6B80]">수도권 · 서울</span>
+                    <span className="text-xs font-bold text-[#5A6B80]">{hospitalInfo.region}</span>
                   </span>
                   <StatusBadge severity={active ? "normal" : "offline"} label={active ? "활성" : "비활성"} />
                 </div>
@@ -79,6 +94,7 @@ function HospitalDetail() {
             <div className="flex shrink-0 gap-[10px]">
               <button
                 type="button"
+                onClick={() => setIsEditOpen(true)}
                 className="flex h-10 items-center gap-2 rounded-lg bg-[#2B6FE3] px-4 text-[13px] font-bold text-white"
               >
                 <Icon name="pencil" size={16} className="text-white" />
@@ -98,7 +114,7 @@ function HospitalDetail() {
           <div className="flex flex-col gap-6 xl:flex-row">
             <div className="flex w-full flex-col gap-5">
               <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-                {KPIS.map((kpi) => (
+                {kpis.map((kpi) => (
                   <div
                     key={kpi.label}
                     className="flex overflow-hidden rounded-xl border border-[#DCE3EC] bg-white shadow-[0_2px_3px_rgba(30,42,58,0.08)]"
@@ -175,10 +191,10 @@ function HospitalDetail() {
                 <div className="flex flex-col gap-3 p-4">
                   <div className="flex items-center gap-3">
                     <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-[#DCE3EC] bg-[#EDF1F6] text-base font-bold text-[#1E2A3A]">
-                      김
+                      {hospitalInfo.manager.slice(0, 1)}
                     </span>
                     <div className="flex flex-col gap-[3px]">
-                      <p className="text-[15px] font-bold text-[#1E2A3A]">김도현</p>
+                      <p className="text-[15px] font-bold text-[#1E2A3A]">{hospitalInfo.manager}</p>
                       <p className="text-xs text-[#5A6B80]">병원 관리자</p>
                     </div>
                   </div>
@@ -260,6 +276,14 @@ function HospitalDetail() {
           </div>
         </div>
       </div>
+
+      <AddHospitalModal
+        isOpen={isEditOpen}
+        onClose={() => setIsEditOpen(false)}
+        onSubmit={handleEditSubmit}
+        mode="edit"
+        initialValues={hospitalInfo}
+      />
     </div>
   );
 }

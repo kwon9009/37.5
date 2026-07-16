@@ -3,18 +3,19 @@ import Icon from "../../icon/icon.jsx";
 
 const REGION_OPTIONS = ["수도권", "영남권", "호남권", "충청권", "강원권", "제주권"];
 
-const INITIAL_FORM = { name: "", region: REGION_OPTIONS[0], beds: "", manager: "" };
+const EMPTY_FORM = { name: "", region: REGION_OPTIONS[0], beds: "", manager: "" };
 
-function AddHospitalModal({ isOpen, onClose, onSubmit }) {
-  const [form, setForm] = useState(INITIAL_FORM);
+function AddHospitalModal({ isOpen, onClose, onSubmit, mode = "add", initialValues }) {
+  const isEdit = mode === "edit";
+  const [form, setForm] = useState(EMPTY_FORM);
   const [error, setError] = useState("");
 
   useEffect(() => {
     if (isOpen) {
-      setForm(INITIAL_FORM);
+      setForm(isEdit && initialValues ? { ...EMPTY_FORM, ...initialValues } : EMPTY_FORM);
       setError("");
     }
-  }, [isOpen]);
+  }, [isOpen, isEdit, initialValues]);
 
   if (!isOpen) return null;
 
@@ -44,7 +45,7 @@ function AddHospitalModal({ isOpen, onClose, onSubmit }) {
       >
         <div className="flex items-center justify-between">
           <h2 id="addHospitalTitle" className="text-xl font-bold text-[#1E2A3A]">
-            병원 추가
+            {isEdit ? "병원 정보 수정" : "병원 추가"}
           </h2>
           <button
             type="button"
@@ -56,7 +57,9 @@ function AddHospitalModal({ isOpen, onClose, onSubmit }) {
           </button>
         </div>
 
-        <p className="-mt-3 text-[13px] text-[#5A6B80]">새로 등록할 병원의 기본 정보를 입력하세요</p>
+        <p className="-mt-3 text-[13px] text-[#5A6B80]">
+          {isEdit ? "병원의 기본 정보를 수정하세요" : "새로 등록할 병원의 기본 정보를 입력하세요"}
+        </p>
 
         <div className="flex flex-col gap-2">
           <label htmlFor="hospitalName" className="text-xs font-bold tracking-wide text-[#5A6B80]">
@@ -131,7 +134,7 @@ function AddHospitalModal({ isOpen, onClose, onSubmit }) {
             취소
           </button>
           <button type="button" onClick={handleSubmit} className="rounded-lg bg-[#2B6FE3] px-5 py-[10px] text-sm font-bold text-white">
-            등록
+            {isEdit ? "저장" : "등록"}
           </button>
         </div>
       </div>
