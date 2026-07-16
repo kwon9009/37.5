@@ -1,16 +1,27 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import logo from "../../../components/icon/37.5.png";
+import { useHospitalRequestStore } from "../../../store/hospital-request-store.js";
 
 function HospitalCodeRegister() {
-  const [departmentName, setDepartmentName] = useState("");
-  const [hospitalCode, setHospitalCode] = useState("");
-  const [departmentLoginId, setDepartmentLoginId] = useState("");
-  const [password, setPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
+  const [hospitalName, setHospitalName] = useState("");
+  const [area, setArea] = useState("");
+  const [address, setAddress] = useState("");
+  const [error, setError] = useState("");
+  const navigate = useNavigate();
+  const submitRequest = useHospitalRequestStore((state) => state.submitRequest);
 
   const handleSubmit = (event) => {
     event.preventDefault();
+    setError("");
+
+    if (!hospitalName.trim() || !area.trim() || !address.trim()) {
+      setError("병원명, 지역, 주소를 모두 입력해 주세요.");
+      return;
+    }
+
+    submitRequest({ hospitalName: hospitalName.trim(), area: area.trim(), address: address.trim() });
+    navigate("/login", { state: { hospitalRequested: true } });
   };
 
   return (
@@ -25,14 +36,14 @@ function HospitalCodeRegister() {
           <div className="hospital-code-register__brand flex flex-col items-center gap-[10px]">
             <img src={logo} alt="37.5" className="h-12 w-12 object-contain" />
             <p className="text-[22px] font-extrabold text-[#1E2A3A]">37.5℃</p>
-            <p className="text-base font-bold text-[#1E2A3A]">병원 코드로 등록하기</p>
-            <p className="text-[13px] text-[#5A6B80]">본사에서 발급받은 병원 코드를 입력해 주세요</p>
+            <p className="text-base font-bold text-[#1E2A3A]">병원 직접 등록하기</p>
+            <p className="text-[13px] text-[#5A6B80]">검색 목록에 없는 병원의 정보를 입력해 등록을 요청해 주세요</p>
           </div>
 
           <div className="hospital-code-register__fields flex flex-col gap-4">
             <div className="hospital-code-register__field flex flex-col gap-[7px]">
-              <label htmlFor="departmentName" className="text-xs font-bold tracking-wide text-[#5A6B80]">
-                부서명
+              <label htmlFor="hospitalName" className="text-xs font-bold tracking-wide text-[#5A6B80]">
+                병원명
               </label>
               <div className="hospital-code-register__input flex h-12 items-center gap-[10px] rounded-lg border border-[#DCE3EC] px-[14px]">
                 <svg
@@ -48,26 +59,29 @@ function HospitalCodeRegister() {
                   strokeLinejoin="round"
                   className="shrink-0 text-[#5A6B80]"
                 >
-                  <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
-                  <circle cx="9" cy="7" r="4" />
-                  <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
-                  <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+                  <path d="M6 22V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v18Z" />
+                  <path d="M6 12H4a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h2" />
+                  <path d="M18 9h2a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1h-2" />
+                  <path d="M10 6h4" />
+                  <path d="M10 10h4" />
+                  <path d="M10 14h4" />
+                  <path d="M10 18h4" />
                 </svg>
                 <input
-                  id="departmentName"
-                  name="departmentName"
+                  id="hospitalName"
+                  name="hospitalName"
                   type="text"
-                  placeholder="예: 응급의학과"
-                  value={departmentName}
-                  onChange={(event) => setDepartmentName(event.target.value)}
+                  placeholder="예: 서울중앙병원"
+                  value={hospitalName}
+                  onChange={(event) => setHospitalName(event.target.value)}
                   className="w-full border-0 bg-transparent text-[15px] text-[#1E2A3A] placeholder:text-[#5A6B80] focus:outline-none"
                 />
               </div>
             </div>
 
             <div className="hospital-code-register__field flex flex-col gap-[7px]">
-              <label htmlFor="hospitalCode" className="text-xs font-bold tracking-wide text-[#5A6B80]">
-                병원 코드
+              <label htmlFor="area" className="text-xs font-bold tracking-wide text-[#5A6B80]">
+                지역
               </label>
               <div className="hospital-code-register__input flex h-12 items-center gap-[10px] rounded-lg border border-[#DCE3EC] px-[14px]">
                 <svg
@@ -83,61 +97,25 @@ function HospitalCodeRegister() {
                   strokeLinejoin="round"
                   className="shrink-0 text-[#5A6B80]"
                 >
-                  <path d="M2.586 17.414A2 2 0 0 0 2 18.828V21a1 1 0 0 0 1 1h3a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h1a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h.172a2 2 0 0 0 1.414-.586l.814-.814a6.5 6.5 0 1 0-4-4z" />
-                  <circle cx="16.5" cy="7.5" r=".5" fill="currentColor" />
+                  <path d="M14.106 5.553a2 2 0 0 0 1.788 0l3.659-1.83A1 1 0 0 1 21 4.619v12.764a1 1 0 0 1-.553.894l-4.553 2.277a2 2 0 0 1-1.788 0l-4.212-2.106a2 2 0 0 0-1.788 0l-3.659 1.83A1 1 0 0 1 3 19.381V6.618a1 1 0 0 1 .553-.894l4.553-2.277a2 2 0 0 1 1.788 0z" />
+                  <path d="M15 5.764v15" />
+                  <path d="M9 3.236v15" />
                 </svg>
                 <input
-                  id="hospitalCode"
-                  name="hospitalCode"
+                  id="area"
+                  name="area"
                   type="text"
-                  placeholder="예: VG-2024-XXXX"
-                  value={hospitalCode}
-                  onChange={(event) => setHospitalCode(event.target.value.toUpperCase())}
-                  className="w-full border-0 bg-transparent text-[15px] uppercase text-[#1E2A3A] placeholder:normal-case placeholder:text-[#5A6B80] focus:outline-none"
-                />
-              </div>
-            </div>
-
-            <div className="hospital-code-register__field flex flex-col gap-[7px]">
-              <label htmlFor="departmentLoginId" className="text-xs font-bold tracking-wide text-[#5A6B80]">
-                부서 아이디
-              </label>
-              <div className="hospital-code-register__input flex h-12 items-center gap-[10px] rounded-lg border border-[#DCE3EC] px-[14px]">
-                <svg
-                  aria-hidden="true"
-                  focusable="false"
-                  width="18"
-                  height="18"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  className="shrink-0 text-[#5A6B80]"
-                >
-                  <rect x="2" y="5" width="20" height="14" rx="2" />
-                  <path d="M6.17 15a3 3 0 0 1 5.66 0" />
-                  <circle cx="9" cy="11" r="2" />
-                  <path d="M16 10h2" />
-                  <path d="M16 14h2" />
-                </svg>
-                <input
-                  id="departmentLoginId"
-                  name="departmentLoginId"
-                  type="text"
-                  autoComplete="username"
-                  placeholder="로그인에 사용할 아이디"
-                  value={departmentLoginId}
-                  onChange={(event) => setDepartmentLoginId(event.target.value)}
+                  placeholder="예: 서울"
+                  value={area}
+                  onChange={(event) => setArea(event.target.value)}
                   className="w-full border-0 bg-transparent text-[15px] text-[#1E2A3A] placeholder:text-[#5A6B80] focus:outline-none"
                 />
               </div>
             </div>
 
             <div className="hospital-code-register__field flex flex-col gap-[7px]">
-              <label htmlFor="password" className="text-xs font-bold tracking-wide text-[#5A6B80]">
-                비밀번호
+              <label htmlFor="address" className="text-xs font-bold tracking-wide text-[#5A6B80]">
+                병원 주소
               </label>
               <div className="hospital-code-register__input flex h-12 items-center gap-[10px] rounded-lg border border-[#DCE3EC] px-[14px]">
                 <svg
@@ -153,74 +131,34 @@ function HospitalCodeRegister() {
                   strokeLinejoin="round"
                   className="shrink-0 text-[#5A6B80]"
                 >
-                  <rect width="18" height="11" x="3" y="11" rx="2" ry="2" />
-                  <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                  <path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0" />
+                  <circle cx="12" cy="10" r="3" />
                 </svg>
                 <input
-                  id="password"
-                  name="password"
-                  type="password"
-                  autoComplete="new-password"
-                  placeholder="비밀번호"
-                  value={password}
-                  onChange={(event) => setPassword(event.target.value)}
-                  className="w-full border-0 bg-transparent text-[15px] text-[#1E2A3A] placeholder:text-[#5A6B80] focus:outline-none"
-                />
-              </div>
-            </div>
-
-            <div className="hospital-code-register__field flex flex-col gap-[7px]">
-              <label htmlFor="confirmPassword" className="text-xs font-bold tracking-wide text-[#5A6B80]">
-                비밀번호 확인
-              </label>
-              <div className="hospital-code-register__input flex h-12 items-center gap-[10px] rounded-lg border border-[#DCE3EC] px-[14px]">
-                <svg
-                  aria-hidden="true"
-                  focusable="false"
-                  width="18"
-                  height="18"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  className="shrink-0 text-[#5A6B80]"
-                >
-                  <rect width="18" height="11" x="3" y="11" rx="2" ry="2" />
-                  <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-                </svg>
-                <input
-                  id="confirmPassword"
-                  name="confirmPassword"
-                  type="password"
-                  autoComplete="new-password"
-                  placeholder="비밀번호"
-                  value={confirmPassword}
-                  onChange={(event) => setConfirmPassword(event.target.value)}
+                  id="address"
+                  name="address"
+                  type="text"
+                  placeholder="예: 서울특별시 중구 세종대로 110"
+                  value={address}
+                  onChange={(event) => setAddress(event.target.value)}
                   className="w-full border-0 bg-transparent text-[15px] text-[#1E2A3A] placeholder:text-[#5A6B80] focus:outline-none"
                 />
               </div>
             </div>
           </div>
+
+          {error && <p className="hospital-code-register__error text-xs font-semibold text-[#E0435D]">{error}</p>}
 
           <button
             type="submit"
             className="hospital-code-register__submit h-[52px] w-full rounded-lg bg-[#2B6FE3] text-[15px] font-bold tracking-wide text-white transition-colors hover:bg-[#2560c9]"
           >
-            등록하기
+            병원 등록 요청하기
           </button>
 
           <p className="hospital-code-register__back flex items-center justify-center gap-1 text-[13px]">
             <Link to="/signup" className="font-bold text-[#2B6FE3] hover:underline">
               병원 검색으로 돌아가기
-            </Link>
-          </p>
-
-          <p className="hospital-code-register__back-to-login flex items-center justify-center gap-1 text-[13px]">
-            <span className="text-[#5A6B80]">이미 계정이 있으신가요?</span>
-            <Link to="/login" className="font-bold text-[#2B6FE3] hover:underline">
-              로그인
             </Link>
           </p>
         </form>

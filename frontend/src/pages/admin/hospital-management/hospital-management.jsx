@@ -5,6 +5,7 @@ import AdminHeader from "../../../components/admin-header/admin-header.jsx";
 import Icon from "../../../components/icon/icon.jsx";
 import AddHospitalModal from "../../../components/modals/add-hospital-modal/add-hospital-modal.jsx";
 import { HOSPITALS as INITIAL_HOSPITALS } from "../../../data/admin.js";
+import { useHospitalRequestStore } from "../../../store/hospital-request-store.js";
 
 const STATUS_TABS = ["전체", "활성", "비활성"];
 const PAGE_SIZE = 5;
@@ -17,6 +18,29 @@ function AdminHospitalManagement() {
   const [regionFilter, setRegionFilter] = useState("전체");
   const [statusFilter, setStatusFilter] = useState("전체");
   const [page, setPage] = useState(1);
+  const hospitalRequests = useHospitalRequestStore((state) => state.requests);
+  const pendingRequests = useMemo(
+    () => hospitalRequests.filter((request) => request.status === "대기중"),
+    [hospitalRequests]
+  );
+  const approveRequest = useHospitalRequestStore((state) => state.approveRequest);
+  const rejectRequest = useHospitalRequestStore((state) => state.rejectRequest);
+
+  const handleApproveRequest = (request) => {
+    approveRequest(request.id);
+    setHospitals((current) => [
+      {
+        id: `${request.hospitalName}-${Date.now()}`,
+        name: request.hospitalName,
+        region: request.area,
+        beds: 0,
+        devices: 0,
+        manager: "-",
+        active: true,
+      },
+      ...current,
+    ]);
+  };
 
   const regionOptions = useMemo(
     () => Array.from(new Set(hospitals.map((hospital) => hospital.region))),
@@ -67,6 +91,48 @@ function AdminHospitalManagement() {
               병원 추가
             </button>
           </div>
+
+          {pendingRequests.length > 0 && (
+            <div className="flex flex-col gap-3 overflow-hidden rounded-xl border border-[#E8A13B] bg-white shadow-[0_2px_3px_rgba(30,42,58,0.08)]">
+              <div className="flex items-center justify-between bg-[#FCF0DC] px-5 py-3">
+                <p className="text-sm font-bold text-[#1E2A3A]">병원 등록 요청 · 대기중 {pendingRequests.length}건</p>
+              </div>
+              <div className="flex flex-col px-5 pb-4">
+                {pendingRequests.map((request) => (
+                  <div
+                    key={request.id}
+                    className="flex flex-wrap items-center justify-between gap-3 border-b border-[#DCE3EC] py-3 last:border-b-0"
+                  >
+                    <div className="flex flex-col gap-[3px]">
+                      <p className="text-sm font-bold text-[#1E2A3A]">
+                        {request.hospitalName} <span className="font-normal text-[#5A6B80]">· {request.area}</span>
+                      </p>
+                      <p className="text-xs text-[#5A6B80]">{request.address}</p>
+                      <p className="text-[11px] text-[#5A6B80]">{request.requestedAt} 요청</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => handleApproveRequest(request)}
+                        className="flex items-center gap-1 rounded-lg bg-[#2FA35C] px-3 py-[6px] text-xs font-bold text-white"
+                      >
+                        <Icon name="check" size={13} className="text-white" />
+                        승인
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => rejectRequest(request.id)}
+                        className="flex items-center gap-1 rounded-lg border border-[#DCE3EC] bg-white px-3 py-[6px] text-xs font-semibold text-[#5A6B80]"
+                      >
+                        <Icon name="x" size={13} />
+                        거절
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           <div className="flex flex-col gap-3 rounded-xl border border-[#DCE3EC] bg-white p-4 shadow-[0_2px_3px_rgba(30,42,58,0.08)]">
             <div className="flex flex-wrap items-center gap-3">
