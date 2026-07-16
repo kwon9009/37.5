@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Icon from "../icon/icon.jsx";
 import { HOSPITALS, DEVICES, USERS } from "../../data/admin.js";
+import { useAuthStore } from "../../store/auth-store.js";
 
 const RESULT_GROUPS = [
   {
@@ -36,7 +37,14 @@ const RESULT_GROUPS = [
 function AdminHeader({ notificationCount = 5 }) {
   const [searchQuery, setSearchQuery] = useState("");
   const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const navigate = useNavigate();
+  const logout = useAuthStore((state) => state.logout);
+
+  const handleLogout = () => {
+    logout();
+    navigate("/admin-login");
+  };
 
   const trimmedQuery = searchQuery.trim();
   const resultGroups = trimmedQuery
@@ -124,17 +132,33 @@ function AdminHeader({ notificationCount = 5 }) {
           )}
         </button>
 
-        <button
-          type="button"
-          onClick={() => navigate("/admin-login")}
-          className="admin-header__user flex items-center gap-2"
-        >
-          <span className="flex h-[34px] w-[34px] items-center justify-center rounded-full bg-[#7C5CFC]">
-            <Icon name="shield" size={16} className="text-white" />
-          </span>
-          <span className="text-sm font-semibold text-white">시스템관리자</span>
-          <Icon name="chevron-down" size={16} className="text-[#8B8FA3]" />
-        </button>
+        <div className="admin-header__user-menu relative">
+          <button
+            type="button"
+            onClick={() => setIsUserMenuOpen((current) => !current)}
+            onBlur={() => setTimeout(() => setIsUserMenuOpen(false), 120)}
+            className="admin-header__user flex items-center gap-2"
+          >
+            <span className="flex h-[34px] w-[34px] items-center justify-center rounded-full bg-[#7C5CFC]">
+              <Icon name="shield" size={16} className="text-white" />
+            </span>
+            <span className="text-sm font-semibold text-white">시스템관리자</span>
+            <Icon name="chevron-down" size={16} className="text-[#8B8FA3]" />
+          </button>
+
+          {isUserMenuOpen && (
+            <div className="absolute right-0 top-[calc(100%+8px)] z-50 w-[180px] overflow-hidden rounded-lg border border-[#DCE3EC] bg-white shadow-[0_12px_32px_rgba(30,42,58,0.25)]">
+              <button
+                type="button"
+                onMouseDown={handleLogout}
+                className="flex w-full items-center gap-2 px-4 py-3 text-left text-sm text-[#E0442E] hover:bg-[#FDEDEA]"
+              >
+                <Icon name="log-out" size={16} className="text-[#E0442E]" />
+                로그아웃
+              </button>
+            </div>
+          )}
+        </div>
       </div>
     </header>
   );
