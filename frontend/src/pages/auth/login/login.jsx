@@ -1,16 +1,48 @@
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import logo from "../../../components/icon/37.5.png";
+import { apiClient } from "../../../api/client.js";
+import { useAuthStore } from "../../../store/auth-store.js";
+
+const ROLE_HOME = {
+  ADMIN: "/admin/hospitals",
+  DEPARTMENT: "/dashboard",
+  GUARDIAN: "/dashboard",
+};
 
 function Login() {
-  const [hospitalId, setHospitalId] = useState("");
+  const [loginId, setLoginId] = useState("");
   const [password, setPassword] = useState("");
   const [keepSignedIn, setKeepSignedIn] = useState(false);
+  const [error, setError] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const navigate = useNavigate();
+  const location = useLocation();
+  const login = useAuthStore((state) => state.login);
+  const justRegistered = location.state?.registered;
 
-  const handleSubmit = (event) => {
+  const handleSubmit = async (event) => {
     event.preventDefault();
-    navigate("/dashboard");
+    setError("");
+    setIsSubmitting(true);
+
+    try {
+      const { data } = await apiClient.post("/auth/login", {
+        login_id: loginId,
+        password,
+      });
+
+      login(
+        { accessToken: data.access_token, userId: data.user_id, role: data.role },
+        keepSignedIn,
+      );
+
+      navigate(ROLE_HOME[data.role] ?? "/dashboard");
+    } catch (err) {
+      setError(err.response?.data?.detail ?? "로그인 중 오류가 발생했습니다.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -28,9 +60,15 @@ function Login() {
               <p className="text-[13px] text-[#5A6B80]">비접촉 환자 모니터링 시스템</p>
             </div>
 
+            {justRegistered && (
+              <p className="login__success rounded-lg bg-[#E9F7EF] px-3 py-2 text-center text-xs font-semibold text-[#1E8E4F]">
+                회원가입이 완료되었습니다. 로그인해 주세요.
+              </p>
+            )}
+
             <div className="login__fields flex flex-col gap-4">
               <div className="login__field flex flex-col gap-[7px]">
-                <label htmlFor="hospitalId" className="text-xs font-bold tracking-wide text-[#5A6B80]">
+                <label htmlFor="loginId" className="text-xs font-bold tracking-wide text-[#5A6B80]">
                   아이디
                 </label>
                 <div className="login__input flex h-12 items-center gap-[10px] rounded-lg border border-[#DCE3EC] px-[14px]">
@@ -51,13 +89,13 @@ function Login() {
                     <circle cx="12" cy="7" r="4" />
                   </svg>
                   <input
-                    id="hospitalId"
-                    name="hospitalId"
+                    id="loginId"
+                    name="loginId"
                     type="text"
                     autoComplete="username"
-                    placeholder="hospital_id"
-                    value={hospitalId}
-                    onChange={(event) => setHospitalId(event.target.value)}
+                    placeholder="login_id"
+                    value={loginId}
+                    onChange={(event) => setLoginId(event.target.value)}
                     className="w-full border-0 bg-transparent text-[15px] text-[#1E2A3A] placeholder:text-[#5A6B80] focus:outline-none"
                   />
                 </div>
@@ -98,11 +136,14 @@ function Login() {
               </div>
             </div>
 
+            {error && <p className="login__error text-xs font-semibold text-[#E0435D]">{error}</p>}
+
             <button
               type="submit"
-              className="login__submit h-[52px] w-full rounded-lg bg-[#2B6FE3] text-[15px] font-bold tracking-wide text-white transition-colors hover:bg-[#2560c9]"
+              disabled={isSubmitting}
+              className="login__submit h-[52px] w-full rounded-lg bg-[#2B6FE3] text-[15px] font-bold tracking-wide text-white transition-colors hover:bg-[#2560c9] disabled:cursor-not-allowed disabled:opacity-60"
             >
-              로그인
+              {isSubmitting ? "로그인 중..." : "로그인"}
             </button>
 
             <label className="login__remember flex items-center gap-2 text-xs text-[#010102]">

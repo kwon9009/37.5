@@ -4,6 +4,7 @@ import Sidebar from "../../components/sidebar/sidebar.jsx";
 import Header from "../../components/header/header.jsx";
 import PatientCard from "../../components/patient-card/patient-card.jsx";
 import Icon from "../../components/icon/icon.jsx";
+import EmergencyScreeningOverlay from "../../components/emergency-screening-overlay/emergency-screening-overlay.jsx";
 
 const KPIS = [
   { key: "all", label: "전체 환자", value: 42, color: "#1E2A3A", bg: "#FFFFFF" },
@@ -30,7 +31,6 @@ const RECENT_ALERTS = [
 
 const EMERGENCY_EVENTS = [
   { name: "정수빈 · 305호", detail: "응급 호출 발생 · 14:24", color: "#E0442E", path: "/patients/정수빈" },
-  { name: "김도윤 · 311호", detail: "낙상 감지 · 13:52", color: "#E0442E", path: "/falls/김도윤" },
 ];
 
 function formatClock(date) {
@@ -80,14 +80,36 @@ function Dashboard() {
   const navigate = useNavigate();
   const [now, setNow] = useState(() => new Date());
   const [activeFilter, setActiveFilter] = useState("all");
+  const [acknowledgedNames, setAcknowledgedNames] = useState(() => new Set());
+  const [screeningEnabled, setScreeningEnabled] = useState(false);
 
   useEffect(() => {
     const interval = setInterval(() => setNow(new Date()), 1000);
     return () => clearInterval(interval);
   }, []);
 
+  useEffect(() => {
+    // 실시간 감지 이벤트를 흉내내기 위한 지연 (실제로는 SSE로 응급 이벤트 수신 시 즉시 트리거)
+    const timeout = setTimeout(() => setScreeningEnabled(true), 1200);
+    return () => clearTimeout(timeout);
+  }, []);
+
   const visiblePatients =
     activeFilter === "all" ? ALL_PATIENTS : ALL_PATIENTS.filter((patient) => patient.severity === activeFilter);
+
+  const screeningPatient = screeningEnabled
+    ? ALL_PATIENTS.find((patient) => patient.severity === "emergency" && !acknowledgedNames.has(patient.name))
+    : undefined;
+
+  const handleAcknowledge = () => {
+    setAcknowledgedNames((current) => new Set(current).add(screeningPatient.name));
+  };
+
+  const handleRespond = () => {
+    const name = screeningPatient.name;
+    setAcknowledgedNames((current) => new Set(current).add(name));
+    navigate(`/patients/${encodeURIComponent(name)}`);
+  };
 
   return (
     <div className="dashboard flex min-h-screen bg-[#F5F7FA]">
@@ -171,6 +193,12 @@ function Dashboard() {
           </div>
         </div>
       </div>
+
+      <EmergencyScreeningOverlay
+        patient={screeningPatient}
+        onAcknowledge={handleAcknowledge}
+        onRespond={handleRespond}
+      />
     </div>
   );
 }

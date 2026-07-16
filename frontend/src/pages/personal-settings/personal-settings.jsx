@@ -5,7 +5,6 @@ import Icon from "../../components/icon/icon.jsx";
 
 const NOTIFICATION_TOGGLES = [
   { key: "emergencyAlerts", label: "담당 환자 응급 알림", desc: "담당 환자에게 응급 상황이 발생하면 즉시 알림을 받습니다", default: true },
-  { key: "fallRiskAlerts", label: "낙상 위험 알림", desc: "담당 환자의 낙상 위험 이벤트 발생 시 알림을 받습니다", default: true },
   { key: "sensorDisconnectAlerts", label: "센서 연결 끊김 알림", desc: "모니터링 센서 연결이 끊기면 알림을 받습니다", default: true },
   { key: "weeklyReport", label: "일일 근무 요약 리포트", desc: "근무 종료 시 담당 환자 요약 리포트를 이메일로 받습니다", default: false },
 ];

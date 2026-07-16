@@ -7,8 +7,6 @@ import Dashboard from "./pages/dashboard/dashboard.jsx";
 import PatientList from "./pages/patient-list/patient-list.jsx";
 import PatientDetail from "./pages/patient-detail/patient-detail.jsx";
 import RealtimeMonitoring from "./pages/realtime-monitoring/realtime-monitoring.jsx";
-import FallManagement from "./pages/fall-management/fall-management.jsx";
-import FallEmergencyDetail from "./pages/fall-emergency-detail/fall-emergency-detail.jsx";
 import Notifications from "./pages/notifications/notifications.jsx";
 import IntegrationRequestManagement from "./pages/integration-request-management/integration-request-management.jsx";
 import IntegrationRequestDetail from "./pages/integration-request-detail/integration-request-detail.jsx";
@@ -34,8 +32,6 @@ function App() {
       <Route path="/patients" element={<PatientList />} />
       <Route path="/patients/:patientId" element={<PatientDetail />} />
       <Route path="/monitoring" element={<RealtimeMonitoring />} />
-      <Route path="/falls" element={<FallManagement />} />
-      <Route path="/falls/:eventId" element={<FallEmergencyDetail />} />
       <Route path="/notifications" element={<Notifications />} />
       <Route path="/integration-requests" element={<IntegrationRequestManagement />} />
       <Route path="/integration-requests/:requestId" element={<IntegrationRequestDetail />} />
