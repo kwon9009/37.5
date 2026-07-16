@@ -3,6 +3,7 @@ import Login from "./pages/auth/login/login.jsx";
 import Signup from "./pages/auth/signup/signup.jsx";
 import HospitalCodeRegister from "./pages/auth/hospital-code-register/hospital-code-register.jsx";
 import AdminLogin from "./pages/auth/admin-login/admin-login.jsx";
+import FindPassword from "./pages/auth/find-password/find-password.jsx";
 import Dashboard from "./pages/dashboard/dashboard.jsx";
 import PatientList from "./pages/patient-list/patient-list.jsx";
 import PatientDetail from "./pages/patient-detail/patient-detail.jsx";
@@ -28,6 +29,7 @@ function App() {
       <Route path="/signup" element={<Signup />} />
       <Route path="/signup/hospital-code" element={<HospitalCodeRegister />} />
       <Route path="/admin-login" element={<AdminLogin />} />
+      <Route path="/find-password" element={<FindPassword />} />
       <Route path="/dashboard" element={<Dashboard />} />
       <Route path="/patients" element={<PatientList />} />
       <Route path="/patients/:patientId" element={<PatientDetail />} />

@@ -20,6 +20,8 @@ function Login() {
   const location = useLocation();
   const login = useAuthStore((state) => state.login);
   const justRegistered = location.state?.registered;
+  const justRequestedHospital = location.state?.hospitalRequested;
+  const justResetPassword = location.state?.passwordReset;
 
   const handleSubmit = async (event) => {
     event.preventDefault();
@@ -63,6 +65,18 @@ function Login() {
             {justRegistered && (
               <p className="login__success rounded-lg bg-[#E9F7EF] px-3 py-2 text-center text-xs font-semibold text-[#1E8E4F]">
                 회원가입이 완료되었습니다. 로그인해 주세요.
+              </p>
+            )}
+
+            {justRequestedHospital && (
+              <p className="login__success rounded-lg bg-[#E9F7EF] px-3 py-2 text-center text-xs font-semibold text-[#1E8E4F]">
+                병원 등록 요청이 접수되었습니다. 관리자 승인 후 이용하실 수 있어요.
+              </p>
+            )}
+
+            {justResetPassword && (
+              <p className="login__success rounded-lg bg-[#E9F7EF] px-3 py-2 text-center text-xs font-semibold text-[#1E8E4F]">
+                비밀번호가 변경되었습니다. 새 비밀번호로 로그인해 주세요.
               </p>
             )}
 
@@ -162,9 +176,9 @@ function Login() {
                 회원가입
               </Link>
               {" · "}
-              <button type="button" className="hover:text-[#2B6FE3] hover:underline">
+              <Link to="/find-password" className="hover:text-[#2B6FE3] hover:underline">
                 비밀번호를 잊으셨나요?
-              </button>
+              </Link>
             </p>
           </form>
         </section>
