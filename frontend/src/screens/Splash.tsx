@@ -21,7 +21,7 @@ export default function Splash() {
         </p>
       </div>
       <div className="px-6 pb-10">
-        <Button variant="outline" className="border-transparent text-primary" onClick={() => navigate("/terms")}>
+        <Button variant="outline" className="border-transparent font-bold text-primary-foreground/80" onClick={() => navigate("/terms")}>
           시작하기
         </Button>
         <p className="mt-4 text-center text-xs text-primary-foreground/60">버전 1.0.0</p>
