@@ -22,7 +22,7 @@ class EmergencyLog(Base):
     )
 
     patient_id: Mapped[int] = mapped_column(
-        ForeignKey("patients.patient_id"),
+        ForeignKey("patients.patient_id", ondelete="CASCADE"),
         nullable=False,
     )
 
