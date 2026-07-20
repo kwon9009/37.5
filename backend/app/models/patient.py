@@ -103,22 +103,27 @@ class Patient(BaseModel):
 
     devices: Mapped[list[Device]] = relationship(
         back_populates="patient",
+        passive_deletes=True,
     )
 
     vital_checks: Mapped[list[VitalCheck]] = relationship(
         back_populates="patient",
+        passive_deletes=True,
     )
 
     vital_logs: Mapped[list[VitalLog]] = relationship(
         back_populates="patient",
+        passive_deletes=True,
     )
 
     emergency_logs: Mapped[list[EmergencyLog]] = relationship(
         back_populates="patient",
+        passive_deletes=True,
     )
 
     alerts: Mapped[list[Alert]] = relationship(
         back_populates="patient",
+        passive_deletes=True,
     )
 
     def __repr__(self) -> str:
