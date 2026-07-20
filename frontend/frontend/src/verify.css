@@ -1,0 +1,66 @@
+/* 인증(verify) 시퀀스 전용 스타일 */
+
+/* 잘못된 입력 시 진동(흔들림) 애니메이션 */
+@keyframes verify-shake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  15% {
+    transform: translateX(-9px);
+  }
+  30% {
+    transform: translateX(9px);
+  }
+  45% {
+    transform: translateX(-7px);
+  }
+  60% {
+    transform: translateX(7px);
+  }
+  75% {
+    transform: translateX(-4px);
+  }
+  90% {
+    transform: translateX(4px);
+  }
+}
+
+.verify-shake {
+  animation: verify-shake 0.42s cubic-bezier(0.36, 0.07, 0.19, 0.97);
+}
+
+/* 인증번호 입력칸: 숫자만, 넓은 자간 */
+.verify-code-input {
+  letter-spacing: 0.35em;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+/* 오류 상태 강조 */
+.verify-error-border {
+  border-color: var(--color-danger) !important;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-danger) 20%, transparent) !important;
+}
+
+/* 경고 문구 */
+.verify-warning {
+  margin-top: 0.4rem;
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--color-danger);
+}
+
+/* 인증 완료 상태 */
+.verify-success {
+  margin-top: 0.4rem;
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--color-success);
+}
