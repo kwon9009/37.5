@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import ForeignKey, BigInteger
+from sqlalchemy import ForeignKey, BigInteger, TIMESTAMP, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
@@ -22,7 +22,7 @@ class VitalLog(Base):
     )
 
     patient_id: Mapped[int] = mapped_column(
-        ForeignKey("patients.patient_id"),
+        ForeignKey("patients.patient_id", ondelete="CASCADE"),
         nullable=False,
     )
 
@@ -35,7 +35,9 @@ class VitalLog(Base):
     )
 
     recorded_at: Mapped[datetime] = mapped_column(
+        TIMESTAMP,
         nullable=False,
+        server_default=func.now(),
     )
 
     # Relationship

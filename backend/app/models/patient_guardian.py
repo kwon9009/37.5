@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from sqlalchemy import ForeignKey, String, BigInteger
+from sqlalchemy import ForeignKey, String, BigInteger, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
@@ -14,6 +14,9 @@ if TYPE_CHECKING:
 
 class PatientGuardian(Base):
     __tablename__ = "patient_guardians"
+    __table_args__ = (
+        UniqueConstraint("patient_id", "guardian_id", name="uk_patient_guardian"),
+    )
 
     patient_guardian_id: Mapped[int] = mapped_column(
         BigInteger,
@@ -22,12 +25,12 @@ class PatientGuardian(Base):
     )
 
     patient_id: Mapped[int] = mapped_column(
-        ForeignKey("patients.patient_id"),
+        ForeignKey("patients.patient_id", ondelete="CASCADE"),
         nullable=False,
     )
 
     guardian_id: Mapped[int] = mapped_column(
-        ForeignKey("guardians.guardian_id"),
+        ForeignKey("guardians.guardian_id", ondelete="CASCADE"),
         nullable=False,
     )
 

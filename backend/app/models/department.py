@@ -16,7 +16,9 @@ if TYPE_CHECKING:
 
 class Department(BaseModel):
     __tablename__ = "departments"
-    __table_args__ = (UniqueConstraint("hospital_id", "name", name="uk_department_hospital_name"),)
+    __table_args__ = (
+        UniqueConstraint("hospital_id", "name", name="uk_department_hospital_name"),
+    )
 
     department_id: Mapped[int] = mapped_column(
         BigInteger, primary_key=True, autoincrement=True
@@ -26,6 +28,7 @@ class Department(BaseModel):
         BigInteger,
         ForeignKey(
             "users.user_id",
+            ondelete="CASCADE",
         ),
         unique=True,
         nullable=False,
@@ -35,6 +38,7 @@ class Department(BaseModel):
         BigInteger,
         ForeignKey(
             "hospitals.hospital_id",
+            ondelete="CASCADE",
         ),
         nullable=False,
     )
