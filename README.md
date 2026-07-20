@@ -64,7 +64,7 @@ Database / Hospital Dashboard / Guardian App
 
 ## 시작하기
 
-### 1. 저장소 받기
+### 저장소 받기
 
 ```bash
 git clone https://github.com/kwon9009/37.5.git
@@ -126,6 +126,8 @@ API 문서: http://localhost:8000/docs
 
 ## MR60BHA2 연결 확인
 
+mmWave(MR60BHA2): XIAO ESP32C6에 Seeed Arduino mmWave 예제(mmWaveBreath) 업로드 -> USB로 RPI 연결 
+
 RPI에서 USB 장치를 확인합니다.
 
 ```bash
@@ -159,8 +161,6 @@ Real-time heart rate: Sending state 82.00000 bpm
 - `Real-time heart rate`: 분당 심박수 추정값
 - 종료: `Ctrl + ]` 또는 `Ctrl + C`
 
-센서 포트는 하나의 수집 프로그램만 사용해야 합니다. 백엔드 수집기가 실행 중일 때 `miniterm`을 동시에 실행하지 마세요.
-
 ## 권장 측정 환경
 
 - 센서와 측정 대상의 거리: 약 0.5~1.5m
@@ -192,8 +192,8 @@ VS Code SSH 설정 예시:
 
 ```ssh-config
 Host rpi5-tailscale
-    HostName <RPI_TAILSCALE_IP>
-    User ai
+HostName <RPI_TAILSCALE_IP>
+User ai
 ```
 
 공유기 포트포워딩이나 공인 인터넷에 SSH 포트를 공개하지 않습니다. 외부 담당자에게는 Tailscale 관리 페이지에서 해당 RPI 장비 한 대만 공유합니다.
