@@ -1,17 +1,17 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import logo from "../../../components/icon/37.5.png";
-import { useHospitalRequestStore } from "../../../store/hospital-request-store.js";
+import { apiClient } from "../../../api/client.js";
 
 function HospitalCodeRegister() {
   const [hospitalName, setHospitalName] = useState("");
   const [area, setArea] = useState("");
   const [address, setAddress] = useState("");
   const [error, setError] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const navigate = useNavigate();
-  const submitRequest = useHospitalRequestStore((state) => state.submitRequest);
 
-  const handleSubmit = (event) => {
+  const handleSubmit = async (event) => {
     event.preventDefault();
     setError("");
 
@@ -20,8 +20,20 @@ function HospitalCodeRegister() {
       return;
     }
 
-    submitRequest({ hospitalName: hospitalName.trim(), area: area.trim(), address: address.trim() });
-    navigate("/login", { state: { hospitalRequested: true } });
+    setIsSubmitting(true);
+    try {
+      await apiClient.post("/hospital-requests", {
+        hospital_name: hospitalName.trim(),
+        area: area.trim(),
+        address: address.trim(),
+      });
+
+      navigate("/login", { state: { hospitalRequested: true } });
+    } catch (err) {
+      setError(err.response?.data?.detail ?? "등록 요청 중 오류가 발생했습니다.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -151,9 +163,10 @@ function HospitalCodeRegister() {
 
           <button
             type="submit"
-            className="hospital-code-register__submit h-[52px] w-full rounded-lg bg-[#2B6FE3] text-[15px] font-bold tracking-wide text-white transition-colors hover:bg-[#2560c9]"
+            disabled={isSubmitting}
+            className="hospital-code-register__submit h-[52px] w-full rounded-lg bg-[#2B6FE3] text-[15px] font-bold tracking-wide text-white transition-colors hover:bg-[#2560c9] disabled:cursor-not-allowed disabled:opacity-60"
           >
-            병원 등록 요청하기
+            {isSubmitting ? "요청 중..." : "병원 등록 요청하기"}
           </button>
 
           <p className="hospital-code-register__back flex items-center justify-center gap-1 text-[13px]">
