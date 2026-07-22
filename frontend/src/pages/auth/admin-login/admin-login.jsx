@@ -2,15 +2,40 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import Icon from "../../../components/icon/icon.jsx";
 import logo from "../../../components/icon/37.5.png";
+import { apiClient } from "../../../api/client.js";
+import { useAuthStore } from "../../../store/auth-store.js";
 
 function AdminLogin() {
   const [adminId, setAdminId] = useState("");
   const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const navigate = useNavigate();
+  const login = useAuthStore((state) => state.login);
 
-  const handleSubmit = (event) => {
+  const handleSubmit = async (event) => {
     event.preventDefault();
-    navigate("/admin/hospitals");
+    setError("");
+    setIsSubmitting(true);
+
+    try {
+      const { data } = await apiClient.post("/auth/login", {
+        login_id: adminId,
+        password,
+      });
+
+      if (data.role !== "ADMIN") {
+        setError("관리자 계정이 아닙니다.");
+        return;
+      }
+
+      login({ accessToken: data.access_token, userId: data.user_id, role: data.role }, false);
+      navigate("/admin/hospitals");
+    } catch (err) {
+      setError(err.response?.data?.detail ?? "로그인 중 오류가 발생했습니다.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -68,11 +93,14 @@ function AdminLogin() {
             </div>
           </div>
 
+          {error && <p className="admin-login__error text-xs font-semibold text-[#E0435D]">{error}</p>}
+
           <button
             type="submit"
-            className="admin-login__submit h-[52px] w-full rounded-lg bg-[#7C5CFC] text-[15px] font-bold tracking-wide text-white transition-colors hover:bg-[#6a4de0]"
+            disabled={isSubmitting}
+            className="admin-login__submit h-[52px] w-full rounded-lg bg-[#7C5CFC] text-[15px] font-bold tracking-wide text-white transition-colors hover:bg-[#6a4de0] disabled:cursor-not-allowed disabled:opacity-60"
           >
-            관리자 로그인
+            {isSubmitting ? "로그인 중..." : "관리자 로그인"}
           </button>
         </form>
 
