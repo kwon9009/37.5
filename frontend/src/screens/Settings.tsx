@@ -154,15 +154,6 @@ export default function Settings() {
                 이용약관 및 정책에 대한 동의 여부를 다시 선택할 수 있습니다. 필수 항목에 비동의 시 서비스 이용이 제한될 수 있습니다.
               </p>
               <ConsentRow
-                required
-                title="사용자 정보 보관에 대한 사항"
-                value={requiredConsent}
-                onChange={(c) => {
-                  setRequiredConsent(c)
-                  setSavedMsg("")
-                }}
-              />
-              <ConsentRow
                 title="이벤트 정보 수집 (선택)"
                 value={optionalConsent}
                 onChange={(c) => {
