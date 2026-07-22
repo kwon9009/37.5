@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import { useNavigate } from "react-router-dom"
-import { Screen, TopBar } from "@/components/Screen"
+import { Screen, TopBar, StickyAction } from "@/components/Screen"
 import { Button, Field } from "@/components/ui"
 import { cn } from "@/lib/utils"
 
@@ -112,13 +112,13 @@ export default function PatientInfo() {
     <Screen>
       <TopBar title="환자 정보 확인" back />
       <form
-        className="flex flex-1 flex-col overflow-y-auto"
+        className="flex flex-1 flex-col overflow-hidden"
         onSubmit={(e) => {
           e.preventDefault()
           navigate("/hospital")
         }}
       >
-        <div className="flex-1 space-y-5 px-5 py-6">
+        <StickyAction className="space-y-5 px-5 py-6" action={<Button type="submit">확인하기</Button>}>
           <div>
             <h2 className="text-lg font-bold text-foreground">환자 정보를 입력해 주세요</h2>
             <p className="mt-1 text-sm text-muted-foreground">모니터링할 환자의 기본 정보입니다.</p>
@@ -184,10 +184,7 @@ export default function PatientInfo() {
               </div>
             )}
           </div>
-        </div>
-        <div className="border-t border-border bg-card px-5 py-4">
-          <Button type="submit">확인하기</Button>
-        </div>
+        </StickyAction>
       </form>
     </Screen>
   )

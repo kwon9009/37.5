@@ -1,7 +1,7 @@
 import { useState } from "react"
 import { useNavigate } from "react-router-dom"
 import { AlertCircle, CheckCircle2, Check } from "lucide-react"
-import { Screen, TopBar } from "@/components/Screen"
+import { Screen, TopBar, StickyAction } from "@/components/Screen"
 import { Button, Field } from "@/components/ui"
 import { cn } from "@/lib/utils"
 import "@/verify.css"
@@ -157,8 +157,8 @@ export default function Signup() {
   return (
     <Screen>
       <TopBar title="회원가입" back />
-      <form className="flex flex-1 flex-col overflow-y-auto" onSubmit={handleSubmit}>
-        <div className="flex-1 space-y-5 px-5 py-6">
+      <form className="flex flex-1 flex-col overflow-hidden" onSubmit={handleSubmit}>
+        <StickyAction className="space-y-5 px-5 py-6" action={<Button type="submit">다음</Button>}>
           <div>
             <h2 className="text-lg font-bold text-foreground">계정 정보를 입력해 주세요</h2>
             <p className="mt-1 text-sm text-muted-foreground">보호자 본인 인증 후 계정을 생성합니다.</p>
@@ -293,7 +293,7 @@ export default function Signup() {
             <div className="flex w-full items-stretch gap-2">
               <input
                 id="userid"
-                placeholder="영문+숫자 조합 6자 이상"
+                placeholder="아이디를 입력하세요"
                 aria-label="아이디"
                 className={cn(
                   "h-13 min-w-0 flex-1 rounded-2xl border border-input bg-card px-4 text-base text-foreground outline-none placeholder:text-muted-foreground/60 focus:border-ring focus:ring-2 focus:ring-ring/20",
@@ -402,11 +402,7 @@ export default function Signup() {
               </p>
             )}
           </div>
-        </div>
-
-        <div className="border-t border-border bg-card px-5 py-4">
-          <Button type="submit">다음</Button>
-        </div>
+        </StickyAction>
       </form>
     </Screen>
   )
