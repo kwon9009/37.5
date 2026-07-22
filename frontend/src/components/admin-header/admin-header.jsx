@@ -40,6 +40,7 @@ function AdminHeader({ notificationCount = 5 }) {
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const navigate = useNavigate();
   const logout = useAuthStore((state) => state.logout);
+  const loginId = useAuthStore((state) => state.loginId);
 
   const handleLogout = () => {
     logout();
@@ -142,7 +143,7 @@ function AdminHeader({ notificationCount = 5 }) {
             <span className="flex h-[34px] w-[34px] items-center justify-center rounded-full bg-[#7C5CFC]">
               <Icon name="shield" size={16} className="text-white" />
             </span>
-            <span className="text-sm font-semibold text-white">시스템관리자</span>
+            <span className="text-sm font-semibold text-white">{loginId ?? "시스템관리자"}</span>
             <Icon name="chevron-down" size={16} className="text-[#8B8FA3]" />
           </button>
 

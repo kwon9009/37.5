@@ -7,6 +7,8 @@ import Icon from "../../components/icon/icon.jsx";
 import EmergencyScreeningOverlay from "../../components/emergency-screening-overlay/emergency-screening-overlay.jsx";
 import { apiClient } from "../../api/client.js";
 
+const SEVERITY_ORDER = { emergency: 0, warning: 1, caution: 2, normal: 3 };
+
 const KPI_META = [
   { key: "all", label: "전체 환자", color: "#1E2A3A", bg: "#FFFFFF" },
   { key: "normal", label: "정상", color: "#2FA35C", bg: "#FFFFFF" },
@@ -95,17 +97,19 @@ function Dashboard() {
         setSummary(summaryRes.data);
 
         setPatients(
-          patientsRes.data.map((patient) => ({
-            id: patient.patient_id,
-            name: patient.name,
-            room: patient.room,
-            presenceLabel: patient.presence_label,
-            severity: patient.severity,
-            heartRate: patient.heart_rate,
-            respirationRate: patient.respiration_rate,
-            sensorStatus: patient.sensor_status,
-            timestamp: toClockString(patient.timestamp),
-          })),
+          patientsRes.data
+            .map((patient) => ({
+              id: patient.patient_id,
+              name: patient.name,
+              room: patient.room,
+              presenceLabel: patient.presence_label,
+              severity: patient.severity,
+              heartRate: patient.heart_rate,
+              respirationRate: patient.respiration_rate,
+              sensorStatus: patient.sensor_status,
+              timestamp: toClockString(patient.timestamp),
+            }))
+            .sort((a, b) => SEVERITY_ORDER[a.severity] - SEVERITY_ORDER[b.severity]),
         );
 
         setAlerts(

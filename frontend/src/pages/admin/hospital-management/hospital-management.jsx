@@ -1,11 +1,11 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import AdminSidebar from "../../../components/admin-sidebar/admin-sidebar.jsx";
 import AdminHeader from "../../../components/admin-header/admin-header.jsx";
 import Icon from "../../../components/icon/icon.jsx";
 import AddHospitalModal from "../../../components/modals/add-hospital-modal/add-hospital-modal.jsx";
 import { HOSPITALS as INITIAL_HOSPITALS } from "../../../data/admin.js";
-import { useHospitalRequestStore } from "../../../store/hospital-request-store.js";
+import { apiClient } from "../../../api/client.js";
 
 const STATUS_TABS = ["전체", "활성", "비활성"];
 const PAGE_SIZE = 5;
@@ -18,28 +18,41 @@ function AdminHospitalManagement() {
   const [regionFilter, setRegionFilter] = useState("전체");
   const [statusFilter, setStatusFilter] = useState("전체");
   const [page, setPage] = useState(1);
-  const hospitalRequests = useHospitalRequestStore((state) => state.requests);
-  const pendingRequests = useMemo(
-    () => hospitalRequests.filter((request) => request.status === "대기중"),
-    [hospitalRequests]
-  );
-  const approveRequest = useHospitalRequestStore((state) => state.approveRequest);
-  const rejectRequest = useHospitalRequestStore((state) => state.rejectRequest);
+  const [pendingRequests, setPendingRequests] = useState([]);
+
+  const loadPendingRequests = () => {
+    apiClient
+      .get("/hospital-requests")
+      .then(({ data }) => {
+        setPendingRequests(data.filter((request) => request.status === "PENDING"));
+      })
+      .catch(() => {});
+  };
+
+  useEffect(() => {
+    loadPendingRequests();
+  }, []);
 
   const handleApproveRequest = (request) => {
-    approveRequest(request.id);
-    setHospitals((current) => [
-      {
-        id: `${request.hospitalName}-${Date.now()}`,
-        name: request.hospitalName,
-        region: request.area,
-        beds: 0,
-        devices: 0,
-        manager: "-",
-        active: true,
-      },
-      ...current,
-    ]);
+    apiClient.post(`/hospital-requests/${request.hospital_request_id}/approve`).then(() => {
+      setHospitals((current) => [
+        {
+          id: `${request.hospital_name}-${Date.now()}`,
+          name: request.hospital_name,
+          region: request.area,
+          beds: 0,
+          devices: 0,
+          manager: "-",
+          active: true,
+        },
+        ...current,
+      ]);
+      loadPendingRequests();
+    });
+  };
+
+  const handleRejectRequest = (request) => {
+    apiClient.post(`/hospital-requests/${request.hospital_request_id}/reject`).then(loadPendingRequests);
   };
 
   const regionOptions = useMemo(
@@ -100,15 +113,17 @@ function AdminHospitalManagement() {
               <div className="flex flex-col px-5 pb-4">
                 {pendingRequests.map((request) => (
                   <div
-                    key={request.id}
+                    key={request.hospital_request_id}
                     className="flex flex-wrap items-center justify-between gap-3 border-b border-[#DCE3EC] py-3 last:border-b-0"
                   >
                     <div className="flex flex-col gap-[3px]">
                       <p className="text-sm font-bold text-[#1E2A3A]">
-                        {request.hospitalName} <span className="font-normal text-[#5A6B80]">· {request.area}</span>
+                        {request.hospital_name} <span className="font-normal text-[#5A6B80]">· {request.area}</span>
                       </p>
                       <p className="text-xs text-[#5A6B80]">{request.address}</p>
-                      <p className="text-[11px] text-[#5A6B80]">{request.requestedAt} 요청</p>
+                      <p className="text-[11px] text-[#5A6B80]">
+                        {new Date(request.requested_at).toLocaleString("ko-KR", { hour12: false })} 요청
+                      </p>
                     </div>
                     <div className="flex items-center gap-2">
                       <button
@@ -121,7 +136,7 @@ function AdminHospitalManagement() {
                       </button>
                       <button
                         type="button"
-                        onClick={() => rejectRequest(request.id)}
+                        onClick={() => handleRejectRequest(request)}
                         className="flex items-center gap-1 rounded-lg border border-[#DCE3EC] bg-white px-3 py-[6px] text-xs font-semibold text-[#5A6B80]"
                       >
                         <Icon name="x" size={13} />

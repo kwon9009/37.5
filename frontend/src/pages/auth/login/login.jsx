@@ -35,7 +35,7 @@ function Login() {
       });
 
       login(
-        { accessToken: data.access_token, userId: data.user_id, role: data.role },
+        { accessToken: data.access_token, userId: data.user_id, role: data.role, loginId },
         keepSignedIn,
       );
 

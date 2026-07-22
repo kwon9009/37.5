@@ -5,12 +5,14 @@ import StatusBadge from "../status-badge/status-badge.jsx";
 import { PATIENTS } from "../../data/patients.js";
 import { useAuthStore } from "../../store/auth-store.js";
 
-function Header({ hospitalName = "서울중앙병원", userName = "김간호 · RN", notificationCount = 3 }) {
+function Header({ hospitalName = "서울중앙병원", userName, notificationCount = 3 }) {
   const [searchQuery, setSearchQuery] = useState("");
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const navigate = useNavigate();
   const logout = useAuthStore((state) => state.logout);
+  const loginId = useAuthStore((state) => state.loginId);
+  const displayName = userName ?? loginId ?? "김간호 · RN";
 
   const handleLogout = () => {
     logout();
@@ -100,7 +102,7 @@ function Header({ hospitalName = "서울중앙병원", userName = "김간호 · 
             className="header__user flex items-center gap-2"
           >
             <span className="h-[34px] w-[34px] rounded-full bg-[#2B6FE3]" />
-            <span className="text-sm font-semibold text-white">{userName}</span>
+            <span className="text-sm font-semibold text-white">{displayName}</span>
             <Icon name="chevron-down" size={16} className="text-[#8B9AAE]" />
           </button>
 

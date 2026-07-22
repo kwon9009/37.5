@@ -6,6 +6,7 @@ from app.models.device import Device
 from app.models.emergency_log import EmergencyLog
 from app.models.guardian import Guardian
 from app.models.hospital import Hospital
+from app.models.hospital_request import HospitalRequest
 from app.models.patient import Patient
 from app.models.patient_guardian import PatientGuardian
 from app.models.user import User
