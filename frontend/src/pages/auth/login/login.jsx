@@ -175,7 +175,7 @@ function Login() {
               <Link to="/signup" className="hover:text-[#2B6FE3] hover:underline">
                 회원가입
               </Link>
-              {" · "}
+              {" / "}
               <Link to="/find-password" className="hover:text-[#2B6FE3] hover:underline">
                 비밀번호를 잊으셨나요?
               </Link>
