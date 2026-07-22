@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.schemas.dashboard.summary_response import DashboardSummaryResponse
 from app.schemas.dashboard.patient_response import DashboardPatientResponse
+from app.schemas.dashboard.alert_response import DashboardAlertResponse
 from app.services import dashboard_service
 
 router = APIRouter(
