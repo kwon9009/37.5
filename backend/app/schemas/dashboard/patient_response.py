@@ -5,17 +5,21 @@ from pydantic import BaseModel
 
 class DashboardPatientResponse(BaseModel):
     patient_id: int
-    patient_no: str
-    patient_name: str
 
-    ward: str
-    room_num: int
-    bed_num: int
+    name: str
+
+    room: str
+
+    presence_label: str
+
+    severity: str
 
     heart_rate: int
-    resp_rate: int
 
-    status: str
-    device_status: str
+    respiration_rate: int
 
-    updated_at: datetime
+    sensor_status: str
+
+    timestamp: datetime
+
+    notes: str

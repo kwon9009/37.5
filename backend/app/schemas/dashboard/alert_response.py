@@ -3,14 +3,10 @@ from datetime import datetime
 from pydantic import BaseModel
 
 
-class RecentAlertResponse(BaseModel):
+class DashboardAlertResponse(BaseModel):
     alert_id: int
-
-    patient_id: int
     patient_name: str
-
+    room: str
     message: str
-
     is_read: bool
-
-    created_at: datetime
+    sent_at: datetime
