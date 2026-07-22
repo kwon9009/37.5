@@ -18,18 +18,19 @@ export const useAuthStore = create((set) => ({
   accessToken: stored?.accessToken ?? null,
   userId: stored?.userId ?? null,
   role: stored?.role ?? null,
+  loginId: stored?.loginId ?? null,
 
-  login: ({ accessToken, userId, role }, keepSignedIn) => {
-    const payload = JSON.stringify({ accessToken, userId, role });
+  login: ({ accessToken, userId, role, loginId }, keepSignedIn) => {
+    const payload = JSON.stringify({ accessToken, userId, role, loginId });
     localStorage.removeItem(STORAGE_KEY);
     sessionStorage.removeItem(STORAGE_KEY);
     (keepSignedIn ? localStorage : sessionStorage).setItem(STORAGE_KEY, payload);
-    set({ accessToken, userId, role });
+    set({ accessToken, userId, role, loginId });
   },
 
   logout: () => {
     localStorage.removeItem(STORAGE_KEY);
     sessionStorage.removeItem(STORAGE_KEY);
-    set({ accessToken: null, userId: null, role: null });
+    set({ accessToken: null, userId: null, role: null, loginId: null });
   },
 }));

@@ -29,7 +29,7 @@ function AdminLogin() {
         return;
       }
 
-      login({ accessToken: data.access_token, userId: data.user_id, role: data.role }, false);
+      login({ accessToken: data.access_token, userId: data.user_id, role: data.role, loginId: adminId }, false);
       navigate("/admin/hospitals");
     } catch (err) {
       setError(err.response?.data?.detail ?? "로그인 중 오류가 발생했습니다.");
