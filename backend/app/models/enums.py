@@ -20,6 +20,7 @@ class DeviceStatus(str, Enum):
 class VitalStatus(str, Enum):
     NORMAL = "NORMAL"
     WARNING = "WARNING"
+    ALERT = "ALERT"
     DANGER = "DANGER"
 
 
