@@ -1,12 +1,17 @@
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { useNavigate } from "react-router-dom"
-import { AlertTriangle, Phone, BookOpen } from "lucide-react"
+import { AlertTriangle, Phone, BookOpen, Heart, Wind, Volume2, VolumeX } from "lucide-react"
+import { cn } from "@/lib/utils"
 import { Screen } from "@/components/Screen"
-import { patient } from "@/lib/data"
+import { patient, emergencyEvent } from "@/lib/data"
 
 export default function Emergency() {
   const navigate = useNavigate()
   const [countdown, setCountdown] = useState(5)
+  const [muted, setMuted] = useState(false)
+
+  const audioCtxRef = useRef<AudioContext | null>(null)
+  const intervalRef = useRef<number | null>(null)
 
   useEffect(() => {
     if (countdown <= 0) return
@@ -14,25 +19,126 @@ export default function Emergency() {
     return () => clearTimeout(id)
   }, [countdown])
 
+  // 응급 경고음: Web Audio API 로 삐-삐 반복음 재생
+  useEffect(() => {
+    if (muted) {
+      if (intervalRef.current) window.clearInterval(intervalRef.current)
+      return
+    }
+
+    const AudioCtx = window.AudioContext || (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
+    if (!AudioCtx) return
+
+    const ctx = audioCtxRef.current ?? new AudioCtx()
+    audioCtxRef.current = ctx
+
+    function beep() {
+      const osc = ctx.createOscillator()
+      const gain = ctx.createGain()
+      osc.type = "square"
+      osc.frequency.value = 880
+      gain.gain.setValueAtTime(0.0001, ctx.currentTime)
+      gain.gain.exponentialRampToValueAtTime(0.25, ctx.currentTime + 0.02)
+      gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.35)
+      osc.connect(gain).connect(ctx.destination)
+      osc.start()
+      osc.stop(ctx.currentTime + 0.36)
+    }
+
+    // 브라우저 자동재생 정책상 사용자 상호작용 후 재생 (resume)
+    ctx.resume().then(() => {
+      beep()
+      intervalRef.current = window.setInterval(beep, 900)
+    })
+
+    return () => {
+      if (intervalRef.current) window.clearInterval(intervalRef.current)
+    }
+  }, [muted])
+
+  // 화면 이탈 시 오디오 정리
+  useEffect(() => {
+    return () => {
+      if (intervalRef.current) window.clearInterval(intervalRef.current)
+      audioCtxRef.current?.close()
+    }
+  }, [])
+
+  // 심박/호흡 이상을 나눠서 안내 문구 구성
+  const abnormalLabels = [
+    emergencyEvent.heartAbnormal && "심박수",
+    emergencyEvent.respAbnormal && "호흡수",
+  ].filter(Boolean) as string[]
+  const abnormalText =
+    abnormalLabels.length > 0 ? `${abnormalLabels.join("·")} 이상이 감지되었습니다.` : "이상 징후가 감지되었습니다."
+
   return (
     <Screen className="bg-danger text-danger-foreground">
-      <div className="flex flex-1 flex-col items-center justify-center px-8 text-center">
-        <div className="relative mb-8">
+      <div className="flex flex-1 flex-col items-center justify-center overflow-y-auto px-8 py-8 text-center">
+        <div className="relative mb-6">
           <span className="pulse-ring absolute inset-0 rounded-full bg-danger-foreground/40" />
-          <div className="relative grid h-28 w-28 place-items-center rounded-full bg-danger-foreground/20">
-            <AlertTriangle size={56} strokeWidth={2} aria-hidden />
+          <div className="relative grid h-24 w-24 place-items-center rounded-full bg-danger-foreground/20">
+            <AlertTriangle size={48} strokeWidth={2} aria-hidden />
           </div>
         </div>
         <h1 className="text-3xl font-bold">긴급 상황 발생</h1>
         <p className="mt-3 text-balance text-lg font-semibold text-danger-foreground/90">
-          {patient.name} 님에게 낙상이 감지되었습니다.
+          {patient.name} 님의 {abnormalText}
         </p>
         <p className="mt-2 text-balance leading-relaxed text-danger-foreground/80">
-          즉시 상태를 확인하고 필요한 조치를 취해 주세요. 상황이 심각할 수 있습니다.
+          심장질환 이력이 있는 환자입니다. 아래 생체신호를 확인하고 즉시 대응해 주세요.
         </p>
+
+        {/* 실시간 생체신호 확인 (심박 / 호흡 이상을 나눠서 강조) */}
+        <div className="mt-6 grid w-full grid-cols-2 gap-3">
+          <div
+            className={cn(
+              "flex flex-col items-center rounded-2xl p-4 transition",
+              emergencyEvent.heartAbnormal
+                ? "bg-danger-foreground text-danger ring-2 ring-danger-foreground"
+                : "bg-danger-foreground/15",
+            )}
+          >
+            <Heart size={22} aria-hidden />
+            <span className={cn("mt-1 text-xs", emergencyEvent.heartAbnormal ? "text-danger/70" : "text-danger-foreground/80")}>
+              심박수 {emergencyEvent.heartAbnormal && `· ${emergencyEvent.heartStatus}`}
+            </span>
+            <span className="mt-0.5 text-2xl font-bold">
+              {emergencyEvent.heartRate}
+              <span className="ml-1 text-sm font-medium">bpm</span>
+            </span>
+          </div>
+          <div
+            className={cn(
+              "flex flex-col items-center rounded-2xl p-4 transition",
+              emergencyEvent.respAbnormal
+                ? "bg-danger-foreground text-danger ring-2 ring-danger-foreground"
+                : "bg-danger-foreground/15",
+            )}
+          >
+            <Wind size={22} aria-hidden />
+            <span className={cn("mt-1 text-xs", emergencyEvent.respAbnormal ? "text-danger/70" : "text-danger-foreground/80")}>
+              호흡수 {emergencyEvent.respAbnormal && `· ${emergencyEvent.respStatus}`}
+            </span>
+            <span className="mt-0.5 text-2xl font-bold">
+              {emergencyEvent.respiration}
+              <span className="ml-1 text-sm font-medium">회/분</span>
+            </span>
+          </div>
+        </div>
+
+        {/* 경고음 음소거 토글 */}
+        <button
+          onClick={() => setMuted((m) => !m)}
+          className="mt-4 flex items-center gap-2 rounded-full bg-danger-foreground/15 px-4 py-2 text-sm font-medium"
+          aria-pressed={muted}
+        >
+          {muted ? <VolumeX size={16} aria-hidden /> : <Volume2 size={16} aria-hidden />}
+          {muted ? "경고음 꺼짐" : "경고음 켜짐"}
+        </button>
       </div>
 
-      <div className="space-y-3 px-6 pb-10">
+      <div className="shrink-0 space-y-3 px-6 pb-10">
         <a
           href="tel:0000000000"
           className="flex h-14 w-full items-center justify-center gap-2 rounded-2xl bg-danger-foreground font-semibold text-danger"

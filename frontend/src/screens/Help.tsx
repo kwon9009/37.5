@@ -37,7 +37,7 @@ export default function Help() {
           </span>
           <span>
             <span className="block font-bold">응급 대응 가이드 안내</span>
-            <span className="block text-sm text-primary-foreground/80">낙상 등 응급 상황 대처법을 확인하세요</span>
+            <span className="block text-sm text-primary-foreground/80">심박수 이상 등 응급 상황 대처법을 확인하세요</span>
           </span>
         </button>
 

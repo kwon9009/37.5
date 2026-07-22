@@ -27,7 +27,7 @@ function ConsentBlock({
         <span
           className={cn(
             "rounded-full px-2 py-0.5 text-xs font-semibold",
-            required ? "bg-primary/10 text-primary" : "bg-accent/15 text-accent",
+            required ? "bg-accent/15 text-accent" : "bg-primary/15 text-primary",
           )}
         >
           {required ? "필수" : "선택"}
@@ -54,7 +54,9 @@ function ConsentBlock({
           onClick={() => onChange("no")}
           className={cn(
             "h-11 flex-1 rounded-xl border text-sm font-semibold transition",
-            value === "no" ? "border-foreground bg-foreground text-background" : "border-border bg-card text-foreground",
+            value === "no" 
+              ? "border-primary bg-primary text-primary-foreground"
+              : "border-border bg-card text-foreground",
           )}
         >
           아니오
@@ -82,7 +84,7 @@ export default function Terms() {
           required
           title="사용자 정보 보관에 대한 사항"
           body="사용자 및 환자의 생체신호·계정 정보를 안전하게 보관하고 모니터링 목적에 한해 활용합니다."
-          restriction="거부 시 서비스 이용에 제약이 있을 수 있습니다."
+          restriction="거부 시 서비스 이용이 불가능합니다."
           value={required}
           onChange={setRequired}
         />

@@ -11,8 +11,10 @@ type ScreenProps = {
 /** Centered mobile frame wrapper used by every screen. */
 export function Screen({ children, className }: ScreenProps) {
   return (
-    <div className="flex min-h-dvh justify-center bg-muted/40">
-      <div className={cn("app-shell flex min-h-dvh flex-col bg-background", className)}>{children}</div>
+    <div className="flex h-dvh justify-center overflow-hidden bg-muted/40">
+      {/* h-dvh + overflow-hidden: 바깥 스크롤을 없애 스크롤바가 상단 제목 칸(TopBar) 위로 겹치지 않게 함.
+          실제 스크롤은 각 화면 내부의 overflow-y-auto 영역에서만 발생. */}
+      <div className={cn("app-shell flex h-dvh flex-col overflow-hidden bg-background", className)}>{children}</div>
     </div>
   )
 }

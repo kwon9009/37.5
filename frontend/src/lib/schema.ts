@@ -138,7 +138,7 @@ export interface EmergencyLog {
   patient_id: ID
   heart_rate: number // INT
   resp_rate: number // INT
-  event_type: string // VARCHAR(50) 예: "fall", "resp_abnormal"
+  event_type: string // VARCHAR(50) 예: "cardiac"(심박 이상), "resp_abnormal"(호흡 이상)
   created_at: Timestamp
 }
 

@@ -17,7 +17,7 @@ export default function Splash() {
         </div>
         <h1 className="text-5xl font-bold tracking-tight">37.5°C</h1>
         <p className="mt-3 text-balance text-center text-primary-foreground/80">
-          소중한 가족의 건강을 곁에서 지켜보세요
+          세상을 단 1°C를 올려서 더 많은 생명을 살리자!
         </p>
       </div>
       <div className="px-6 pb-10">

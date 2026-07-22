@@ -30,6 +30,31 @@ export const vitals = {
   present: device?.status === "active",
 }
 
+// 최신 응급 이벤트 (응급 화면에서 심박/호흡 표시용)
+const latestEmergency = db.emergency_logs
+  .filter((e) => e.patient_id === currentPatient.patient_id)
+  .sort((a, b) => (a.created_at < b.created_at ? 1 : -1))[0]
+
+// 성인 정상 범위 기준 (요양병원 모니터링 기준값)
+const HR_NORMAL = { min: 60, max: 100 } // 심박수 bpm
+const RR_NORMAL = { min: 12, max: 20 } // 호흡수 회/분
+
+const evHeart = latestEmergency?.heart_rate ?? 0
+const evResp = latestEmergency?.resp_rate ?? 0
+const heartAbnormal = evHeart < HR_NORMAL.min || evHeart > HR_NORMAL.max
+const respAbnormal = evResp < RR_NORMAL.min || evResp > RR_NORMAL.max
+
+export const emergencyEvent = {
+  heartRate: evHeart,
+  respiration: evResp,
+  eventType: latestEmergency?.event_type ?? "cardiac",
+  // 심박/호흡 이상을 나눠서 판별
+  heartAbnormal,
+  respAbnormal,
+  heartStatus: evHeart > HR_NORMAL.max ? "높음" : evHeart < HR_NORMAL.min ? "낮음" : "정상",
+  respStatus: evResp > RR_NORMAL.max ? "높음" : evResp < RR_NORMAL.min ? "낮음" : "정상",
+}
+
 export type { NotiType }
 export type Noti = {
   id: number
@@ -92,7 +117,7 @@ export const historyLog = [
     .map((e) => ({
       id: 10000 + e.emergency_log_id,
       type: "urgent" as NotiType,
-      title: `응급 이벤트 (${e.event_type}) · 심박 ${e.heart_rate} / 호흡 ${e.resp_rate}`,
+      title: `심박수 이상 감지 · 심박 ${e.heart_rate} / 호흡 ${e.resp_rate}`,
       date: shortDate(e.created_at),
     })),
   ...db.alerts
@@ -112,7 +137,7 @@ export const faqs = [
   },
   {
     q: "긴급 알림은 어떻게 동작하나요?",
-    a: "낙상 등 응급 상황이 감지되면 즉시 푸시 알림과 함께 응급 대응 가이드 화면이 표시됩니다.",
+    a: "심박수 이상 등 응급 상황이 감지되면 즉시 푸시 알림·경고음과 함께 응급 대응 가이드 화면이 표시됩니다.",
   },
   {
     q: "병원 연락 버튼을 누르면 어떻게 되나요?",

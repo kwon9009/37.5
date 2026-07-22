@@ -9,9 +9,12 @@ import "@/verify.css"
 // 데모용 정답 인증번호
 const DEMO_CODE = "123456"
 
+// 데모용 이미 사용 중인 아이디
+const TAKEN_IDS = ["admin", "test", "user123", "hong", "guardian"]
+
 const pwRules = [
-  { key: "digit", label: "숫자 포함", test: (v: string) => /[0-9]/.test(v) },
   { key: "letter", label: "영문(대/소문자)", test: (v: string) => /[a-zA-Z]/.test(v) },
+  { key: "digit", label: "숫자 포함", test: (v: string) => /[0-9]/.test(v) },
   { key: "special", label: "특수기호", test: (v: string) => /[^A-Za-z0-9]/.test(v) },
 ]
 
@@ -25,6 +28,21 @@ export default function Signup() {
   const [codeShake, setCodeShake] = useState(false)
   const [verified, setVerified] = useState(false)
 
+  // 성명 상태 (완성 한글만)
+  const [name, setName] = useState("")
+  const [nameWarning, setNameWarning] = useState("")
+  const [nameShake, setNameShake] = useState(false)
+
+  // 연락처 상태 (010-XXXX-XXXX)
+  const [phone, setPhone] = useState("")
+  const [phoneWarning, setPhoneWarning] = useState("")
+  const [phoneShake, setPhoneShake] = useState(false)
+
+  // 아이디 상태 (중복검사)
+  const [userid, setUserid] = useState("")
+  const [useridStatus, setUseridStatus] = useState<"idle" | "ok" | "taken" | "invalid">("idle")
+  const [useridShake, setUseridShake] = useState(false)
+
   // 비밀번호 상태
   const [pw, setPw] = useState("")
   const [pw2, setPw2] = useState("")
@@ -32,6 +50,58 @@ export default function Signup() {
   const [pwWarning, setPwWarning] = useState("")
 
   const pwValid = pwRules.every((r) => r.test(pw))
+
+  // 성명: 완성된 한글(가-힣)만 허용. 자모/영문/숫자 포함 시 진동 + 삭제
+  function handleNameBlur() {
+    if (name && !/^[가-힣]+$/.test(name)) {
+      setNameWarning("완성된 한글만 입력할 수 있습니다. 다시 입력해 주세요.")
+      setNameShake(true)
+      setName("")
+    } else {
+      setNameWarning("")
+    }
+  }
+
+  // 연락처: 입력 중 자동으로 010-XXXX-XXXX 형태로 포맷
+  function handlePhoneChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const digits = e.target.value.replace(/[^0-9]/g, "").slice(0, 11)
+    let out = digits
+    if (digits.length > 3 && digits.length <= 7) {
+      out = `${digits.slice(0, 3)}-${digits.slice(3)}`
+    } else if (digits.length > 7) {
+      out = `${digits.slice(0, 3)}-${digits.slice(3, 7)}-${digits.slice(7)}`
+    }
+    setPhone(out)
+    setPhoneWarning("")
+  }
+
+  // 연락처: 형식 불충족 시 진동 + 삭제
+  function handlePhoneBlur() {
+    if (phone && !/^010-\d{4}-\d{4}$/.test(phone)) {
+      setPhoneWarning("010-XXXX-XXXX 형태로 입력해 주세요.")
+      setPhoneShake(true)
+      setPhone("")
+    } else {
+      setPhoneWarning("")
+    }
+  }
+
+  // 아이디: 중복검사 (형식 검사 + 사용 여부 확인)
+  // 규칙: 영문과 숫자를 모두 포함, 최소 6자 이상
+  function handleUseridCheck() {
+    if (!/^(?=.*[a-zA-Z])(?=.*[0-9])[a-zA-Z0-9]{6,20}$/.test(userid)) {
+      setUseridStatus("invalid")
+      setUseridShake(true)
+      return
+    }
+    if (TAKEN_IDS.includes(userid.toLowerCase())) {
+      setUseridStatus("taken")
+      setUseridShake(true)
+      setUserid("")
+      return
+    }
+    setUseridStatus("ok")
+  }
 
   // 인증번호: 숫자만 입력, 숫자 외 입력 시 경고
   function handleCodeChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -94,18 +164,61 @@ export default function Signup() {
             <p className="mt-1 text-sm text-muted-foreground">보호자 본인 인증 후 계정을 생성합니다.</p>
           </div>
 
-          <Field id="name" label="성명" placeholder="성명을 입력하세요" required />
+          <div>
+            <Field
+              id="name"
+              label="성명"
+              placeholder="성명을 입력하세요"
+              value={name}
+              onChange={(e) => {
+                setName(e.target.value)
+                setNameWarning("")
+              }}
+              onBlur={handleNameBlur}
+              onAnimationEnd={() => setNameShake(false)}
+              className={cn(nameShake && "verify-shake", nameWarning && "verify-error-border")}
+              required
+            />
+            {nameWarning && (
+              <p className="verify-warning" role="alert">
+                <AlertCircle size={14} aria-hidden />
+                {nameWarning}
+              </p>
+            )}
+          </div>
 
           {/* 연락처 + 인증번호 발급 */}
           <div>
             <span className="mb-1.5 block text-sm font-medium text-muted-foreground">연락처</span>
             <div className="flex w-full items-stretch gap-2">
-              <Field id="phone" type="tel" placeholder="휴대폰 번호" className="flex-1" required />
+              <input
+                id="phone"
+                type="tel"
+                inputMode="numeric"
+                placeholder="010-0000-0000"
+                aria-label="연락처"
+                className={cn(
+                  "h-13 min-w-0 flex-1 rounded-2xl border border-input bg-card px-4 text-base text-foreground outline-none placeholder:text-muted-foreground/60 focus:border-ring focus:ring-2 focus:ring-ring/20",
+                  phoneShake && "verify-shake",
+                  phoneWarning && "verify-error-border",
+                )}
+                value={phone}
+                onChange={handlePhoneChange}
+                onBlur={handlePhoneBlur}
+                onAnimationEnd={() => setPhoneShake(false)}
+                required
+              />
               <Button
                 type="button"
                 variant="outline"
-                className="h-13 w-auto shrink-0 whitespace-nowrap px-4 text-sm"
+                className="h-13 w-28 shrink-0 whitespace-nowrap px-0 text-sm"
                 onClick={() => {
+                  if (!/^010-\d{4}-\d{4}$/.test(phone)) {
+                    setPhoneWarning("010-XXXX-XXXX 형태로 입력해 주세요.")
+                    setPhoneShake(true)
+                    setPhone("")
+                    return
+                  }
                   setPhoneSent(true)
                   setVerified(false)
                   setCode("")
@@ -115,6 +228,12 @@ export default function Signup() {
                 인증번호 발급
               </Button>
             </div>
+            {phoneWarning && (
+              <p className="verify-warning" role="alert">
+                <AlertCircle size={14} aria-hidden />
+                {phoneWarning}
+              </p>
+            )}
           </div>
 
           {/* 인증번호 확인 시퀀스 */}
@@ -133,7 +252,7 @@ export default function Signup() {
                   placeholder="인증번호 6자리"
                   aria-label="인증번호"
                   className={cn(
-                    "verify-code-input h-13 flex-1 rounded-2xl border border-input bg-card px-4 text-base text-foreground outline-none placeholder:font-normal placeholder:tracking-normal placeholder:text-muted-foreground/60 focus:border-ring focus:ring-2 focus:ring-ring/20 disabled:opacity-60",
+                    "verify-code-input h-13 min-w-0 flex-1 rounded-2xl border border-input bg-card px-4 text-base text-foreground outline-none placeholder:font-normal placeholder:tracking-normal placeholder:text-muted-foreground/60 focus:border-ring focus:ring-2 focus:ring-ring/20 disabled:opacity-60",
                     codeWarning && "verify-error-border",
                     codeShake && "verify-shake",
                   )}
@@ -141,7 +260,7 @@ export default function Signup() {
                 <Button
                   type="button"
                   variant={verified ? "muted" : "primary"}
-                  className="h-13 w-auto shrink-0 whitespace-nowrap px-5 text-sm"
+                  className="h-13 w-28 shrink-0 whitespace-nowrap px-0 text-sm"
                   disabled={verified}
                   onClick={handleVerify}
                 >
@@ -168,7 +287,56 @@ export default function Signup() {
 
           <div className="h-px bg-border" />
 
-          <Field id="userid" label="아이디" placeholder="아이디를 입력하세요" required />
+          {/* 아이디 + 중복검사 */}
+          <div>
+            <span className="mb-1.5 block text-sm font-medium text-muted-foreground">아이디</span>
+            <div className="flex w-full items-stretch gap-2">
+              <input
+                id="userid"
+                placeholder="영문+숫자 조합 6자 이상"
+                aria-label="아이디"
+                className={cn(
+                  "h-13 min-w-0 flex-1 rounded-2xl border border-input bg-card px-4 text-base text-foreground outline-none placeholder:text-muted-foreground/60 focus:border-ring focus:ring-2 focus:ring-ring/20",
+                  useridShake && "verify-shake",
+                  (useridStatus === "taken" || useridStatus === "invalid") && "verify-error-border",
+                )}
+                value={userid}
+                onChange={(e) => {
+                  setUserid(e.target.value)
+                  setUseridStatus("idle")
+                }}
+                onAnimationEnd={() => setUseridShake(false)}
+                required
+              />
+              <Button
+                type="button"
+                variant={useridStatus === "ok" ? "muted" : "primary"}
+                className="h-13 w-28 shrink-0 whitespace-nowrap px-0 text-sm"
+                disabled={useridStatus === "ok"}
+                onClick={handleUseridCheck}
+              >
+                {useridStatus === "ok" ? "확인됨" : "중복검사"}
+              </Button>
+            </div>
+            {useridStatus === "invalid" && (
+              <p className="verify-warning" role="alert">
+                <AlertCircle size={14} aria-hidden />
+                아이디는 영문과 숫자를 모두 포함해 6자 이상으로 입력해 주세요.
+              </p>
+            )}
+            {useridStatus === "taken" && (
+              <p className="verify-warning" role="alert">
+                <AlertCircle size={14} aria-hidden />
+                이미 사용 중인 아이디입니다. 다시 입력해 주세요.
+              </p>
+            )}
+            {useridStatus === "ok" && (
+              <p className="verify-success">
+                <CheckCircle2 size={14} aria-hidden />
+                사용 가능한 아이디입니다.
+              </p>
+            )}
+          </div>
 
           {/* 비밀번호 + 요구사항 */}
           <div>
@@ -186,14 +354,14 @@ export default function Signup() {
               className={cn(pwShake && "verify-shake", pwWarning && "verify-error-border")}
               required
             />
-            <ul className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1.5">
+            <ul className="mt-2 flex items-center gap-3">
               {pwRules.map((r) => {
                 const ok = r.test(pw)
                 return (
                   <li
                     key={r.key}
                     className={cn(
-                      "flex items-center gap-1.5 text-xs font-medium transition",
+                      "flex items-center gap-1.5 whitespace-nowrap text-xs font-medium transition",
                       ok ? "text-success" : "text-muted-foreground",
                     )}
                   >

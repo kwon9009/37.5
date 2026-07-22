@@ -1,8 +1,9 @@
 import { useState } from "react"
 import { useNavigate } from "react-router-dom"
-import { User, FileText, LogOut, ChevronRight, VolumeX, Volume1, Volume2 } from "lucide-react"
+import { User, FileText, LogOut, ChevronRight, ChevronDown, VolumeX, Volume1, Volume2, CheckCircle2 } from "lucide-react"
 import { Screen, TopBar } from "@/components/Screen"
 import { BottomNav } from "@/components/BottomNav"
+import { cn } from "@/lib/utils"
 import { patient } from "@/lib/data"
 
 const soundLevels = [
@@ -12,10 +13,67 @@ const soundLevels = [
   { key: "high", label: "크게", Icon: Volume2 },
 ]
 
+type Choice = "yes" | "no"
+
+// 회원가입 전 약관 동의(Terms)와 동일한 예/아니오 재동의 블록
+function ConsentRow({
+  required,
+  title,
+  value,
+  onChange,
+}: {
+  required?: boolean
+  title: string
+  value: Choice
+  onChange: (c: Choice) => void
+}) {
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center gap-2">
+        <span
+          className={cn(
+            "rounded-full px-2 py-0.5 text-xs font-semibold",
+            required ? "bg-accent/15 text-accent" : "bg-primary/15 text-primary",
+          )}
+        >
+          {required ? "필수" : "선택"}
+        </span>
+        <span className="text-sm font-medium text-foreground">{title}</span>
+      </div>
+      <div className="flex gap-2">
+        <button
+          onClick={() => onChange("yes")}
+          className={cn(
+            "h-10 flex-1 rounded-xl border text-sm font-semibold transition",
+            value === "yes" ? "border-primary bg-primary text-primary-foreground" : "border-border bg-card text-foreground",
+          )}
+        >
+          동의
+        </button>
+        <button
+          onClick={() => onChange("no")}
+          className={cn(
+            "h-10 flex-1 rounded-xl border text-sm font-semibold transition",
+            value === "no" ? "border-primary bg-primary text-primary-foreground" : "border-border bg-card text-foreground",
+          )}
+        >
+          비동의
+        </button>
+      </div>
+    </div>
+  )
+}
+
 export default function Settings() {
   const navigate = useNavigate()
   const [sound, setSound] = useState("mid")
   const current = soundLevels.find((l) => l.key === sound) ?? soundLevels[2]
+
+  // 이용약관 및 정책 재동의 (가입 시 동의한 상태로 시작)
+  const [termsOpen, setTermsOpen] = useState(false)
+  const [requiredConsent, setRequiredConsent] = useState<Choice>("yes")
+  const [optionalConsent, setOptionalConsent] = useState<Choice>("yes")
+  const [savedMsg, setSavedMsg] = useState("")
 
   return (
     <Screen>
@@ -74,11 +132,70 @@ export default function Settings() {
             </div>
           </div>
           <div className="h-px bg-border" />
-          <button className="flex w-full items-center gap-3 px-5 py-4 text-left hover:bg-muted/40">
+          <button
+            onClick={() => {
+              setTermsOpen((o) => !o)
+              setSavedMsg("")
+            }}
+            aria-expanded={termsOpen}
+            className="flex w-full items-center gap-3 px-5 py-4 text-left hover:bg-muted/40"
+          >
             <FileText size={20} className="text-primary" aria-hidden />
             <span className="flex-1 font-medium text-foreground">이용약관 및 정책</span>
-            <ChevronRight size={18} className="text-muted-foreground" aria-hidden />
+            {termsOpen ? (
+              <ChevronDown size={18} className="text-muted-foreground" aria-hidden />
+            ) : (
+              <ChevronRight size={18} className="text-muted-foreground" aria-hidden />
+            )}
           </button>
+          {termsOpen && (
+            <div className="space-y-4 border-t border-border bg-muted/30 px-5 py-4">
+              <p className="text-xs leading-relaxed text-muted-foreground">
+                이용약관 및 정책에 대한 동의 여부를 다시 선택할 수 있습니다. 필수 항목에 비동의 시 서비스 이용이 제한될 수 있습니다.
+              </p>
+              <ConsentRow
+                required
+                title="사용자 정보 보관에 대한 사항"
+                value={requiredConsent}
+                onChange={(c) => {
+                  setRequiredConsent(c)
+                  setSavedMsg("")
+                }}
+              />
+              <ConsentRow
+                title="이벤트 정보 수집 (선택)"
+                value={optionalConsent}
+                onChange={(c) => {
+                  setOptionalConsent(c)
+                  setSavedMsg("")
+                }}
+              />
+              <button
+                onClick={() =>
+                  setSavedMsg(
+                    requiredConsent === "no"
+                      ? "필수 항목에 비동의하여 일부 서비스 이용이 제한됩니다."
+                      : "동의 설정이 저장되었습니다.",
+                  )
+                }
+                className="h-11 w-full rounded-xl bg-primary text-sm font-semibold text-primary-foreground transition hover:bg-primary/90"
+              >
+                변경 사항 저장
+              </button>
+              {savedMsg && (
+                <p
+                  className={cn(
+                    "flex items-center gap-1.5 text-xs font-medium",
+                    requiredConsent === "no" ? "text-danger" : "text-success",
+                  )}
+                  role="status"
+                >
+                  <CheckCircle2 size={14} aria-hidden />
+                  {savedMsg}
+                </p>
+              )}
+            </div>
+          )}
         </div>
 
         <button
