@@ -3,7 +3,7 @@ from datetime import datetime
 from pydantic import BaseModel
 
 
-class EmergencyEventResponse(BaseModel):
+class DashboardEmergencyResponse(BaseModel):
     emergency_log_id: int
 
     patient_id: int

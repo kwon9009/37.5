@@ -128,9 +128,9 @@ def create_hospitals(db: Session):
             hospital_code="BUSAN001",
         ),
         Hospital(
-            name="부산병원",
-            area="부산",
-            hospital_code="BUSAN001",
+            name="대전병원",
+            area="대전",
+            hospital_code="DAEJEON001",
         ),
     ]
 
