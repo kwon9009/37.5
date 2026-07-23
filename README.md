@@ -79,7 +79,7 @@ Windows PowerShell에서:
 ```powershell
 cd frontend
 if (!(Test-Path ".env")) { Copy-Item ".env.example" ".env" }
-docker run --rm -it -p 127.0.0.1:5173:5173 -v "${PWD}:/app" -v "web_375_node_modules:/app/node_modules" -w /app node:22-alpine sh -c "npm install && npm run dev -- --host 0.0.0.0"
+docker run --rm -it -p 127.0.0.1:5173:5173 -v "${PWD}:/app" -v "web_375_node_modules:/app/node_modules" -w /app node:24-alpine sh -c "npm install && npm run dev -- --host 0.0.0.0"
 ```
 
 브라우저에서 다음 주소로 접속합니다.

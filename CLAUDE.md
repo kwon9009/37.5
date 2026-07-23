@@ -32,9 +32,9 @@ git에 커밋되어 팀원 4명 전원이 동일한 맥락을 공유합니다.
   - 응급 로그 테이블: 이상 감지 시 전후 5분 1초 단위 정밀 데이터만 저장.
 
 ## 기술 스택
-- Backend: Python 3.11, FastAPI, SQLAlchemy, MySQL(PyMySQL), SSE(sse-starlette). API 문서는 Swagger 자동생성(/docs).
+- Backend: Python 3.12, FastAPI, SQLAlchemy, MySQL(PyMySQL), SSE(sse-starlette). API 문서는 Swagger 자동생성(/docs).
 - Frontend: React + Vite, PWA, 상태관리 Zustand, HTTP Axios, 실시간 차트 Chart.js, 스타일 Tailwind CSS.
-- Hardware: Python 3.11, pyserial(센서), requests(전송), OpenCV + 비전AI(낙상).
+- Hardware: Python 3.12, pyserial(센서), requests(전송), OpenCV + 비전AI(낙상).
 - 협업: GitHub, Notion(문서/진척), Figma(와이어프레임).
 
 ## 저장소 구조
@@ -44,7 +44,7 @@ git에 커밋되어 팀원 4명 전원이 동일한 맥락을 공유합니다.
 - docs/     : 상세 배경 문서(PROJECT.md). ERD/시나리오 이미지도 여기에 둘 것.
 
 ## 개발 규칙 (컨벤션)
-- 언어/버전: Python 3.11, Node 20 LTS로 통일. 각 컴포넌트는 가상환경(venv) 사용.
+- 언어/버전: Python 3.12, Node 24 LTS로 통일. 각 컴포넌트는 가상환경(venv) 사용.
 - 포매터: Python=Black, JS/React=Prettier(+ESLint). 저장 시 자동 포맷.
 - 브랜치 이름: `타입/영역-내용` (예: feat/be-vitals-api, feat/hw-mmwave-reader). 타입=feat/fix/docs/chore, 영역=be/fe/hw.
 - 커밋 메시지: `타입: 내용` (예: feat: 심박 파싱 추가).
