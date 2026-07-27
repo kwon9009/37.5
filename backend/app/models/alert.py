@@ -3,10 +3,20 @@ from __future__ import annotations
 from datetime import datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import Boolean, ForeignKey, String, TIMESTAMP, func, BigInteger, text
+from sqlalchemy import (
+    Boolean,
+    ForeignKey,
+    String,
+    TIMESTAMP,
+    func,
+    BigInteger,
+    text,
+    Enum,
+)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
+from app.models.enums import VitalStatus
 
 if TYPE_CHECKING:
     from app.models.department import Department
@@ -43,6 +53,11 @@ class Alert(Base):
         nullable=False,
     )
 
+    status: Mapped[VitalStatus] = mapped_column(
+        Enum(VitalStatus),
+        nullable=False,
+    )
+
     # 바꾸기
     is_read: Mapped[bool] = mapped_column(
         Boolean,
@@ -71,4 +86,9 @@ class Alert(Base):
     )
 
     def __repr__(self) -> str:
-        return f"Alert(" f"alert_id={self.alert_id}, " f"is_read={self.is_read})"
+        return (
+            f"Alert("
+            f"alert_id={self.alert_id}, "
+            f"is_read={self.is_read}), "
+            f"status={self.status})"
+        )

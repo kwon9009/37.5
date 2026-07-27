@@ -1,0 +1,73 @@
+/* 인증번호 확인 시퀀스 전용 스타일 */
+
+/* 잘못 입력 시 진동(shake) 애니메이션 */
+@keyframes verify-shake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  15% {
+    transform: translateX(-8px);
+  }
+  30% {
+    transform: translateX(7px);
+  }
+  45% {
+    transform: translateX(-6px);
+  }
+  60% {
+    transform: translateX(5px);
+  }
+  75% {
+    transform: translateX(-3px);
+  }
+  90% {
+    transform: translateX(2px);
+  }
+}
+
+.verify-shake {
+  animation: verify-shake 0.4s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
+}
+
+/* 오류 상태의 입력 필드 강조 */
+.verify-error {
+  border-color: var(--color-danger) !important;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-danger) 18%, transparent);
+}
+
+/* 숫자 입력 필드: 브라우저 기본 스핀 버튼 제거 */
+.verify-code::-webkit-outer-spin-button,
+.verify-code::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.verify-code {
+  -moz-appearance: textfield;
+  appearance: textfield;
+  letter-spacing: 0.4em;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 인증 완료 상태 */
+.verify-success {
+  border-color: var(--color-success) !important;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-success) 18%, transparent);
+}
+
+/* 경고 메시지 등장 */
+@keyframes verify-warn-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.verify-warn {
+  animation: verify-warn-in 0.2s ease-out both;
+}

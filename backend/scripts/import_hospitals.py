@@ -21,6 +21,6 @@ for index, row in df.iterrows():
     )
 
     db.add(hospital)
-
+print("병원 데이터 추가 완료")
 db.commit()
 db.close()

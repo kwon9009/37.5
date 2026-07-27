@@ -433,6 +433,12 @@ def create_alerts(db: Session):
 
     departments = db.query(Department).order_by(Department.department_id).all()
 
+    alert_statuses = [
+        VitalStatus.WARNING,
+        VitalStatus.ALERT,
+        VitalStatus.DANGER,
+    ]
+
     messages = {
         VitalStatus.WARNING: "활력징후 주의가 감지되었습니다.",
         VitalStatus.ALERT: "의료진 확인이 필요합니다.",
@@ -443,21 +449,15 @@ def create_alerts(db: Session):
 
     for i, patient in enumerate(patients):
 
-        vital = (
-            db.query(VitalCheck)
-            .filter(VitalCheck.patient_id == patient.patient_id)
-            .first()
-        )
-
-        if vital.status == VitalStatus.NORMAL:
-            continue
+        status = random.choice(alert_statuses)
 
         alerts.append(
             Alert(
                 patient_id=patient.patient_id,
                 department_id=patient.department_id,
                 guardian_id=guardians[i % len(guardians)].guardian_id,
-                message=messages[vital.status],
+                message=messages[status],
+                status=status,
                 is_read=random.choice([True, False]),
             )
         )
@@ -555,7 +555,6 @@ def main():
             return
 
         create_users(db)
-        create_hospitals(db)
         create_admins(db)
         create_admin_hospitals(db)
         create_departments(db)
