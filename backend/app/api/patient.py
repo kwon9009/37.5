@@ -11,6 +11,9 @@ from app.schemas.patient.patient_vital_logs_response import (
 from app.schemas.patient.patient_alert_response import (
     PatientAlertResponse,
 )
+from app.schemas.patient.patient_emergency_logs_response import (
+    PatientEmergencyLogsResponse,
+)
 from app.services import patient_service
 
 router = APIRouter(
@@ -59,6 +62,21 @@ def get_patient_alerts(
     db: Session = Depends(get_db),
 ):
     return patient_service.get_patient_alerts(
+        db=db,
+        patient_id=patient_id,
+    )
+
+
+# 환자 응급 기록 조회
+@router.get(
+    "/{patient_id}/emergency-logs",
+    response_model=PatientEmergencyLogsResponse,
+)
+def get_patient_emergency_logs(
+    patient_id: int,
+    db: Session = Depends(get_db),
+):
+    return patient_service.get_patient_emergency_logs(
         db=db,
         patient_id=patient_id,
     )

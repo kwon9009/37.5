@@ -18,6 +18,10 @@ from app.schemas.patient.patient_alert_response import (
     AlertResponse,
     PatientAlertResponse,
 )
+from app.schemas.patient.patient_emergency_logs_response import (
+    EmergencyLogResponse,
+    PatientEmergencyLogsResponse,
+)
 
 
 # 환자 상세 조회
@@ -121,6 +125,7 @@ def get_patient_alerts(
     for row in rows:
         alerts.append(
             AlertResponse(
+                alert_id=row.alert_id,
                 message=row.message,
                 status=row.status,
                 is_read=row.is_read,
@@ -130,4 +135,31 @@ def get_patient_alerts(
 
     return PatientAlertResponse(
         alerts=alerts,
+    )
+
+
+# 환자 응급 기록 조회
+def get_patient_emergency_logs(
+    db: Session,
+    patient_id: int,
+):
+    rows = patient_crud.get_patient_emergency_logs(
+        db=db,
+        patient_id=patient_id,
+    )
+
+    emergency_logs = []
+
+    for row in rows:
+        emergency_logs.append(
+            EmergencyLogResponse(
+                heart_rate=row.heart_rate,
+                resp_rate=row.resp_rate,
+                event_type=row.event_type,
+                created_at=row.created_at,
+            )
+        )
+
+    return PatientEmergencyLogsResponse(
+        emergency_logs=emergency_logs,
     )

@@ -118,7 +118,7 @@ def get_patient_emergency_logs(
     rows = (
         db.query(EmergencyLog)
         .filter(EmergencyLog.patient_id == patient_id)
-        .order_by(EmergencyLog.occurred_at.desc())
+        .order_by(EmergencyLog.created_at.desc())
         .all()
     )
 

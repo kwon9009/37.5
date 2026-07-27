@@ -5,6 +5,7 @@ from app.models.enums import VitalStatus
 
 
 class AlertResponse(BaseModel):
+    alert_id: int
     message: str
     status: VitalStatus
     is_read: bool
