@@ -69,7 +69,7 @@ def get_dashboard_patients(
             {
                 "patient_id": patient.patient_id,
                 "name": patient.name,
-                "room": f"{patient.room_num}호 · B-{patient.bed_num}",
+                "room": f"{patient.ward} · {patient.room_num}호 · {patient.bed_num}번",
                 "presence_label": patient.is_present,
                 "severity": vital.status,
                 "heart_rate": vital.heart_rate,

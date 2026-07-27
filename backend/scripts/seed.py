@@ -555,7 +555,6 @@ def main():
             return
 
         create_users(db)
-        create_hospitals(db)
         create_admins(db)
         create_admin_hospitals(db)
         create_departments(db)
