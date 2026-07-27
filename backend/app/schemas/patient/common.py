@@ -23,8 +23,8 @@ class PatientInfoResponse(BaseModel):
     gender: str
     birth_date: datetime
     ward: str
-    room_num: str
-    bed_num: str
+    room_num: int
+    bed_num: int
     status: PatientStatus
     is_present: bool
     special_notes: str | None
