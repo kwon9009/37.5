@@ -9,6 +9,8 @@ export default function Emergency() {
   const navigate = useNavigate()
   const [countdown, setCountdown] = useState(5)
   const [muted, setMuted] = useState(false)
+  // 브라우저 자동재생 정책으로 경고음이 막힌 상태
+  const [blocked, setBlocked] = useState(false)
 
   const audioCtxRef = useRef<AudioContext | null>(null)
   const intervalRef = useRef<number | null>(null)
@@ -22,45 +24,82 @@ export default function Emergency() {
   // 응급 경고음: Web Audio API 로 삐-삐 반복음 재생
   useEffect(() => {
     if (muted) {
-      if (intervalRef.current) window.clearInterval(intervalRef.current)
+      if (intervalRef.current) {
+        window.clearInterval(intervalRef.current)
+        intervalRef.current = null
+      }
       return
     }
 
-    const AudioCtx = window.AudioContext || (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
+    const AudioCtx =
+      window.AudioContext || (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
     if (!AudioCtx) return
 
-    const ctx = audioCtxRef.current ?? new AudioCtx()
-    audioCtxRef.current = ctx
+    // 닫힌 AudioContext 는 resume 할 수 없으므로 새로 생성해서 사용
+    let ctx = audioCtxRef.current
+    if (!ctx || ctx.state === "closed") {
+      ctx = new AudioCtx()
+      audioCtxRef.current = ctx
+    }
+    const active = ctx
+    let cancelled = false
 
     function beep() {
-      const osc = ctx.createOscillator()
-      const gain = ctx.createGain()
+      if (active.state !== "running") return
+      const osc = active.createOscillator()
+      const gain = active.createGain()
       osc.type = "square"
       osc.frequency.value = 880
-      gain.gain.setValueAtTime(0.0001, ctx.currentTime)
-      gain.gain.exponentialRampToValueAtTime(0.25, ctx.currentTime + 0.02)
-      gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.35)
-      osc.connect(gain).connect(ctx.destination)
+      gain.gain.setValueAtTime(0.0001, active.currentTime)
+      gain.gain.exponentialRampToValueAtTime(0.25, active.currentTime + 0.02)
+      gain.gain.exponentialRampToValueAtTime(0.0001, active.currentTime + 0.35)
+      osc.connect(gain).connect(active.destination)
       osc.start()
-      osc.stop(ctx.currentTime + 0.36)
+      osc.stop(active.currentTime + 0.36)
     }
 
-    // 브라우저 자동재생 정책상 사용자 상호작용 후 재생 (resume)
-    ctx.resume().then(() => {
+    function start() {
+      if (cancelled || active.state !== "running") return
+      setBlocked(false)
+      if (intervalRef.current) window.clearInterval(intervalRef.current)
       beep()
       intervalRef.current = window.setInterval(beep, 900)
-    })
+    }
+
+    // 자동재생 정책으로 resume 이 막히면 첫 사용자 상호작용에서 다시 시도
+    function tryResume() {
+      active
+        .resume()
+        .then(start)
+        .catch(() => setBlocked(true))
+    }
+
+    tryResume()
+    if (active.state !== "running") setBlocked(true)
+    window.addEventListener("pointerdown", tryResume)
+    window.addEventListener("keydown", tryResume)
 
     return () => {
-      if (intervalRef.current) window.clearInterval(intervalRef.current)
+      cancelled = true
+      window.removeEventListener("pointerdown", tryResume)
+      window.removeEventListener("keydown", tryResume)
+      if (intervalRef.current) {
+        window.clearInterval(intervalRef.current)
+        intervalRef.current = null
+      }
     }
   }, [muted])
 
-  // 화면 이탈 시 오디오 정리
+  // 화면 이탈 시 오디오 정리 (닫은 컨텍스트를 재사용하지 않도록 ref 초기화)
   useEffect(() => {
     return () => {
-      if (intervalRef.current) window.clearInterval(intervalRef.current)
-      audioCtxRef.current?.close()
+      if (intervalRef.current) {
+        window.clearInterval(intervalRef.current)
+        intervalRef.current = null
+      }
+      const ctx = audioCtxRef.current
+      audioCtxRef.current = null
+      if (ctx && ctx.state !== "closed") void ctx.close()
     }
   }, [])
 
@@ -136,6 +175,11 @@ export default function Emergency() {
           {muted ? <VolumeX size={16} aria-hidden /> : <Volume2 size={16} aria-hidden />}
           {muted ? "경고음 꺼짐" : "경고음 켜짐"}
         </button>
+        {!muted && blocked && (
+          <p className="mt-2 text-xs font-medium text-danger-foreground/80" role="status">
+            화면을 한 번 터치하면 경고음이 재생됩니다.
+          </p>
+        )}
       </div>
 
       <div className="shrink-0 space-y-3 px-6 pb-10">
