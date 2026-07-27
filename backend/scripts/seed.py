@@ -110,37 +110,6 @@ def create_users(db: Session):
 
 
 # --------------------------------------------------
-# Hospitals
-# --------------------------------------------------
-
-
-def create_hospitals(db: Session):
-
-    hospitals = [
-        Hospital(
-            name="서울병원",
-            area="서울",
-            hospital_code="SEOUL001",
-        ),
-        Hospital(
-            name="부산병원",
-            area="부산",
-            hospital_code="BUSAN001",
-        ),
-        Hospital(
-            name="대전병원",
-            area="대전",
-            hospital_code="DAEJEON001",
-        ),
-    ]
-
-    db.add_all(hospitals)
-    db.commit()
-
-    log("Hospitals")
-
-
-# --------------------------------------------------
 # Admin
 # --------------------------------------------------
 
