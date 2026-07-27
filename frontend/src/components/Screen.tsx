@@ -1,4 +1,4 @@
-import type { ReactNode } from "react"
+import { useEffect, useRef, useState, type ReactNode } from "react"
 import { useNavigate } from "react-router-dom"
 import { ChevronLeft, Bell } from "lucide-react"
 import { cn } from "@/lib/utils"
@@ -15,6 +15,64 @@ export function Screen({ children, className }: ScreenProps) {
       {/* h-dvh + overflow-hidden: 바깥 스크롤을 없애 스크롤바가 상단 제목 칸(TopBar) 위로 겹치지 않게 함.
           실제 스크롤은 각 화면 내부의 overflow-y-auto 영역에서만 발생. */}
       <div className={cn("app-shell flex h-dvh flex-col overflow-hidden bg-background", className)}>{children}</div>
+    </div>
+  )
+}
+
+type StickyActionProps = {
+  children: ReactNode
+  /** 하단에 고정될 액션 버튼 (예: "다음") */
+  action: ReactNode
+  /** 스크롤 영역 안쪽 여백/간격 클래스 */
+  className?: string
+}
+
+/**
+ * 스크롤 영역 + 하단 고정 액션 버튼 레이아웃 (모든 플로우 화면 공통 규칙).
+ * - 액션 버튼은 항상 최상단 레이어에 떠 있어(overlay) 내용 위에 겹칩니다.
+ * - 스크롤 내용은 하단 여백을 확보해 모든 요소를 버튼 바로 위까지 스크롤할 수 있습니다.
+ * - 아직 아래에 가려진 내용이 있으면(끝까지 스크롤되지 않았으면) 버튼을 중간 정도 반투명 처리해
+ *   뒤 내용을 확인하는 데 방해되지 않게 하고, 끝까지 스크롤하면 완전히 불투명해집니다.
+ */
+export function StickyAction({ children, action, className }: StickyActionProps) {
+  const ref = useRef<HTMLDivElement>(null)
+  const [dim, setDim] = useState(false)
+
+  function update() {
+    const el = ref.current
+    if (!el) return
+    const canScroll = el.scrollHeight - el.clientHeight > 4
+    const atBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 4
+    // 아래에 가려진 내용이 남아 있을 때만 버튼을 반투명 처리
+    setDim(canScroll && !atBottom)
+  }
+
+  useEffect(() => {
+    update()
+    const el = ref.current
+    if (!el) return
+    const ro = new ResizeObserver(update)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
+
+  return (
+    <div className="relative flex flex-1 flex-col overflow-hidden">
+      <div ref={ref} onScroll={update} className={cn("flex-1 overflow-y-auto", className)}>
+        {children}
+        {/* 하단 버튼이 마지막 내용을 가리지 않도록 여백 확보 (버튼 바로 위까지 스크롤 가능) */}
+        <div aria-hidden className="h-24" />
+      </div>
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 px-5 pb-5">
+        <div
+          className={cn(
+            "pointer-events-auto transition-opacity duration-300",
+            dim ? "opacity-60" : "opacity-100",
+          )}
+        >
+          {action}
+        </div>
+      </div>
     </div>
   )
 }

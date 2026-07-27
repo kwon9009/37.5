@@ -1,6 +1,6 @@
 import { useState } from "react"
 import { useNavigate } from "react-router-dom"
-import { Screen, TopBar } from "@/components/Screen"
+import { Screen, TopBar, StickyAction } from "@/components/Screen"
 import { Button, Card } from "@/components/ui"
 import { cn } from "@/lib/utils"
 
@@ -76,7 +76,14 @@ export default function Terms() {
   return (
     <Screen>
       <TopBar title="정보 보관 약관 동의" back />
-      <div className="flex-1 space-y-4 overflow-y-auto px-5 py-5">
+      <StickyAction
+        className="space-y-4 px-5 py-5"
+        action={
+          <Button disabled={!canProceed} onClick={() => navigate("/signup")}>
+            동의하고 계속하기
+          </Button>
+        }
+      >
         <p className="text-sm leading-relaxed text-muted-foreground">
           서비스 이용을 위해 아래 약관에 동의해 주세요. 필수 항목에 동의하지 않으면 서비스 이용이 제한될 수 있습니다.
         </p>
@@ -95,12 +102,7 @@ export default function Terms() {
           value={optional}
           onChange={setOptional}
         />
-      </div>
-      <div className="border-t border-border bg-card px-5 py-4">
-        <Button disabled={!canProceed} onClick={() => navigate("/signup")}>
-          동의하고 계속하기
-        </Button>
-      </div>
+      </StickyAction>
     </Screen>
   )
 }

@@ -3,7 +3,6 @@ import Splash from "./screens/Splash"
 import Terms from "./screens/Terms"
 import Signup from "./screens/Signup"
 import PatientInfo from "./screens/PatientInfo"
-import Hospital from "./screens/Hospital"
 import Waiting from "./screens/Waiting"
 import Login from "./screens/Login"
 import Home from "./screens/Home"
@@ -20,7 +19,6 @@ export const routes: RouteObject[] = [
   { path: "/terms", element: <Terms /> },
   { path: "/signup", element: <Signup /> },
   { path: "/patient-info", element: <PatientInfo /> },
-  { path: "/hospital", element: <Hospital /> },
   { path: "/waiting", element: <Waiting /> },
   { path: "/login", element: <Login /> },
   { path: "/home", element: <Home /> },

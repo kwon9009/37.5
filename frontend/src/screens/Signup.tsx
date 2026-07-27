@@ -51,9 +51,13 @@ export default function Signup() {
 
   const pwValid = pwRules.every((r) => r.test(pw))
 
-  // 성명: 완성된 한글(가-힣)만 허용. 자모/영문/숫자 포함 시 진동 + 삭제
+  // 성명: 미입력 시 안내, 완성된 한글(가-힣)만 허용. 자모/영문/숫자 포함 시 진동 + 삭제
   function handleNameBlur() {
-    if (name && !/^[가-힣]+$/.test(name)) {
+    if (!name) {
+      setNameWarning("성명을 입력해주세요.")
+      return
+    }
+    if (!/^[가-힣]+$/.test(name)) {
       setNameWarning("완성된 한글만 입력할 수 있습니다. 다시 입력해 주세요.")
       setNameShake(true)
       setName("")
@@ -136,6 +140,12 @@ export default function Signup() {
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
+    // 성명 미입력 시 안내 문구 표시
+    if (!name) {
+      setNameWarning("성명을 입력해주세요.")
+      setNameShake(true)
+      return
+    }
     // 비밀번호 요구사항 미충족 시 진동 + 입력값 삭제
     if (!pwValid) {
       setPwWarning("비밀번호 요구사항을 모두 충족해 주세요.")
@@ -177,7 +187,6 @@ export default function Signup() {
               onBlur={handleNameBlur}
               onAnimationEnd={() => setNameShake(false)}
               className={cn(nameShake && "verify-shake", nameWarning && "verify-error-border")}
-              required
             />
             {nameWarning && (
               <p className="verify-warning" role="alert">
