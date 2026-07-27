@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from sqlalchemy import String, BigInteger, UniqueConstraint
+from sqlalchemy import String, BigInteger, UniqueConstraint, Integer
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
@@ -13,7 +13,9 @@ if TYPE_CHECKING:
 
 class Hospital(Base):
     __tablename__ = "hospitals"
-    __table_args__ = (UniqueConstraint("name", "area", name="uk_hospital_name_area"),)
+    __table_args__ = (
+        UniqueConstraint("name", "address", name="uk_hospital_name_address"),
+    )
 
     hospital_id: Mapped[int] = mapped_column(
         BigInteger, primary_key=True, autoincrement=True
@@ -21,9 +23,11 @@ class Hospital(Base):
 
     name: Mapped[str] = mapped_column(String(50), nullable=False)
 
-    area: Mapped[str] = mapped_column(String(20), nullable=False)
+    address: Mapped[str] = mapped_column(String(50), nullable=False)
 
-    hospital_code: Mapped[str] = mapped_column(String(50), unique=True, nullable=False)
+    hospital_code: Mapped[str] = mapped_column(String(10), unique=True, nullable=False)
+
+    bed_count: Mapped[int] = mapped_column(Integer, nullable=False)
 
     # Relationship
     departments: Mapped[list["Department"]] = relationship(
@@ -37,6 +41,8 @@ class Hospital(Base):
             f"Hospital("
             f"hospital_id={self.hospital_id}, "
             f"name='{self.name}', "
-            f"area='{self.area}'"
+            f"address='{self.address}'"
+            f"hospital_code='{self.hospital_code}'"
+            f"bed_count='{self.bed_count}'"
             f")"
         )
