@@ -14,7 +14,7 @@ export default function Login() {
             className="mb-4 h-24 w-24 object-contain drop-shadow-sm"
           />
           <h1 className="text-3xl font-bold text-foreground">37.5°C</h1>
-          <p className="mt-1 text-sm text-muted-foreground">다시 오신 것을 환영합니다</p>
+          <p className="mt-1 text-sm text-muted-foreground">따스한 마음으로 세상을 밝히자!</p>
         </div>
 
         <form
