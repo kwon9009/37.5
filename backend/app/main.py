@@ -1,6 +1,8 @@
 """
-FastAPI 진입점 - "동작하는 뼈대" 버전.
-지금은 DB 없이 메모리에 최신값만 저장합니다. (나중에 MySQL로 교체)
+FastAPI 진입점.
+
+센서가 보낸 측정값은 MySQL에 저장하고(vital_checks/vital_logs),
+SSE 스트림용 최신값만 메모리에 함께 들고 있습니다.
 
 실행:  uvicorn app.main:app --reload
 확인:  http://localhost:8000/docs
@@ -11,9 +13,13 @@ import json
 from datetime import datetime
 import app.models
 
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy.orm import Session
 from sse_starlette.sse import EventSourceResponse
+from app.core.database import get_db
+from app.schemas.vitals.vitals_ingest_request import VitalsIngestRequest
+from app.services import vital_service
 from app.api.auth import router as auth_router
 from app.api.admin import router as admin_router
 from app.api.hospital import router as hospital_router
@@ -50,13 +56,22 @@ def health():
 
 
 @app.post("/api/vitals")
-async def receive_vitals(data: dict):
-    """라즈베리파이가 1초마다 보내는 생체 데이터 수신."""
-    data["received_at"] = datetime.now().isoformat()
-    patient_id = data.get("patient_id", "unknown")
-    latest_vitals[patient_id] = data
-    # TODO: 여기서 이상 감지 -> emergency_logs 저장 -> SMS 발송
-    return {"ok": True}
+def receive_vitals(
+    request: VitalsIngestRequest,
+    db: Session = Depends(get_db),
+):
+    """라즈베리파이가 1초마다 보내는 생체 데이터 수신 -> 등급 판정 후 DB 반영."""
+    result = vital_service.ingest_vitals(db=db, request=request)
+
+    # SSE 구독자에게 밀어줄 최신값 (메모리)
+    latest_vitals[str(request.patient_id)] = {
+        **request.model_dump(mode="json"),
+        "status": result["status"],
+        "received_at": datetime.now().isoformat(),
+    }
+
+    # TODO: DANGER 지속 시 -> alerts/emergency_logs 저장 -> SMS 발송
+    return {"ok": True, **result}
 
 
 @app.get("/api/stream/{patient_id}")
