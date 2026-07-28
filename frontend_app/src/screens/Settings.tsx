@@ -151,7 +151,7 @@ export default function Settings() {
           {termsOpen && (
             <div className="space-y-4 border-t border-border bg-muted/30 px-5 py-4">
               <p className="text-xs leading-relaxed text-muted-foreground">
-                이용약관 및 정책에 대한 동의 여부를 다시 선택할 수 있습니다. 필수 항목에 비동의 시 서비스 이용이 제한될 수 있습니다.
+                이용약관 및 정책에 대한 동의 여부를 다시 선택할 수 있습니다. 필수 항목에 비동의 시 서비스 이용이 불가능합니다.
               </p>
               <ConsentRow
                 required
