@@ -10,6 +10,7 @@ from app.models.patient import Patient
 from app.models.patient_guardian import PatientGuardian
 from app.models.vital_check import VitalCheck
 from app.models.vital_log import VitalLog
+from app.models.enums import VitalStatus
 
 
 # 환자 상세 조회
@@ -121,5 +122,48 @@ def get_patient_emergency_logs(
         .order_by(EmergencyLog.created_at.desc())
         .all()
     )
+
+    return rows
+
+
+# 환자 목록 조회
+def get_patients(
+    db: Session,
+    department_id: int,
+    keyword: str | None = None,
+    room_num: int | None = None,
+    status: VitalStatus | None = None,
+):
+
+    query = (
+        db.query(
+            Patient,
+            Department,
+            VitalCheck,
+        )
+        .join(
+            Department,
+            Patient.department_id == Department.department_id,
+        )
+        .outerjoin(
+            VitalCheck,
+            VitalCheck.patient_id == Patient.patient_id,
+        )
+        .filter(Patient.department_id == department_id)
+    )
+
+    if keyword:
+        query = query.filter(Patient.name.contains(keyword))
+
+    if room_num is not None:
+        query = query.filter(Patient.room_num == room_num)
+
+    if status:
+        query = query.filter(VitalCheck.status == status)
+
+    rows = query.order_by(
+        Patient.room_num,
+        Patient.bed_num,
+    ).all()
 
     return rows

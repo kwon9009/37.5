@@ -27,3 +27,14 @@ def create_department(
     db.flush()
 
     return department
+
+
+# User ID로 진료과 조회
+def get_by_user_id(
+    db: Session,
+    user_id: int,
+) -> Department | None:
+
+    stmt = select(Department).where(Department.user_id == user_id)
+
+    return db.scalar(stmt)

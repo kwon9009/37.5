@@ -13,7 +13,7 @@ class GuardianResponse(BaseModel):
 
 class CurrentVitalResponse(BaseModel):
     heart_rate: int | None
-    respiration_rate: int | None
+    resp_rate: int | None
     measured_at: datetime | None
 
 

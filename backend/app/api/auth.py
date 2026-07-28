@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.orm import Session
+from fastapi.security import OAuth2PasswordRequestForm
 
 from app.core.database import get_db
 from app.schemas.auth.login_request import LoginRequest
@@ -65,6 +66,26 @@ def register_department_api(
     db: Session = Depends(get_db),
 ) -> RegisterResponse:
     return register_department(
+        db=db,
+        request=request,
+    )
+
+
+@router.post(
+    "/token",
+    response_model=LoginResponse,
+)
+def login_token(
+    form_data: OAuth2PasswordRequestForm = Depends(),
+    db: Session = Depends(get_db),
+):
+
+    request = LoginRequest(
+        login_id=form_data.username,
+        password=form_data.password,
+    )
+
+    return login_user(
         db=db,
         request=request,
     )
