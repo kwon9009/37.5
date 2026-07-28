@@ -1,7 +1,10 @@
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
-from app.crud import patient_crud
+from app.crud import department_crud, patient_crud
+
+from app.models.enums import VitalStatus
+
 from app.schemas.patient.common import (
     CurrentVitalResponse,
     GuardianResponse,
@@ -21,6 +24,10 @@ from app.schemas.patient.patient_alert_response import (
 from app.schemas.patient.patient_emergency_logs_response import (
     EmergencyLogResponse,
     PatientEmergencyLogsResponse,
+)
+from app.schemas.patient.patient_list_respoonse import (
+    PatientListItemResponse,
+    PatientListResponse,
 )
 
 
@@ -59,7 +66,7 @@ def get_patient_detail(
     if vital_check:
         current_vital = CurrentVitalResponse(
             heart_rate=vital_check.heart_rate,
-            respiration_rate=vital_check.resp_rate,
+            resp_rate=vital_check.resp_rate,
             measured_at=vital_check.updated_at,
         )
 
@@ -162,4 +169,52 @@ def get_patient_emergency_logs(
 
     return PatientEmergencyLogsResponse(
         emergency_logs=emergency_logs,
+    )
+
+
+# 환자 목록 조회
+def get_patients(
+    db: Session,
+    user_id: int,
+    keyword: str | None = None,
+    room_num: int | None = None,
+    status: VitalStatus | None = None,
+) -> PatientListResponse:
+
+    department = department_crud.get_by_user_id(
+        db=db,
+        user_id=user_id,
+    )
+
+    rows = patient_crud.get_patients(
+        db=db,
+        department_id=department.department_id,
+        keyword=keyword,
+        room_num=room_num,
+        status=status,
+    )
+
+    patients = []
+
+    for patient, department, vital_check in rows:
+
+        patients.append(
+            PatientListItemResponse(
+                patient_id=patient.patient_id,
+                name=patient.name,
+                gender=patient.gender,
+                birthdate=patient.birthdate,
+                room_num=patient.room_num,
+                bed_num=patient.bed_num,
+                department_name=department.name,
+                patient_status=patient.status,
+                vital_status=vital_check.status if vital_check else None,
+                heart_rate=vital_check.heart_rate if vital_check else None,
+                resp_rate=vital_check.resp_rate if vital_check else None,
+                updated_at=vital_check.updated_at if vital_check else None,
+            )
+        )
+
+    return PatientListResponse(
+        patients=patients,
     )
