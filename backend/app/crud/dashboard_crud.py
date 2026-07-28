@@ -1,23 +1,37 @@
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
+from app.models.alert import Alert
 from app.models.device import Device
 from app.models.patient import Patient
 from app.models.vital_check import VitalCheck
-from app.models.alert import Alert
 
 
+# 대시보드 요약 조회
 def get_dashboard_summary(
     db: Session,
+    department_id: int,
 ) -> dict:
-    total_patients = db.query(Patient).count()
+
+    total_patients = (
+        db.query(Patient).filter(Patient.department_id == department_id).count()
+    )
 
     status_counts = (
         db.query(
             VitalCheck.status,
             func.count(VitalCheck.vital_check_id),
         )
-        .group_by(VitalCheck.status)
+        .join(
+            Patient,
+            Patient.patient_id == VitalCheck.patient_id,
+        )
+        .filter(
+            Patient.department_id == department_id,
+        )
+        .group_by(
+            VitalCheck.status,
+        )
         .all()
     )
 
@@ -40,8 +54,10 @@ def get_dashboard_summary(
     }
 
 
+# 대시보드 환자 목록 조회
 def get_dashboard_patients(
     db: Session,
+    department_id: int,
 ) -> list[dict]:
 
     results = (
@@ -57,6 +73,9 @@ def get_dashboard_patients(
         .join(
             Device,
             Patient.patient_id == Device.patient_id,
+        )
+        .filter(
+            Patient.department_id == department_id,
         )
         .all()
     )
@@ -83,12 +102,27 @@ def get_dashboard_patients(
     return patients
 
 
-def get_recent_alerts(db: Session) -> list[dict]:
+# 최근 알림 조회
+def get_recent_alerts(
+    db: Session,
+    department_id: int,
+) -> list[dict]:
 
     rows = (
-        db.query(Alert, Patient)
-        .join(Patient, Alert.patient_id == Patient.patient_id)
-        .order_by(Alert.sent_at.desc())
+        db.query(
+            Alert,
+            Patient,
+        )
+        .join(
+            Patient,
+            Alert.patient_id == Patient.patient_id,
+        )
+        .filter(
+            Patient.department_id == department_id,
+        )
+        .order_by(
+            Alert.sent_at.desc(),
+        )
         .limit(10)
         .all()
     )
@@ -96,6 +130,7 @@ def get_recent_alerts(db: Session) -> list[dict]:
     alerts = []
 
     for alert, patient in rows:
+
         alerts.append(
             {
                 "alert_id": alert.alert_id,

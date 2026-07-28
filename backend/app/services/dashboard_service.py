@@ -1,24 +1,46 @@
 from sqlalchemy.orm import Session
 
-from app.crud import dashboard_crud
+from app.crud import dashboard_crud, department_crud
 from app.models.enums import DeviceStatus, VitalStatus
+from app.schemas.dashboard.alert_response import DashboardAlertResponse
 from app.schemas.dashboard.patient_response import DashboardPatientResponse
 from app.schemas.dashboard.summary_response import DashboardSummaryResponse
-from app.schemas.dashboard.alert_response import DashboardAlertResponse
 
 
+# 대시보드 요약 조회
 def get_dashboard_summary(
     db: Session,
+    user_id: int,
 ) -> DashboardSummaryResponse:
-    summary = dashboard_crud.get_dashboard_summary(db)
+
+    department = department_crud.get_by_user_id(
+        db=db,
+        user_id=user_id,
+    )
+
+    summary = dashboard_crud.get_dashboard_summary(
+        db=db,
+        department_id=department.department_id,
+    )
+
     return DashboardSummaryResponse(**summary)
 
 
+# 대시보드 환자 목록 조회
 def get_dashboard_patients(
     db: Session,
+    user_id: int,
 ) -> list[DashboardPatientResponse]:
 
-    patients = dashboard_crud.get_dashboard_patients(db)
+    department = department_crud.get_by_user_id(
+        db=db,
+        user_id=user_id,
+    )
+
+    patients = dashboard_crud.get_dashboard_patients(
+        db=db,
+        department_id=department.department_id,
+    )
 
     severity_map = {
         VitalStatus.NORMAL: "normal",
@@ -42,7 +64,7 @@ def get_dashboard_patients(
                 patient_id=patient["patient_id"],
                 name=patient["name"],
                 room=patient["room"],
-                presence_label=("재실중" if patient["presence_label"] else "부재중"),
+                presence_label="재실중" if patient["presence_label"] else "부재중",
                 severity=severity_map[patient["severity"]],
                 heart_rate=patient["heart_rate"],
                 respiration_rate=patient["respiration_rate"],
@@ -55,10 +77,20 @@ def get_dashboard_patients(
     return response
 
 
+# 최근 알림 조회
 def get_recent_alerts(
     db: Session,
+    user_id: int,
 ) -> list[DashboardAlertResponse]:
 
-    alerts = dashboard_crud.get_recent_alerts(db)
+    department = department_crud.get_by_user_id(
+        db=db,
+        user_id=user_id,
+    )
+
+    alerts = dashboard_crud.get_recent_alerts(
+        db=db,
+        department_id=department.department_id,
+    )
 
     return [DashboardAlertResponse(**alert) for alert in alerts]
