@@ -13,6 +13,15 @@ from app.models.vital_log import VitalLog
 from app.models.enums import VitalStatus
 
 
+# 환자 단건 조회 (권한 검사용)
+def get_by_id(
+    db: Session,
+    patient_id: int,
+) -> Patient | None:
+
+    return db.query(Patient).filter(Patient.patient_id == patient_id).first()
+
+
 # 환자 상세 조회
 def get_patient_detail(
     db: Session,

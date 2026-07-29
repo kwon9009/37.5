@@ -1,9 +1,11 @@
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
-from app.crud import department_crud, patient_crud
+from app.crud import patient_crud
 
 from app.models.enums import VitalStatus
+from app.models.user import User
+from app.services import permission_service
 
 from app.schemas.patient.common import (
     CurrentVitalResponse,
@@ -35,7 +37,14 @@ from app.schemas.patient.patient_list_respoonse import (
 def get_patient_detail(
     db: Session,
     patient_id: int,
+    current_user: User,
 ):
+    permission_service.ensure_can_access_patient(
+        db=db,
+        current_user=current_user,
+        patient_id=patient_id,
+    )
+
     result = patient_crud.get_patient_detail(
         db=db,
         patient_id=patient_id,
@@ -95,7 +104,14 @@ def get_patient_detail(
 def get_patient_vital_logs(
     db: Session,
     patient_id: int,
+    current_user: User,
 ):
+    permission_service.ensure_can_access_patient(
+        db=db,
+        current_user=current_user,
+        patient_id=patient_id,
+    )
+
     rows = patient_crud.get_patient_vital_logs(
         db=db,
         patient_id=patient_id,
@@ -121,7 +137,14 @@ def get_patient_vital_logs(
 def get_patient_alerts(
     db: Session,
     patient_id: int,
+    current_user: User,
 ):
+    permission_service.ensure_can_access_patient(
+        db=db,
+        current_user=current_user,
+        patient_id=patient_id,
+    )
+
     rows = patient_crud.get_patient_alerts(
         db=db,
         patient_id=patient_id,
@@ -149,7 +172,14 @@ def get_patient_alerts(
 def get_patient_emergency_logs(
     db: Session,
     patient_id: int,
+    current_user: User,
 ):
+    permission_service.ensure_can_access_patient(
+        db=db,
+        current_user=current_user,
+        patient_id=patient_id,
+    )
+
     rows = patient_crud.get_patient_emergency_logs(
         db=db,
         patient_id=patient_id,
@@ -181,7 +211,7 @@ def get_patients(
     status: VitalStatus | None = None,
 ) -> PatientListResponse:
 
-    department = department_crud.get_by_user_id(
+    department = permission_service.get_department_or_403(
         db=db,
         user_id=user_id,
     )
