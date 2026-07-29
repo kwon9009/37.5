@@ -82,11 +82,13 @@ type TopBarProps = {
   back?: boolean
   bell?: boolean
   bellCount?: number
+  /** 지정하지 않으면 기본 동작(알림 내역 페이지로 이동)을 사용 */
+  onBellClick?: () => void
   right?: ReactNode
   logo?: boolean
 }
 
-export function TopBar({ title, back, bell, bellCount = 0, right, logo }: TopBarProps) {
+export function TopBar({ title, back, bell, bellCount = 0, onBellClick, right, logo }: TopBarProps) {
   const navigate = useNavigate()
   return (
     <header className="sticky top-0 z-20 flex h-14 items-center justify-between border-b border-border bg-card/95 px-2 backdrop-blur">
@@ -115,7 +117,7 @@ export function TopBar({ title, back, bell, bellCount = 0, right, logo }: TopBar
         {bell && (
           <button
             aria-label="알림"
-            onClick={() => navigate("/notifications")}
+            onClick={() => (onBellClick ? onBellClick() : navigate("/notifications"))}
             className="relative grid h-10 w-10 place-items-center rounded-full text-foreground hover:bg-muted"
           >
             <Bell size={22} aria-hidden />

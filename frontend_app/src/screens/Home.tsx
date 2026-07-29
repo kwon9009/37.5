@@ -1,6 +1,6 @@
 import { useState } from "react"
 import { useNavigate } from "react-router-dom"
-import { Heart, Wind, UserCheck, UserX, Phone, FileText, X, AlertTriangle } from "lucide-react"
+import { Heart, Wind, UserCheck, UserX, Phone, FileText, X, AlertTriangle, Bell, Trash2 } from "lucide-react"
 import { Screen, TopBar } from "@/components/Screen"
 import { BottomNav } from "@/components/BottomNav"
 import { patient, vitals, notifications, specialNote } from "@/lib/data"
@@ -33,11 +33,19 @@ function VitalCard({
 export default function Home() {
   const navigate = useNavigate()
   const [showNote, setShowNote] = useState(false)
-  const urgentCount = notifications.filter((n) => n.type === "urgent").length
+  const [showNotifications, setShowNotifications] = useState(false)
+  const [notifItems, setNotifItems] = useState(notifications)
+  const urgentCount = notifItems.filter((n) => n.type === "urgent").length
 
   return (
     <Screen>
-      <TopBar title="37.5°C" logo bell bellCount={notifications.length} />
+      <TopBar
+        title="37.5°C"
+        logo
+        bell
+        bellCount={notifItems.length}
+        onBellClick={() => setShowNotifications(true)}
+      />
       <div className="flex-1 space-y-5 overflow-y-auto px-5 py-5">
         {/* Patient summary */}
         <div className="flex items-center justify-between rounded-3xl bg-primary p-5 text-primary-foreground">
@@ -158,6 +166,92 @@ export default function Home() {
             >
               확인
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* 알림 서랍 - 오른쪽에서 슬라이드로 열리고 반투명해서 메인화면이 비쳐 보임 */}
+      {showNotifications && (
+        <div
+          className="absolute inset-0 z-40 flex justify-end bg-foreground/20"
+          onClick={() => setShowNotifications(false)}
+        >
+          <div
+            className="slide-in-right flex h-full w-[82%] max-w-[20rem] flex-col bg-card/15 shadow-xl backdrop-blur-sm"
+            onClick={(e) => e.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            aria-label="알림 내역"
+          >
+            <div className="flex h-14 shrink-0 items-center justify-between border-b border-border/70 px-4">
+              <h3 className="text-base font-bold text-foreground">알림 내역</h3>
+              <div className="flex items-center gap-1">
+                {notifItems.length > 0 && (
+                  <button
+                    onClick={() => setNotifItems([])}
+                    className="flex items-center gap-1 rounded-full px-2 py-1 text-xs font-semibold text-muted-foreground hover:bg-muted/60"
+                  >
+                    <Trash2 size={14} aria-hidden />
+                    비우기
+                  </button>
+                )}
+                <button
+                  aria-label="닫기"
+                  onClick={() => setShowNotifications(false)}
+                  className="grid h-9 w-9 place-items-center rounded-full text-muted-foreground hover:bg-muted/60"
+                >
+                  <X size={20} aria-hidden />
+                </button>
+              </div>
+            </div>
+
+            <div className="flex-1 overflow-y-auto px-4 py-4">
+              <ul className="space-y-2">
+                {notifItems.map((n) => {
+                  const urgent = n.type === "urgent"
+                  return (
+                    <li key={n.id}>
+                      <button
+                        onClick={() => {
+                          if (!urgent) return
+                          setShowNotifications(false)
+                          navigate("/emergency")
+                        }}
+                        className={`flex w-full items-start gap-3 rounded-2xl border p-3 text-left ${
+                          urgent ? "border-danger/30 bg-danger/10" : "border-border/70 bg-card/60"
+                        }`}
+                      >
+                        <span
+                          className={`mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-xl ${
+                            urgent ? "bg-danger/15 text-danger" : "bg-muted/70 text-primary"
+                          }`}
+                        >
+                          {urgent ? <AlertTriangle size={16} aria-hidden /> : <Bell size={16} aria-hidden />}
+                        </span>
+                        <span className="min-w-0 flex-1">
+                          <span
+                            className={`block text-xs font-semibold ${urgent ? "text-danger" : "text-foreground"}`}
+                          >
+                            {urgent ? "긴급 알림" : "일반 알림"}
+                          </span>
+                          <span className="mt-0.5 block text-sm leading-relaxed text-foreground">{n.title}</span>
+                          <span className="mt-1 block text-xs text-muted-foreground">{n.time}</span>
+                        </span>
+                      </button>
+                    </li>
+                  )
+                })}
+              </ul>
+
+              {notifItems.length === 0 && (
+                <div className="flex flex-col items-center justify-center py-20 text-center">
+                  <span className="mb-3 grid h-12 w-12 place-items-center rounded-full bg-muted/70 text-muted-foreground">
+                    <Bell size={22} aria-hidden />
+                  </span>
+                  <p className="text-sm font-medium text-foreground">새로운 알림이 없습니다</p>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}

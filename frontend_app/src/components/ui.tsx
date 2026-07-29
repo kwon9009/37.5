@@ -1,4 +1,4 @@
-import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode } from "react"
+import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode, TextareaHTMLAttributes } from "react"
 import { cn } from "@/lib/utils"
 
 type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
@@ -43,6 +43,27 @@ export function Field({ label, className, id, ...props }: FieldProps) {
         id={id}
         className={cn(
           "h-13 w-full rounded-2xl border border-input bg-card px-4 text-base text-foreground outline-none placeholder:text-muted-foreground/60 focus:border-ring focus:ring-2 focus:ring-ring/20",
+          className,
+        )}
+        {...props}
+      />
+    </label>
+  )
+}
+
+type TextareaProps = TextareaHTMLAttributes<HTMLTextAreaElement> & {
+  label?: string
+}
+
+export function Textarea({ label, className, id, rows = 5, ...props }: TextareaProps) {
+  return (
+    <label htmlFor={id} className="block">
+      {label && <span className="mb-1.5 block text-sm font-medium text-muted-foreground">{label}</span>}
+      <textarea
+        id={id}
+        rows={rows}
+        className={cn(
+          "w-full resize-none rounded-2xl border border-input bg-card px-4 py-3 text-base text-foreground outline-none placeholder:text-muted-foreground/60 focus:border-ring focus:ring-2 focus:ring-ring/20",
           className,
         )}
         {...props}

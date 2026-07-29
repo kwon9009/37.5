@@ -13,6 +13,7 @@
 import { db } from "./mock-db"
 import type {
   ID,
+  Timestamp,
   Patient,
   Guardian,
   Hospital,
@@ -115,4 +116,30 @@ export async function listEmergencyLogs(patientId: ID): Promise<EmergencyLog[]> 
     .filter((e) => e.patient_id === patientId)
     .sort((a, b) => (a.created_at < b.created_at ? 1 : -1))
   return simulate(rows)
+}
+
+// -------------------- inquiries (도움말 > 추가 문의하기) --------------------
+// ERD 확정 스키마(schema.ts)에는 아직 없는 기능이라 별도 in-memory 저장소로 관리.
+// 실제 백엔드 연결 시 여기만 fetch("/api/inquiries", { method: "POST", ... }) 로 교체.
+export interface InquiryInput {
+  name: string
+  contact: string
+  message: string
+}
+
+export interface Inquiry extends InquiryInput {
+  inquiry_id: ID
+  created_at: Timestamp
+}
+
+const inquiries: Inquiry[] = []
+
+export async function submitInquiry(input: InquiryInput): Promise<Inquiry> {
+  const inquiry: Inquiry = {
+    inquiry_id: inquiries.length + 1,
+    created_at: new Date().toISOString(),
+    ...input,
+  }
+  inquiries.push(inquiry)
+  return simulate(inquiry)
 }

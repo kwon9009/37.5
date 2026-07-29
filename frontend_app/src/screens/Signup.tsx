@@ -57,8 +57,8 @@ export default function Signup() {
       setNameWarning("성명을 입력해주세요.")
       return
     }
-    if (!/^[가-힣]+$/.test(name)) {
-      setNameWarning("완성된 한글만 입력할 수 있습니다. 다시 입력해 주세요.")
+    if (!/^[가-힣]{2,}$/.test(name)) {
+      setNameWarning("정확한 성명을 입력해 주세요.")
       setNameShake(true)
       setName("")
     } else {
