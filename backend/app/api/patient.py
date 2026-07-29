@@ -35,11 +35,13 @@ router = APIRouter(
 )
 def get_patient_detail(
     patient_id: int,
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     return patient_service.get_patient_detail(
         db=db,
         patient_id=patient_id,
+        current_user=current_user,
     )
 
 
@@ -50,11 +52,13 @@ def get_patient_detail(
 )
 def get_patient_vital_logs(
     patient_id: int,
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     return patient_service.get_patient_vital_logs(
         db=db,
         patient_id=patient_id,
+        current_user=current_user,
     )
 
 
@@ -65,11 +69,13 @@ def get_patient_vital_logs(
 )
 def get_patient_alerts(
     patient_id: int,
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     return patient_service.get_patient_alerts(
         db=db,
         patient_id=patient_id,
+        current_user=current_user,
     )
 
 
@@ -80,11 +86,13 @@ def get_patient_alerts(
 )
 def get_patient_emergency_logs(
     patient_id: int,
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     return patient_service.get_patient_emergency_logs(
         db=db,
         patient_id=patient_id,
+        current_user=current_user,
     )
 
 

@@ -1,6 +1,7 @@
 from sqlalchemy.orm import Session
 
-from app.crud import dashboard_crud, department_crud
+from app.crud import dashboard_crud
+from app.services import permission_service
 from app.models.enums import DeviceStatus, VitalStatus
 from app.schemas.dashboard.alert_response import DashboardAlertResponse
 from app.schemas.dashboard.patient_response import DashboardPatientResponse
@@ -13,7 +14,7 @@ def get_dashboard_summary(
     user_id: int,
 ) -> DashboardSummaryResponse:
 
-    department = department_crud.get_by_user_id(
+    department = permission_service.get_department_or_403(
         db=db,
         user_id=user_id,
     )
@@ -32,7 +33,7 @@ def get_dashboard_patients(
     user_id: int,
 ) -> list[DashboardPatientResponse]:
 
-    department = department_crud.get_by_user_id(
+    department = permission_service.get_department_or_403(
         db=db,
         user_id=user_id,
     )
@@ -83,7 +84,7 @@ def get_recent_alerts(
     user_id: int,
 ) -> list[DashboardAlertResponse]:
 
-    department = department_crud.get_by_user_id(
+    department = permission_service.get_department_or_403(
         db=db,
         user_id=user_id,
     )
