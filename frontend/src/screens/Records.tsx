@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import {
   Area,
   AreaChart,
@@ -40,20 +40,43 @@ function Chart({ data, color, unit }: { data: { t: string; value: number }[]; co
   )
 }
 
-// 가로 캘린더용 데모 날짜 (7월 8일 ~ 14일)
-const weekDays = [
-  { w: "월", d: 8 },
-  { w: "화", d: 9 },
-  { w: "수", d: 10 },
-  { w: "목", d: 11 },
-  { w: "금", d: 12 },
-  { w: "토", d: 13 },
-  { w: "일", d: 14 },
-]
+const WEEKDAY_LABEL = ["일", "월", "화", "수", "목", "금", "토"]
+
+// 이번 달 1일 ~ 말일 전체를 캘린더로 구성. 당일 이후 날짜는 아직 기록이 없으므로 비활성화.
+function buildMonthDays(now: Date) {
+  const year = now.getFullYear()
+  const month = now.getMonth()
+  const today = now.getDate()
+  const lastDate = new Date(year, month + 1, 0).getDate()
+  return Array.from({ length: lastDate }, (_, i) => {
+    const d = i + 1
+    return {
+      d,
+      w: WEEKDAY_LABEL[new Date(year, month, d).getDay()],
+      future: d > today,
+    }
+  })
+}
 
 export default function Records() {
   const [tab, setTab] = useState<Tab>("vitals")
-  const [selectedDay, setSelectedDay] = useState(14)
+  const now = new Date()
+  const monthLabel = now.getMonth() + 1
+  const TODAY = now.getDate()
+  const monthDays = useState(() => buildMonthDays(now))[0]
+  const [selectedDay, setSelectedDay] = useState(TODAY)
+  const calendarRef = useRef<HTMLDivElement>(null)
+
+  // 당일이 캘린더 스크롤 영역의 가운데에 오도록 정렬
+  useEffect(() => {
+    const container = calendarRef.current
+    const todayEl = container?.querySelector<HTMLElement>('[data-today="true"]')
+    if (!container || !todayEl) return
+    container.scrollTo({
+      left: todayEl.offsetLeft - container.clientWidth / 2 + todayEl.clientWidth / 2,
+      behavior: "auto",
+    })
+  }, [])
 
   return (
     <Screen>
@@ -78,24 +101,34 @@ export default function Records() {
           ))}
         </div>
 
-        {/* 가로 캘린더 */}
-        <div className="mt-4 flex gap-2 overflow-x-auto pb-1">
-          {weekDays.map((day) => {
+        {/* 가로 캘린더 - 이번 달 1일~말일, 당일 이후는 아직 기록이 없어 비활성화 */}
+        <div ref={calendarRef} className="mt-4 flex gap-2 overflow-x-auto pb-1">
+          {monthDays.map((day) => {
             const active = selectedDay === day.d
             return (
               <button
                 key={day.d}
+                data-today={day.d === TODAY}
+                disabled={day.future}
                 onClick={() => setSelectedDay(day.d)}
                 aria-pressed={active}
+                aria-disabled={day.future}
                 className={cn(
                   "flex h-16 w-12 shrink-0 flex-col items-center justify-center rounded-2xl border transition",
-                  active
-                    ? "border-primary bg-primary text-primary-foreground shadow-sm"
-                    : "border-border bg-card text-muted-foreground",
+                  day.future
+                    ? "cursor-not-allowed border-border/60 bg-muted/40 text-muted-foreground/40"
+                    : active
+                      ? "border-primary bg-primary text-primary-foreground shadow-sm"
+                      : "border-border bg-card text-muted-foreground",
                 )}
               >
                 <span className="text-xs font-medium">{day.w}</span>
-                <span className={cn("mt-0.5 text-lg font-bold", active ? "text-primary-foreground" : "text-foreground")}>
+                <span
+                  className={cn(
+                    "mt-0.5 text-lg font-bold",
+                    day.future ? "" : active ? "text-primary-foreground" : "text-foreground",
+                  )}
+                >
                   {day.d}
                 </span>
               </button>
@@ -105,9 +138,12 @@ export default function Records() {
 
         {/* Status message */}
         <div className="mt-4 rounded-3xl border border-border bg-card p-5 shadow-sm">
-          <p className="text-sm text-muted-foreground">7월 {selectedDay}일 상태 요약</p>
+          <p className="text-sm text-muted-foreground">
+            {monthLabel}월 {selectedDay}일 상태 요약
+          </p>
           <p className="mt-1 text-balance leading-relaxed text-foreground">
-            <span className="font-bold text-success">정상</span> · {patient.name} 님은 7월 {selectedDay}일 하루 동안 안정적인 생체신호를 유지했습니다.
+            <span className="font-bold text-success">정상</span> · {patient.name} 님은 {monthLabel}월 {selectedDay}
+            일 하루 동안 안정적인 생체신호를 유지했습니다.
           </p>
         </div>
 

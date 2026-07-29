@@ -124,18 +124,21 @@ export default function PatientInfo() {
 
   const birthLabel = `${year}.${String(month).padStart(2, "0")}.${String(day).padStart(2, "0")}`
 
-  function handlePnameBlur() {
-    if (!pname) {
-      setPnameWarning("환자 성명을 입력해주세요.")
-      return
-    }
-    if (!/^[가-힣]+$/.test(pname)) {
-      setPnameWarning("완성된 한글만 입력할 수 있습니다. 다시 입력해 주세요.")
+  // 완성된 한글만 허용: blur 시와 제출 시 모두 동일하게 검사 (엔터로 바로 제출하는 경우도 포함)
+  function validatePname() {
+    if (!pname) return true
+    if (!/^[가-힣]{2,}$/.test(pname)) {
+      setPnameWarning("완성된 성명만 입력할 수 있습니다. 다시 입력해 주세요.")
       setPnameShake(true)
       setPname("")
-    } else {
-      setPnameWarning("")
+      return false
     }
+    setPnameWarning("")
+    return true
+  }
+
+  function handlePnameBlur() {
+    validatePname()
   }
 
   // 병원 코드 확인 → 병원명/주소/지도 확장 표시
@@ -155,8 +158,10 @@ export default function PatientInfo() {
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!pname) {
-      setPnameWarning("환자 성명을 입력해주세요.")
       setPnameShake(true)
+      return
+    }
+    if (!validatePname()) {
       return
     }
     if (!hospital) {

@@ -19,17 +19,29 @@ type Choice = "yes" | "no"
 function ConsentRow({
   required,
   title,
+  body,
+  restriction,
   value,
   onChange,
 }: {
   required?: boolean
   title: string
+  body: string
+  restriction: string
   value: Choice
   onChange: (c: Choice) => void
 }) {
+  // 약관 제목을 누르면 본문이 아래로 펼쳐짐 (PatientInfo의 확장 토글 방식과 동일)
+  const [open, setOpen] = useState(false)
+
   return (
     <div className="space-y-2">
-      <div className="flex items-center gap-2">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        aria-expanded={open}
+        className="flex w-full items-center gap-2 text-left"
+      >
         <span
           className={cn(
             "rounded-full px-2 py-0.5 text-xs font-semibold",
@@ -38,8 +50,22 @@ function ConsentRow({
         >
           {required ? "필수" : "선택"}
         </span>
-        <span className="text-sm font-medium text-foreground">{title}</span>
-      </div>
+        <span className="flex-1 text-sm font-medium text-foreground">{title}</span>
+        {open ? (
+          <ChevronDown size={16} className="text-muted-foreground" aria-hidden />
+        ) : (
+          <ChevronRight size={16} className="text-muted-foreground" aria-hidden />
+        )}
+      </button>
+
+      {/* 약관 본문 - 내용이 길 수 있어 패널 내부에서만 스크롤되게 함 */}
+      {open && (
+        <div className="max-h-40 overflow-y-auto rounded-xl bg-muted/60 p-3 text-xs leading-relaxed text-muted-foreground">
+          <p>{body}</p>
+          <p className="mt-2 text-muted-foreground/80">{restriction}</p>
+        </div>
+      )}
+
       <div className="flex gap-2">
         <button
           onClick={() => onChange("yes")}
@@ -156,14 +182,23 @@ export default function Settings() {
               <ConsentRow
                 required
                 title="사용자 정보 보관에 대한 사항"
+                body="사용자 및 환자의 생체신호·계정 정보를 안전하게 보관하고 모니터링 목적에 한해 활용합니다."
+                restriction="거부 시 서비스 이용이 불가능합니다."
                 value={requiredConsent}
                 onChange={(c) => {
+                  // 필수 항목 비동의 시 실제 값은 바꾸지 않고 로그인 화면으로 이동
+                  if (c === "no") {
+                    navigate("/login")
+                    return
+                  }
                   setRequiredConsent(c)
                   setSavedMsg("")
                 }}
               />
               <ConsentRow
                 title="이벤트 정보 수집 (선택)"
+                body="서비스 개선 및 맞춤 알림을 위한 이용 이벤트 정보를 수집합니다."
+                restriction="거부 시 서비스 최적화에 제약이 있을 수 있습니다."
                 value={optionalConsent}
                 onChange={(c) => {
                   setOptionalConsent(c)
