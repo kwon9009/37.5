@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { useNavigate } from "react-router-dom"
 import { Heart, Wind, UserCheck, UserX, Phone, FileText, X, AlertTriangle, Bell, Trash2 } from "lucide-react"
 import { Screen, TopBar } from "@/components/Screen"
@@ -36,6 +36,13 @@ export default function Home() {
   const [showNotifications, setShowNotifications] = useState(false)
   const [notifItems, setNotifItems] = useState(notifications)
   const urgentCount = notifItems.filter((n) => n.type === "urgent").length
+
+  // 홈 화면에 상주하는 동안 1~9초 사이 난수 시간이 지나면 응급 알림 이벤트 발생
+  useEffect(() => {
+    const seconds = Math.floor(Math.random() * 9) + 1
+    const timer = window.setTimeout(() => navigate("/emergency"), seconds * 1000)
+    return () => window.clearTimeout(timer)
+  }, [navigate])
 
   return (
     <Screen>

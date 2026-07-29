@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from "react"
 import { useNavigate } from "react-router-dom"
-import { AlertTriangle, Phone, BookOpen, Heart, Wind, Volume2, VolumeX } from "lucide-react"
+import { AlertTriangle, BookOpen, Heart, Wind, Volume2, VolumeX, FileText } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Screen } from "@/components/Screen"
-import { patient, emergencyEvent } from "@/lib/data"
+import { patient, emergencyEvent, specialNote } from "@/lib/data"
 
 export default function Emergency() {
   const navigate = useNavigate()
@@ -166,6 +166,17 @@ export default function Emergency() {
           </div>
         </div>
 
+        {/* 환자 특이사항 */}
+        {specialNote && (
+          <div className="mt-4 w-full rounded-2xl bg-danger-foreground/15 p-4 text-left">
+            <p className="flex items-center gap-1.5 text-xs font-semibold text-danger-foreground/90">
+              <FileText size={14} aria-hidden />
+              환자 특이사항
+            </p>
+            <p className="mt-1 text-sm leading-relaxed text-danger-foreground/80">{specialNote}</p>
+          </div>
+        )}
+
         {/* 경고음 음소거 토글 */}
         <button
           onClick={() => setMuted((m) => !m)}
@@ -183,16 +194,9 @@ export default function Emergency() {
       </div>
 
       <div className="shrink-0 space-y-3 px-6 pb-10">
-        <a
-          href="tel:0000000000"
-          className="flex h-14 w-full items-center justify-center gap-2 rounded-2xl bg-danger-foreground font-semibold text-danger"
-        >
-          <Phone size={20} aria-hidden />
-          병원 연락하기
-        </a>
         <button
           onClick={() => navigate("/emergency/guide")}
-          className="flex h-14 w-full items-center justify-center gap-2 rounded-2xl border border-danger-foreground/40 font-semibold text-danger-foreground"
+          className="flex h-14 w-full items-center justify-center gap-2 rounded-2xl bg-danger-foreground font-semibold text-danger"
         >
           <BookOpen size={20} aria-hidden />
           응급 대응 가이드 이동
