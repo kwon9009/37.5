@@ -123,7 +123,7 @@ function PatientDetail() {
                   <span>담당 김간호 RN</span>
                 </div>
                 <div className="flex gap-[6px]">
-                  {["낙상 주의", "고혈압 병력", "야간 관찰 필요"].map((tag) => (
+                  {["고혈압 병력", "야간 관찰 필요"].map((tag) => (
                     <span key={tag} className="rounded-full bg-[#EDF1F6] px-[10px] py-1 text-[11px] text-[#5A6B80]">
                       {tag}
                     </span>
@@ -249,7 +249,6 @@ function PatientDetail() {
                   </div>
                   <span className="text-[13px] text-[#5A6B80]">특이사항</span>
                   <div className="flex gap-[6px]">
-                    <SpecialNoteTag icon="triangle-alert" color="#E8A13B" label="낙상위험" showLabel />
                     <SpecialNoteTag icon="shield-alert" color="#E0442E" label="알레르기" showLabel />
                   </div>
                 </div>

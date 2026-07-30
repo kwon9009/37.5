@@ -16,10 +16,22 @@ from fastapi.middleware.cors import CORSMiddleware
 from sse_starlette.sse import EventSourceResponse
 from app.api.auth import router as auth_router
 from app.api.admin import router as admin_router
+from app.api.hospital import router as hospital_router
+from app.api.hospital_request import router as hospital_request_router
+from app.api.dashboard import router as dashboard_router
+from app.api.patient import router as patient_router
+from app.api.alert import router as alert_router
+from app.api.guardian import router as guardian_router
 
 app = FastAPI(title="37.5 SmartCare API")
 app.include_router(auth_router)
 app.include_router(admin_router)
+app.include_router(hospital_router)
+app.include_router(hospital_request_router)
+app.include_router(dashboard_router)
+app.include_router(patient_router)
+app.include_router(alert_router)
+app.include_router(guardian_router)
 
 # 프론트(다른 포트)에서 접근 가능하게 CORS 허용 (개발용: 전체 허용)
 app.add_middleware(

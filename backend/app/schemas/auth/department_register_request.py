@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, EmailStr, Field
 
 
 class DepartmentRegisterRequest(BaseModel):
@@ -32,6 +32,12 @@ class DepartmentRegisterRequest(BaseModel):
         max_length=30,
         description="로그인 아이디",
         examples=["doctor01"],
+    )
+
+    email: EmailStr = Field(
+        ...,
+        description="비밀번호 찾기 등에 사용할 이메일",
+        examples=["doctor01@hospital.kr"],
     )
 
     password: str = Field(

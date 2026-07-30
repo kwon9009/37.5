@@ -20,6 +20,7 @@ class DeviceStatus(str, Enum):
 class VitalStatus(str, Enum):
     NORMAL = "NORMAL"
     WARNING = "WARNING"
+    ALERT = "ALERT"
     DANGER = "DANGER"
 
 
@@ -27,3 +28,9 @@ class UserRole(str, Enum):
     ADMIN = "ADMIN"
     DEPARTMENT = "DEPARTMENT"
     GUARDIAN = "GUARDIAN"
+
+
+class HospitalRequestStatus(str, Enum):
+    PENDING = "PENDING"
+    APPROVED = "APPROVED"
+    REJECTED = "REJECTED"

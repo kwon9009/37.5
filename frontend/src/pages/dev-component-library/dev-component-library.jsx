@@ -9,7 +9,6 @@ import AdminHeader from "../../components/admin-header/admin-header.jsx";
 import Sidebar from "../../components/sidebar/sidebar.jsx";
 import AdminSidebar from "../../components/admin-sidebar/admin-sidebar.jsx";
 import HospitalSearchModal from "../../components/modals/search-modal/search-modal.jsx";
-import FallAssessModal from "../../components/modals/fall-assess-modal/fall-assess-modal.jsx";
 import PatientRegisterModal from "../../components/modals/patient-register-modal/patient-register-modal.jsx";
 
 const SEVERITIES = ["normal", "caution", "warning", "emergency", "offline", "system"];
@@ -76,7 +75,6 @@ function DevComponentLibrary() {
           <span className="mx-2 h-6 w-px bg-[#DCE3EC]" />
           <SpecialNoteTag icon="triangle-alert" color="#E8A13B" />
           <SpecialNoteTag icon="shield-alert" color="#E0442E" />
-          <SpecialNoteTag icon="triangle-alert" color="#E8A13B" label="낙상위험" showLabel />
           <SpecialNoteTag icon="shield-alert" color="#E0442E" label="알레르기" showLabel />
         </div>
       </Section>
@@ -136,13 +134,6 @@ function DevComponentLibrary() {
           </button>
           <button
             type="button"
-            onClick={() => setOpenModal("fallAssess")}
-            className="rounded-lg border border-[#DCE3EC] bg-[#F5F7FA] px-4 py-2 text-sm font-semibold text-[#1E2A3A]"
-          >
-            FallAssessModal 열기
-          </button>
-          <button
-            type="button"
             onClick={() => setOpenModal("patientRegister")}
             className="rounded-lg border border-[#DCE3EC] bg-[#F5F7FA] px-4 py-2 text-sm font-semibold text-[#1E2A3A]"
           >
@@ -152,7 +143,6 @@ function DevComponentLibrary() {
       </Section>
 
       <HospitalSearchModal isOpen={openModal === "search"} onClose={() => setOpenModal(null)} onSelect={() => {}} />
-      <FallAssessModal isOpen={openModal === "fallAssess"} onClose={() => setOpenModal(null)} />
       <PatientRegisterModal isOpen={openModal === "patientRegister"} onClose={() => setOpenModal(null)} />
     </div>
   );

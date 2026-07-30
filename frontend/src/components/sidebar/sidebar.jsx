@@ -6,7 +6,6 @@ const NAV_ITEMS = [
   { key: "dashboard", to: "/dashboard", icon: "layout-dashboard", label: "대시보드" },
   { key: "patients", to: "/patients", icon: "users", label: "환자 목록" },
   { key: "monitoring", to: "/monitoring", icon: "activity", label: "실시간 모니터링" },
-  { key: "falls", to: "/falls", icon: "footprints", label: "낙상 관리" },
   { key: "notifications", to: "/notifications", icon: "bell", label: "알림" },
   { key: "integration", to: "/integration-requests", icon: "user-check", label: "연동 요청", badge: 3 },
 ];

@@ -14,6 +14,7 @@ from app.crud.hospital_crud import get_by_name_and_area
 from app.crud.guardian_crud import create_guardian
 from app.crud.user_crud import (
     create_user,
+    exists_by_email,
     exists_by_login_id,
     get_by_login_id,
 )
@@ -55,6 +56,21 @@ def _validate_login_id(
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="이미 사용 중인 아이디입니다.",
+        )
+
+
+# 이메일 중복 검사
+def _validate_email(
+    db: Session,
+    email: str,
+) -> None:
+    if exists_by_email(
+        db=db,
+        email=email,
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="이미 사용 중인 이메일입니다.",
         )
 
 
@@ -161,6 +177,11 @@ def register_department(
         login_id=request.login_id,
     )
 
+    _validate_email(
+        db=db,
+        email=request.email,
+    )
+
     if exists_by_hospital_and_name(
         db=db,
         hospital_id=hospital.hospital_id,
@@ -174,6 +195,7 @@ def register_department(
     try:
         user = User(
             login_id=request.login_id,
+            email=request.email,
             password=hash_password(request.password),
             role=UserRole.DEPARTMENT,
         )

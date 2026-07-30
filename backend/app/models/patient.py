@@ -3,7 +3,17 @@ from __future__ import annotations
 from datetime import date, datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import Date, Enum, ForeignKey, Integer, String, Text, BigInteger
+from sqlalchemy import (
+    Date,
+    Enum,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
+    BigInteger,
+    Boolean,
+    text,
+)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import BaseModel
@@ -80,6 +90,13 @@ class Patient(BaseModel):
         nullable=False,
     )
 
+    is_present: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=True,
+        server_default=text("1"),
+    )
+
     admission_date: Mapped[date] = mapped_column(
         Date,
         nullable=False,
@@ -103,22 +120,27 @@ class Patient(BaseModel):
 
     devices: Mapped[list[Device]] = relationship(
         back_populates="patient",
+        passive_deletes=True,
     )
 
     vital_checks: Mapped[list[VitalCheck]] = relationship(
         back_populates="patient",
+        passive_deletes=True,
     )
 
     vital_logs: Mapped[list[VitalLog]] = relationship(
         back_populates="patient",
+        passive_deletes=True,
     )
 
     emergency_logs: Mapped[list[EmergencyLog]] = relationship(
         back_populates="patient",
+        passive_deletes=True,
     )
 
     alerts: Mapped[list[Alert]] = relationship(
         back_populates="patient",
+        passive_deletes=True,
     )
 
     def __repr__(self) -> str:

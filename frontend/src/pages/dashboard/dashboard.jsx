@@ -4,37 +4,26 @@ import Sidebar from "../../components/sidebar/sidebar.jsx";
 import Header from "../../components/header/header.jsx";
 import PatientCard from "../../components/patient-card/patient-card.jsx";
 import Icon from "../../components/icon/icon.jsx";
+import EmergencyScreeningOverlay from "../../components/emergency-screening-overlay/emergency-screening-overlay.jsx";
+import { apiClient } from "../../api/client.js";
 
-const KPIS = [
-  { key: "all", label: "전체 환자", value: 42, color: "#1E2A3A", bg: "#FFFFFF" },
-  { key: "normal", label: "정상", value: 28, color: "#2FA35C", bg: "#FFFFFF" },
-  { key: "caution", label: "주의", value: 8, color: "#E8A13B", bg: "#FFFFFF" },
-  { key: "warning", label: "경고", value: 4, color: "#E8762B", bg: "#FFFFFF" },
-  { key: "emergency", label: "응급", value: 2, color: "#E0442E", bg: "#FDEDEA" },
-];
+const SEVERITY_ORDER = { emergency: 0, warning: 1, caution: 2, normal: 3 };
 
-const ALL_PATIENTS = [
-  { name: "정수빈", room: "305호 · B-3", severity: "emergency", heartRate: 118, respirationRate: 23, sensorStatus: "신호 이상", timestamp: "14:24:11" },
-  { name: "박민준", room: "302호 · A-4", severity: "warning", heartRate: 104, respirationRate: 21, sensorStatus: "연결됨", timestamp: "14:31:52" },
-  { name: "최지우", room: "308호 · C-2", severity: "caution", heartRate: 88, respirationRate: 18, sensorStatus: "신호 약함", timestamp: "14:28:33" },
-  { name: "이영희", room: "302호 · A-2", severity: "normal", heartRate: 78, respirationRate: 16, sensorStatus: "연결됨", timestamp: "14:32:08" },
-  { name: "김철수", room: "305호 · B-1", severity: "normal", heartRate: 72, respirationRate: 15, sensorStatus: "연결됨", timestamp: "14:32:05" },
-  { name: "한서연", room: "308호 · C-4", severity: "normal", heartRate: 69, respirationRate: 14, sensorStatus: "연결됨", timestamp: "14:31:47" },
-];
-
-const RECENT_ALERTS = [
-  { name: "박민준 · 302호", detail: "심박 104bpm 상승 · 14:31", color: "#E8762B", path: "/patients/박민준" },
-  { name: "최지우 · 308호", detail: "호흡 불규칙 감지 · 14:28", color: "#E8A13B", path: "/patients/최지우" },
-  { name: "정수빈 · 305호", detail: "무호흡 알림 · 14:24", color: "#E0442E", path: "/patients/정수빈" },
-];
-
-const EMERGENCY_EVENTS = [
-  { name: "정수빈 · 305호", detail: "응급 호출 발생 · 14:24", color: "#E0442E", path: "/patients/정수빈" },
-  { name: "김도윤 · 311호", detail: "낙상 감지 · 13:52", color: "#E0442E", path: "/falls/김도윤" },
+const KPI_META = [
+  { key: "all", label: "전체 환자", color: "#1E2A3A", bg: "#FFFFFF" },
+  { key: "normal", label: "정상", color: "#2FA35C", bg: "#FFFFFF" },
+  { key: "caution", label: "주의", color: "#E8A13B", bg: "#FFFFFF" },
+  { key: "warning", label: "경고", color: "#E8762B", bg: "#FFFFFF" },
+  { key: "emergency", label: "응급", color: "#E0442E", bg: "#FDEDEA" },
 ];
 
 function formatClock(date) {
   return date.toLocaleTimeString("ko-KR", { hour12: false });
+}
+
+function toClockString(isoString) {
+  const date = new Date(isoString);
+  return Number.isNaN(date.getTime()) ? "" : formatClock(date);
 }
 
 function ListPanel({ title, count, items }) {
@@ -80,14 +69,113 @@ function Dashboard() {
   const navigate = useNavigate();
   const [now, setNow] = useState(() => new Date());
   const [activeFilter, setActiveFilter] = useState("all");
+  const [emergencyDismissed, setEmergencyDismissed] = useState(false);
+  const [screeningEnabled, setScreeningEnabled] = useState(false);
+  const [summary, setSummary] = useState(null);
+  const [patients, setPatients] = useState([]);
+  const [alerts, setAlerts] = useState([]);
+  const [error, setError] = useState("");
 
   useEffect(() => {
     const interval = setInterval(() => setNow(new Date()), 1000);
     return () => clearInterval(interval);
   }, []);
 
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadDashboard() {
+      try {
+        const [summaryRes, patientsRes, alertsRes] = await Promise.all([
+          apiClient.get("/dashboard/summary"),
+          apiClient.get("/dashboard/patients"),
+          apiClient.get("/dashboard/recent-alerts"),
+        ]);
+
+        if (cancelled) return;
+
+        setSummary(summaryRes.data);
+
+        setPatients(
+          patientsRes.data
+            .map((patient) => ({
+              id: patient.patient_id,
+              name: patient.name,
+              room: patient.room,
+              presenceLabel: patient.presence_label,
+              severity: patient.severity,
+              heartRate: patient.heart_rate,
+              respirationRate: patient.respiration_rate,
+              sensorStatus: patient.sensor_status,
+              timestamp: toClockString(patient.timestamp),
+            }))
+            .sort((a, b) => SEVERITY_ORDER[a.severity] - SEVERITY_ORDER[b.severity]),
+        );
+
+        setAlerts(
+          alertsRes.data.map((alert) => ({
+            name: `${alert.patient_name} · ${alert.room}`,
+            detail: `${alert.message} · ${toClockString(alert.sent_at)}`,
+            color: alert.is_read ? "#5A6B80" : "#E0442E",
+            path: `/patients/${encodeURIComponent(alert.patient_name)}`,
+          })),
+        );
+      } catch {
+        if (!cancelled) setError("대시보드 데이터를 불러오지 못했습니다.");
+      }
+    }
+
+    loadDashboard();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    // 실시간 감지 이벤트를 흉내내기 위한 지연 (실제로는 SSE로 응급 이벤트 수신 시 즉시 트리거)
+    const timeout = setTimeout(() => setScreeningEnabled(true), 1200);
+    return () => clearTimeout(timeout);
+  }, []);
+
+  const kpis = KPI_META.map((meta) => ({
+    ...meta,
+    value: summary
+      ? {
+          all: summary.total_patients,
+          normal: summary.normal_count,
+          caution: summary.alert_count,
+          warning: summary.warning_count,
+          emergency: summary.danger_count,
+        }[meta.key]
+      : 0,
+  }));
+
+  const emergencyEvents = patients
+    .filter((patient) => patient.severity === "emergency")
+    .map((patient) => ({
+      name: `${patient.name} · ${patient.room}`,
+      detail: `응급 상태 감지 · ${patient.timestamp}`,
+      color: "#E0442E",
+      path: `/patients/${patient.id}`,
+    }));
+
   const visiblePatients =
-    activeFilter === "all" ? ALL_PATIENTS : ALL_PATIENTS.filter((patient) => patient.severity === activeFilter);
+    activeFilter === "all" ? patients : patients.filter((patient) => patient.severity === activeFilter);
+
+  const screeningPatient =
+    screeningEnabled && !emergencyDismissed
+      ? patients.find((patient) => patient.severity === "emergency")
+      : undefined;
+
+  const handleAcknowledge = () => {
+    setEmergencyDismissed(true);
+  };
+
+  const handleRespond = () => {
+    const id = screeningPatient.id;
+    setEmergencyDismissed(true);
+    navigate(`/patients/${id}`);
+  };
 
   return (
     <div className="dashboard flex min-h-screen bg-[#F5F7FA]">
@@ -105,8 +193,12 @@ function Dashboard() {
             <p className="text-xs font-bold tracking-wide text-[#5A6B80]">마지막 업데이트 {formatClock(now)}</p>
           </div>
 
+          {error && (
+            <p className="rounded-lg bg-[#FDEDEA] px-3 py-2 text-xs font-semibold text-[#E0442E]">{error}</p>
+          )}
+
           <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
-            {KPIS.map((kpi) => {
+            {kpis.map((kpi) => {
               const isActive = activeFilter === kpi.key;
               return (
                 <button
@@ -140,7 +232,7 @@ function Dashboard() {
                 className="flex items-center gap-1 text-xs font-bold text-[#2B6FE3]"
               >
                 <Icon name="x" size={12} />
-                {KPIS.find((kpi) => kpi.key === activeFilter)?.label} 필터 해제
+                {kpis.find((kpi) => kpi.key === activeFilter)?.label} 필터 해제
               </button>
             )}
           </div>
@@ -151,9 +243,9 @@ function Dashboard() {
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   {visiblePatients.map((patient) => (
                     <PatientCard
-                      key={patient.name}
+                      key={patient.id}
                       {...patient}
-                      onClick={() => navigate(`/patients/${encodeURIComponent(patient.name)}`)}
+                      onClick={() => navigate(`/patients/${patient.id}`)}
                     />
                   ))}
                 </div>
@@ -165,12 +257,18 @@ function Dashboard() {
             </div>
 
             <div className="flex w-full flex-col gap-5 xl:w-[340px] xl:shrink-0">
-              <ListPanel title="최근 알림" count={RECENT_ALERTS.length} items={RECENT_ALERTS} />
-              <ListPanel title="응급 이벤트" items={EMERGENCY_EVENTS} />
+              <ListPanel title="최근 알림" count={alerts.length} items={alerts} />
+              <ListPanel title="응급 이벤트" items={emergencyEvents} />
             </div>
           </div>
         </div>
       </div>
+
+      <EmergencyScreeningOverlay
+        patient={screeningPatient}
+        onAcknowledge={handleAcknowledge}
+        onRespond={handleRespond}
+      />
     </div>
   );
 }

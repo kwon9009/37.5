@@ -3,11 +3,21 @@ import { useNavigate } from "react-router-dom";
 import Icon from "../icon/icon.jsx";
 import StatusBadge from "../status-badge/status-badge.jsx";
 import { PATIENTS } from "../../data/patients.js";
+import { useAuthStore } from "../../store/auth-store.js";
 
-function Header({ hospitalName = "서울중앙병원", userName = "김간호 · RN", notificationCount = 3 }) {
+function Header({ hospitalName = "서울중앙병원", userName, notificationCount = 3 }) {
   const [searchQuery, setSearchQuery] = useState("");
   const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const navigate = useNavigate();
+  const logout = useAuthStore((state) => state.logout);
+  const loginId = useAuthStore((state) => state.loginId);
+  const displayName = userName ?? loginId ?? "김간호 · RN";
+
+  const handleLogout = () => {
+    logout();
+    navigate("/login");
+  };
 
   const trimmedQuery = searchQuery.trim();
   const matches = trimmedQuery
@@ -84,11 +94,39 @@ function Header({ hospitalName = "서울중앙병원", userName = "김간호 · 
           )}
         </button>
 
-        <button type="button" onClick={() => navigate("/personal-settings")} className="header__user flex items-center gap-2">
-          <span className="h-[34px] w-[34px] rounded-full bg-[#2B6FE3]" />
-          <span className="text-sm font-semibold text-white">{userName}</span>
-          <Icon name="chevron-down" size={16} className="text-[#8B9AAE]" />
-        </button>
+        <div className="header__user-menu relative">
+          <button
+            type="button"
+            onClick={() => setIsUserMenuOpen((current) => !current)}
+            onBlur={() => setTimeout(() => setIsUserMenuOpen(false), 120)}
+            className="header__user flex items-center gap-2"
+          >
+            <span className="h-[34px] w-[34px] rounded-full bg-[#2B6FE3]" />
+            <span className="text-sm font-semibold text-white">{displayName}</span>
+            <Icon name="chevron-down" size={16} className="text-[#8B9AAE]" />
+          </button>
+
+          {isUserMenuOpen && (
+            <div className="absolute right-0 top-[calc(100%+8px)] z-50 w-[180px] overflow-hidden rounded-lg border border-[#DCE3EC] bg-white shadow-[0_12px_32px_rgba(30,42,58,0.25)]">
+              <button
+                type="button"
+                onMouseDown={() => navigate("/personal-settings")}
+                className="flex w-full items-center gap-2 px-4 py-3 text-left text-sm text-[#1E2A3A] hover:bg-[#F5F7FA]"
+              >
+                <Icon name="settings" size={16} className="text-[#5A6B80]" />
+                개인 설정
+              </button>
+              <button
+                type="button"
+                onMouseDown={handleLogout}
+                className="flex w-full items-center gap-2 border-t border-[#DCE3EC] px-4 py-3 text-left text-sm text-[#E0442E] hover:bg-[#FDEDEA]"
+              >
+                <Icon name="log-out" size={16} className="text-[#E0442E]" />
+                로그아웃
+              </button>
+            </div>
+          )}
+        </div>
       </div>
     </header>
   );

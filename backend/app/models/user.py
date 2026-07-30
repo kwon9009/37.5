@@ -9,6 +9,7 @@ from app.models.base import BaseModel
 from app.models.enums import UserRole
 
 if TYPE_CHECKING:
+    from app.models.admin import Admin
     from app.models.department import Department
     from app.models.guardian import Guardian
 
@@ -26,6 +27,13 @@ class User(BaseModel):
         String(50),
         unique=True,
         nullable=False,
+    )
+
+    # 부서(병원 스태프) 계정은 회원가입 시 필수로 받지만, 보호자 등 다른 역할은 아직 이메일이 없어 nullable
+    email: Mapped[str | None] = mapped_column(
+        String(100),
+        unique=True,
+        nullable=True,
     )
 
     password: Mapped[str] = mapped_column(
@@ -56,6 +64,13 @@ class User(BaseModel):
 
     guardian: Mapped["Guardian | None"] = relationship(
         "Guardian",
+        back_populates="user",
+        uselist=False,
+        passive_deletes=True,
+    )
+
+    admin: Mapped["Admin | None"] = relationship(
+        "Admin",
         back_populates="user",
         uselist=False,
         passive_deletes=True,

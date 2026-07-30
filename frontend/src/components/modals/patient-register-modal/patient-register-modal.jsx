@@ -4,7 +4,6 @@ import Icon from "../../icon/icon.jsx";
 const WARD_OPTIONS = ["3병동", "4병동", "5병동", "6병동", "중환자실"];
 
 const NOTE_CHIPS = [
-  { key: "fall", icon: "triangle-alert", label: "낙상위험" },
   { key: "pressure", icon: "bed", label: "욕창위험" },
   { key: "allergy", icon: "shield-alert", label: "알레르기" },
   { key: "mobility", icon: "accessibility", label: "거동불편" },
@@ -25,13 +24,13 @@ const INITIAL_FORM = {
 
 function PatientRegisterModal({ isOpen, onClose, onSubmit }) {
   const [form, setForm] = useState(INITIAL_FORM);
-  const [selectedNotes, setSelectedNotes] = useState(["fall", "allergy"]);
+  const [selectedNotes, setSelectedNotes] = useState(["allergy"]);
   const [error, setError] = useState("");
 
   useEffect(() => {
     if (isOpen) {
       setForm(INITIAL_FORM);
-      setSelectedNotes(["fall", "allergy"]);
+      setSelectedNotes(["allergy"]);
       setError("");
     }
   }, [isOpen]);
