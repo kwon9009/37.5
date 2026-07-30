@@ -133,7 +133,8 @@ function Dashboard() {
 
   useEffect(() => {
     // 실시간 감지 이벤트를 흉내내기 위한 지연 (실제로는 SSE로 응급 이벤트 수신 시 즉시 트리거)
-    const timeout = setTimeout(() => setScreeningEnabled(true), 1200);
+    // 시연용으로 10초 지연 (요청 사항)
+    const timeout = setTimeout(() => setScreeningEnabled(true), 10000);
     return () => clearTimeout(timeout);
   }, []);
 
