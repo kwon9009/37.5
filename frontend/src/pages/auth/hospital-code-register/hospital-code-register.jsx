@@ -1,12 +1,12 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import logo from "../../../components/icon/37.5.png";
-import { apiClient } from "../../../api/client.js";
+import { apiClient, getErrorMessage } from "../../../api/client.js";
 
 function HospitalCodeRegister() {
   const [hospitalName, setHospitalName] = useState("");
-  const [area, setArea] = useState("");
   const [address, setAddress] = useState("");
+  const [bedCount, setBedCount] = useState("");
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const navigate = useNavigate();
@@ -15,8 +15,8 @@ function HospitalCodeRegister() {
     event.preventDefault();
     setError("");
 
-    if (!hospitalName.trim() || !area.trim() || !address.trim()) {
-      setError("병원명, 지역, 주소를 모두 입력해 주세요.");
+    if (!hospitalName.trim() || !address.trim() || !bedCount.trim()) {
+      setError("병원명, 주소, 병상 수를 모두 입력해 주세요.");
       return;
     }
 
@@ -24,13 +24,13 @@ function HospitalCodeRegister() {
     try {
       await apiClient.post("/hospital-requests", {
         hospital_name: hospitalName.trim(),
-        area: area.trim(),
         address: address.trim(),
+        bed_count: Number(bedCount),
       });
 
       navigate("/login", { state: { hospitalRequested: true } });
     } catch (err) {
-      setError(err.response?.data?.detail ?? "등록 요청 중 오류가 발생했습니다.");
+      setError(getErrorMessage(err, "등록 요청 중 오류가 발생했습니다."));
     } finally {
       setIsSubmitting(false);
     }
@@ -92,40 +92,6 @@ function HospitalCodeRegister() {
             </div>
 
             <div className="hospital-code-register__field flex flex-col gap-[7px]">
-              <label htmlFor="area" className="text-xs font-bold tracking-wide text-[#5A6B80]">
-                지역
-              </label>
-              <div className="hospital-code-register__input flex h-12 items-center gap-[10px] rounded-lg border border-[#DCE3EC] px-[14px]">
-                <svg
-                  aria-hidden="true"
-                  focusable="false"
-                  width="18"
-                  height="18"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  className="shrink-0 text-[#5A6B80]"
-                >
-                  <path d="M14.106 5.553a2 2 0 0 0 1.788 0l3.659-1.83A1 1 0 0 1 21 4.619v12.764a1 1 0 0 1-.553.894l-4.553 2.277a2 2 0 0 1-1.788 0l-4.212-2.106a2 2 0 0 0-1.788 0l-3.659 1.83A1 1 0 0 1 3 19.381V6.618a1 1 0 0 1 .553-.894l4.553-2.277a2 2 0 0 1 1.788 0z" />
-                  <path d="M15 5.764v15" />
-                  <path d="M9 3.236v15" />
-                </svg>
-                <input
-                  id="area"
-                  name="area"
-                  type="text"
-                  placeholder="예: 서울"
-                  value={area}
-                  onChange={(event) => setArea(event.target.value)}
-                  className="w-full border-0 bg-transparent text-[15px] text-[#1E2A3A] placeholder:text-[#5A6B80] focus:outline-none"
-                />
-              </div>
-            </div>
-
-            <div className="hospital-code-register__field flex flex-col gap-[7px]">
               <label htmlFor="address" className="text-xs font-bold tracking-wide text-[#5A6B80]">
                 병원 주소
               </label>
@@ -153,6 +119,41 @@ function HospitalCodeRegister() {
                   placeholder="예: 서울특별시 중구 세종대로 110"
                   value={address}
                   onChange={(event) => setAddress(event.target.value)}
+                  className="w-full border-0 bg-transparent text-[15px] text-[#1E2A3A] placeholder:text-[#5A6B80] focus:outline-none"
+                />
+              </div>
+            </div>
+
+            <div className="hospital-code-register__field flex flex-col gap-[7px]">
+              <label htmlFor="bedCount" className="text-xs font-bold tracking-wide text-[#5A6B80]">
+                병상 수
+              </label>
+              <div className="hospital-code-register__input flex h-12 items-center gap-[10px] rounded-lg border border-[#DCE3EC] px-[14px]">
+                <svg
+                  aria-hidden="true"
+                  focusable="false"
+                  width="18"
+                  height="18"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="shrink-0 text-[#5A6B80]"
+                >
+                  <path d="M3 18v-7a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v7" />
+                  <path d="M3 18h18" />
+                  <path d="M5 11V6a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v5" />
+                </svg>
+                <input
+                  id="bedCount"
+                  name="bedCount"
+                  type="number"
+                  min="0"
+                  placeholder="예: 120"
+                  value={bedCount}
+                  onChange={(event) => setBedCount(event.target.value)}
                   className="w-full border-0 bg-transparent text-[15px] text-[#1E2A3A] placeholder:text-[#5A6B80] focus:outline-none"
                 />
               </div>

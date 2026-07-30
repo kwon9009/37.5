@@ -139,7 +139,7 @@ function RealtimeMonitoring() {
       <Sidebar active="monitoring" />
 
       <div className="flex min-h-screen w-full flex-col">
-        <Header notificationCount={3} />
+        <Header />
 
         <div className="flex flex-col gap-5 p-6">
           <div className="flex flex-wrap items-center justify-between gap-4">

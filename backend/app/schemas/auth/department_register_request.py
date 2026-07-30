@@ -2,20 +2,10 @@ from pydantic import BaseModel, EmailStr, Field
 
 
 class DepartmentRegisterRequest(BaseModel):
-    hospital_name: str = Field(
+    hospital_id: int = Field(
         ...,
-        min_length=2,
-        max_length=50,
-        description="병원명",
-        examples=["서울대학교병원"],
-    )
-
-    area: str = Field(
-        ...,
-        min_length=2,
-        max_length=20,
-        description="지역",
-        examples=["서울"],
+        description="소속 병원 ID (병원 검색에서 선택)",
+        examples=[1],
     )
 
     department_name: str = Field(

@@ -48,7 +48,7 @@ function IntegrationRequestManagement() {
       <Sidebar active="integration" />
 
       <div className="flex min-h-screen w-full flex-col">
-        <Header notificationCount={5} />
+        <Header />
 
         <div className="flex flex-col gap-6 p-6">
           <div className="flex flex-col gap-1">

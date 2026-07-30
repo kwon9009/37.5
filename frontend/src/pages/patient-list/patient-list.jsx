@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Sidebar from "../../components/sidebar/sidebar.jsx";
 import Header from "../../components/header/header.jsx";
@@ -6,7 +6,7 @@ import Icon from "../../components/icon/icon.jsx";
 import PresenceBadge from "../../components/presence-badge/presence-badge.jsx";
 import StatusBadge from "../../components/status-badge/status-badge.jsx";
 import PatientRegisterModal from "../../components/modals/patient-register-modal/patient-register-modal.jsx";
-import { PATIENTS as INITIAL_PATIENTS } from "../../data/patients.js";
+import { apiClient } from "../../api/client.js";
 
 const SEVERITY_CHIPS = [
   { key: "normal", label: "정상", color: "#2FA35C" },
@@ -15,15 +15,51 @@ const SEVERITY_CHIPS = [
   { key: "emergency", label: "응급", color: "#E0442E" },
 ];
 
-const ROOM_TABS = ["전체", "302호", "305호", "308호"];
+const VITAL_STATUS_TO_SEVERITY = {
+  NORMAL: "normal",
+  WARNING: "warning",
+  ALERT: "caution",
+  DANGER: "emergency",
+};
+
+const GENDER_LABEL = { MALE: "남", FEMALE: "여" };
+
+function toPatientRow(item) {
+  const room = `${item.room_num}호`;
+  return {
+    id: item.patient_id,
+    name: item.name,
+    gender: GENDER_LABEL[item.gender] ?? item.gender,
+    birthDate: item.birthdate,
+    room,
+    presence:
+      item.patient_status === "DISCHARGED"
+        ? { label: "퇴원", color: "#5A6B80" }
+        : { label: "재실중", color: "#2FA35C" },
+    severity: VITAL_STATUS_TO_SEVERITY[item.vital_status] ?? "normal",
+    heartRate: item.heart_rate ?? "--",
+    respirationRate: item.resp_rate ?? "--",
+    nurse: item.department_name,
+    lastUpdate: item.updated_at ? new Date(item.updated_at).toLocaleTimeString("ko-KR", { hour12: false }) : "-",
+  };
+}
 
 function PatientList() {
   const navigate = useNavigate();
-  const [patients, setPatients] = useState(INITIAL_PATIENTS);
+  const [patients, setPatients] = useState([]);
   const [query, setQuery] = useState("");
   const [activeSeverities, setActiveSeverities] = useState([]);
   const [roomTab, setRoomTab] = useState("전체");
   const [isRegisterOpen, setIsRegisterOpen] = useState(false);
+
+  useEffect(() => {
+    apiClient
+      .get("/patients")
+      .then(({ data }) => setPatients(data.patients.map(toPatientRow)))
+      .catch(() => {});
+  }, []);
+
+  const roomTabs = useMemo(() => ["전체", ...Array.from(new Set(patients.map((patient) => patient.room)))], [patients]);
 
   const toggleSeverity = (key) => {
     setActiveSeverities((current) =>
@@ -72,7 +108,7 @@ function PatientList() {
         <div className="flex flex-col gap-6 p-6">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <h1 className="text-2xl font-bold text-[#1E2A3A]">환자 목록</h1>
-            <p className="text-sm text-[#5A6B80]">총 42명 모니터링 중</p>
+            <p className="text-sm text-[#5A6B80]">총 {patients.length}명 모니터링 중</p>
           </div>
 
           <div className="flex flex-wrap items-center justify-between gap-4">
@@ -116,7 +152,7 @@ function PatientList() {
 
             <div className="flex flex-wrap items-center gap-4">
               <div className="flex items-center gap-[2px] rounded-lg border border-[#DCE3EC] bg-white p-[2px]">
-                {ROOM_TABS.map((room) => (
+                {roomTabs.map((room) => (
                   <button
                     key={room}
                     type="button"

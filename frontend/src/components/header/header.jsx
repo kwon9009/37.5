@@ -4,8 +4,9 @@ import Icon from "../icon/icon.jsx";
 import StatusBadge from "../status-badge/status-badge.jsx";
 import { PATIENTS } from "../../data/patients.js";
 import { useAuthStore } from "../../store/auth-store.js";
+import { useUnreadAlertCount } from "../../hooks/use-unread-alert-count.js";
 
-function Header({ hospitalName = "서울중앙병원", userName, notificationCount = 3 }) {
+function Header({ hospitalName = "서울중앙병원", userName, notificationCount }) {
   const [searchQuery, setSearchQuery] = useState("");
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
@@ -13,6 +14,8 @@ function Header({ hospitalName = "서울중앙병원", userName, notificationCou
   const logout = useAuthStore((state) => state.logout);
   const loginId = useAuthStore((state) => state.loginId);
   const displayName = userName ?? loginId ?? "김간호 · RN";
+  const liveUnreadCount = useUnreadAlertCount();
+  const badgeCount = notificationCount ?? liveUnreadCount;
 
   const handleLogout = () => {
     logout();
@@ -87,9 +90,9 @@ function Header({ hospitalName = "서울중앙병원", userName, notificationCou
           className="relative flex h-6 w-6 items-center justify-center rounded-full outline-none focus-visible:ring-2 focus-visible:ring-white/60 focus-visible:ring-offset-2 focus-visible:ring-offset-[#1E2A3A]"
         >
           <Icon name="bell" size={22} className="text-white" />
-          {notificationCount > 0 && (
+          {badgeCount > 0 && (
             <span className="absolute -right-2 -top-1 flex h-[18px] w-[18px] items-center justify-center rounded-full bg-[#E0442E] text-[11px] font-bold text-white">
-              {notificationCount}
+              {badgeCount}
             </span>
           )}
         </button>

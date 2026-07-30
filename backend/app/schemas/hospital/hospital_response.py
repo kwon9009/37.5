@@ -6,4 +6,4 @@ class HospitalResponse(BaseModel):
 
     hospital_id: int
     name: str
-    area: str
+    address: str

@@ -133,7 +133,8 @@ function Dashboard() {
 
   useEffect(() => {
     // 실시간 감지 이벤트를 흉내내기 위한 지연 (실제로는 SSE로 응급 이벤트 수신 시 즉시 트리거)
-    const timeout = setTimeout(() => setScreeningEnabled(true), 1200);
+    // 시연용으로 10초 지연 (요청 사항)
+    const timeout = setTimeout(() => setScreeningEnabled(true), 10000);
     return () => clearTimeout(timeout);
   }, []);
 
@@ -156,7 +157,7 @@ function Dashboard() {
       name: `${patient.name} · ${patient.room}`,
       detail: `응급 상태 감지 · ${patient.timestamp}`,
       color: "#E0442E",
-      path: `/patients/${encodeURIComponent(patient.name)}`,
+      path: `/patients/${patient.id}`,
     }));
 
   const visiblePatients =
@@ -172,9 +173,9 @@ function Dashboard() {
   };
 
   const handleRespond = () => {
-    const name = screeningPatient.name;
+    const id = screeningPatient.id;
     setEmergencyDismissed(true);
-    navigate(`/patients/${encodeURIComponent(name)}`);
+    navigate(`/patients/${id}`);
   };
 
   return (
@@ -245,7 +246,7 @@ function Dashboard() {
                     <PatientCard
                       key={patient.id}
                       {...patient}
-                      onClick={() => navigate(`/patients/${encodeURIComponent(patient.name)}`)}
+                      onClick={() => navigate(`/patients/${patient.id}`)}
                     />
                   ))}
                 </div>

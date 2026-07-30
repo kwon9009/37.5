@@ -1,16 +1,19 @@
 import { Link } from "react-router-dom";
 import Icon from "../icon/icon.jsx";
 import logo from "../icon/37.5.png";
-
-const NAV_ITEMS = [
-  { key: "dashboard", to: "/dashboard", icon: "layout-dashboard", label: "대시보드" },
-  { key: "patients", to: "/patients", icon: "users", label: "환자 목록" },
-  { key: "monitoring", to: "/monitoring", icon: "activity", label: "실시간 모니터링" },
-  { key: "notifications", to: "/notifications", icon: "bell", label: "알림" },
-  { key: "integration", to: "/integration-requests", icon: "user-check", label: "연동 요청", badge: 3 },
-];
+import { useUnreadAlertCount } from "../../hooks/use-unread-alert-count.js";
 
 function Sidebar({ active = "dashboard" }) {
+  const unreadCount = useUnreadAlertCount();
+
+  const NAV_ITEMS = [
+    { key: "dashboard", to: "/dashboard", icon: "layout-dashboard", label: "대시보드" },
+    { key: "patients", to: "/patients", icon: "users", label: "환자 목록" },
+    { key: "monitoring", to: "/monitoring", icon: "activity", label: "실시간 모니터링" },
+    { key: "notifications", to: "/notifications", icon: "bell", label: "알림", badge: unreadCount > 0 ? unreadCount : null },
+    { key: "integration", to: "/integration-requests", icon: "user-check", label: "연동 요청", badge: 3 },
+  ];
+
   return (
     <aside className="sidebar flex min-h-screen w-[240px] shrink-0 flex-col bg-[#1E2A3A]">
       <div className="sidebar__logo flex items-center gap-[10px] px-5 py-6">

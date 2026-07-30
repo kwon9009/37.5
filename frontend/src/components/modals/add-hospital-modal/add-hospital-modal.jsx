@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import Icon from "../../icon/icon.jsx";
 
-const REGION_OPTIONS = ["수도권", "영남권", "호남권", "충청권", "강원권", "제주권"];
+const REGION_OPTIONS = ["동구", "중구", "서구", "유성구", "대덕구"];
 
 const EMPTY_FORM = { name: "", region: REGION_OPTIONS[0], beds: "", manager: "" };
 

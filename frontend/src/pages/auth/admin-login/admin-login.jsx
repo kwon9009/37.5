@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import Icon from "../../../components/icon/icon.jsx";
 import logo from "../../../components/icon/37.5.png";
-import { apiClient } from "../../../api/client.js";
+import { apiClient, getErrorMessage } from "../../../api/client.js";
 import { useAuthStore } from "../../../store/auth-store.js";
 
 function AdminLogin() {
@@ -32,7 +32,7 @@ function AdminLogin() {
       login({ accessToken: data.access_token, userId: data.user_id, role: data.role, loginId: adminId }, false);
       navigate("/admin/hospitals");
     } catch (err) {
-      setError(err.response?.data?.detail ?? "로그인 중 오류가 발생했습니다.");
+      setError(getErrorMessage(err, "로그인 중 오류가 발생했습니다."));
     } finally {
       setIsSubmitting(false);
     }

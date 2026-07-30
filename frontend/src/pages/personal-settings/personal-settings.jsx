@@ -68,7 +68,7 @@ function PersonalSettings() {
       <Sidebar active={null} />
 
       <div className="flex min-h-screen w-full flex-col">
-        <Header notificationCount={2} />
+        <Header />
 
         <div className="flex flex-col gap-6 p-6">
           <div className="flex flex-wrap items-center justify-between gap-4">

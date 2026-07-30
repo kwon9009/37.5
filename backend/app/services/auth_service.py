@@ -10,7 +10,7 @@ from app.crud.department_crud import (
     create_department,
     exists_by_hospital_and_name,
 )
-from app.crud.hospital_crud import get_by_name_and_area
+from app.crud.hospital_crud import get_by_id as get_hospital_by_id
 from app.crud.guardian_crud import create_guardian
 from app.crud.user_crud import (
     create_user,
@@ -160,10 +160,9 @@ def register_department(
     request: DepartmentRegisterRequest,
 ) -> RegisterResponse:
 
-    hospital = get_by_name_and_area(
+    hospital = get_hospital_by_id(
         db=db,
-        name=request.hospital_name,
-        area=request.area,
+        hospital_id=request.hospital_id,
     )
 
     if hospital is None:
