@@ -2,9 +2,11 @@ import { Link } from "react-router-dom";
 import Icon from "../icon/icon.jsx";
 import logo from "../icon/37.5.png";
 import { useUnreadAlertCount } from "../../hooks/use-unread-alert-count.js";
+import { useAuthStore } from "../../store/auth-store.js";
 
 function Sidebar({ active = "dashboard" }) {
   const unreadCount = useUnreadAlertCount();
+  const role = useAuthStore((state) => state.role);
 
   const NAV_ITEMS = [
     { key: "dashboard", to: "/dashboard", icon: "layout-dashboard", label: "대시보드" },
@@ -52,13 +54,15 @@ function Sidebar({ active = "dashboard" }) {
 
       <div className="sidebar__spacer flex-1" />
 
-      <Link
-        to="/admin-login"
-        className="sidebar__dev-hint flex items-center gap-2 border-t border-white/10 px-5 py-4 text-[#5A6B7F] hover:text-[#8B9AAE]"
-      >
-        <Icon name="terminal" size={13} />
-        <span className="font-mono text-[11px] font-medium">/dev 경로로 관리자 모드 진입</span>
-      </Link>
+      {role === "ADMIN" && (
+        <Link
+          to="/admin-login"
+          className="sidebar__dev-hint flex items-center gap-2 border-t border-white/10 px-5 py-4 text-[#5A6B7F] hover:text-[#8B9AAE]"
+        >
+          <Icon name="terminal" size={13} />
+          <span className="font-mono text-[11px] font-medium">/dev 경로로 관리자 모드 진입</span>
+        </Link>
+      )}
     </aside>
   );
 }
