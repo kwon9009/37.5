@@ -4,7 +4,6 @@ import AdminSidebar from "../../../components/admin-sidebar/admin-sidebar.jsx";
 import AdminHeader from "../../../components/admin-header/admin-header.jsx";
 import Icon from "../../../components/icon/icon.jsx";
 import AddHospitalModal from "../../../components/modals/add-hospital-modal/add-hospital-modal.jsx";
-import { HOSPITALS as INITIAL_HOSPITALS } from "../../../data/admin.js";
 import { apiClient } from "../../../api/client.js";
 
 const STATUS_TABS = ["전체", "활성", "비활성"];
@@ -12,13 +11,32 @@ const PAGE_SIZE = 5;
 
 function AdminHospitalManagement() {
   const navigate = useNavigate();
-  const [hospitals, setHospitals] = useState(INITIAL_HOSPITALS);
+  const [hospitals, setHospitals] = useState([]);
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [regionFilter, setRegionFilter] = useState("전체");
   const [statusFilter, setStatusFilter] = useState("전체");
   const [page, setPage] = useState(1);
   const [pendingRequests, setPendingRequests] = useState([]);
+
+  const loadHospitals = () => {
+    apiClient
+      .get("/admin/hospitals")
+      .then(({ data }) => {
+        setHospitals(
+          data.map((hospital) => ({
+            id: hospital.hospital_id,
+            name: hospital.name,
+            region: hospital.region,
+            beds: hospital.beds,
+            devices: hospital.devices,
+            manager: hospital.manager,
+            active: hospital.active,
+          })),
+        );
+      })
+      .catch(() => {});
+  };
 
   const loadPendingRequests = () => {
     apiClient
@@ -30,23 +48,13 @@ function AdminHospitalManagement() {
   };
 
   useEffect(() => {
+    loadHospitals();
     loadPendingRequests();
   }, []);
 
   const handleApproveRequest = (request) => {
     apiClient.post(`/hospital-requests/${request.hospital_request_id}/approve`).then(() => {
-      setHospitals((current) => [
-        {
-          id: `${request.hospital_name}-${Date.now()}`,
-          name: request.hospital_name,
-          region: request.area,
-          beds: 0,
-          devices: 0,
-          manager: "-",
-          active: true,
-        },
-        ...current,
-      ]);
+      loadHospitals();
       loadPendingRequests();
     });
   };
@@ -118,7 +126,7 @@ function AdminHospitalManagement() {
                   >
                     <div className="flex flex-col gap-[3px]">
                       <p className="text-sm font-bold text-[#1E2A3A]">
-                        {request.hospital_name} <span className="font-normal text-[#5A6B80]">· {request.area}</span>
+                        {request.hospital_name} <span className="font-normal text-[#5A6B80]">· {request.bed_count}병상</span>
                       </p>
                       <p className="text-xs text-[#5A6B80]">{request.address}</p>
                       <p className="text-[11px] text-[#5A6B80]">

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import Sidebar from "../../components/sidebar/sidebar.jsx";
 import Header from "../../components/header/header.jsx";
@@ -6,35 +6,77 @@ import Icon from "../../components/icon/icon.jsx";
 import StatusBadge from "../../components/status-badge/status-badge.jsx";
 import PresenceBadge from "../../components/presence-badge/presence-badge.jsx";
 import SpecialNoteTag from "../../components/special-note-tag/special-note-tag.jsx";
+import { apiClient } from "../../api/client.js";
 
 const RANGE_OPTIONS = ["1시간", "6시간", "24시간"];
+const RANGE_WINDOW_MS = { "1시간": 60 * 60 * 1000, "6시간": 6 * 60 * 60 * 1000, "24시간": 24 * 60 * 60 * 1000 };
 
-const TIMELINE_ITEMS = [
-  { icon: "activity", iconBg: "#FCF0DC", iconColor: "#E8A13B", message: "심박 104bpm — 주의 범위 진입", time: "방금", severity: "caution" },
-  { icon: "activity", iconBg: "#FCF0DC", iconColor: "#E8A13B", message: "호흡 18회/분 — 주의 관찰 필요", time: "28분 전", severity: "caution" },
-  { icon: "circle-alert", iconBg: "#FBEBDD", iconColor: "#E8762B", message: "심박 111bpm — 경고 임계 근접", time: "1시간 12분 전", severity: "warning" },
-];
+const VITAL_STATUS_TO_SEVERITY = {
+  NORMAL: "normal",
+  WARNING: "warning",
+  ALERT: "caution",
+  DANGER: "emergency",
+};
 
-const EMERGENCY_EVENTS = [
-  { icon: "triangle-alert", message: "급성 빈맥 발생 감지", meta: "2026.06.29 03:12 · 심박 138bpm · 호흡 27회/분" },
-  { icon: "triangle-alert", message: "저산소증 의심 알림", meta: "2026.05.14 19:47 · 심박 129bpm · 호흡 9회/분" },
-];
+const GENDER_LABEL = { MALE: "남성", FEMALE: "여성" };
 
-const PATIENT_INFO_ROWS = [
-  ["환자명", "이영희", false],
-  ["생년월일", "1959.03.12 (67세)", false],
-  ["성별", "여성", false],
-  ["병실·병상", "302호 · A-2", true],
-  ["부착 장치", "VG-302-A2", true],
-];
+function calcAge(birthDateIso) {
+  const birth = new Date(birthDateIso);
+  if (Number.isNaN(birth.getTime())) return null;
+  const now = new Date();
+  let age = now.getFullYear() - birth.getFullYear();
+  const beforeBirthday =
+    now.getMonth() < birth.getMonth() || (now.getMonth() === birth.getMonth() && now.getDate() < birth.getDate());
+  if (beforeBirthday) age -= 1;
+  return age;
+}
+
+function formatClock(iso) {
+  const date = new Date(iso);
+  return Number.isNaN(date.getTime()) ? "" : date.toLocaleTimeString("ko-KR", { hour12: false });
+}
+
+function formatRelative(iso) {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return "";
+  const diffMin = Math.round((Date.now() - date.getTime()) / 60000);
+  if (diffMin < 1) return "방금";
+  if (diffMin < 60) return `${diffMin}분 전`;
+  const diffHour = Math.round(diffMin / 60);
+  if (diffHour < 24) return `${diffHour}시간 전`;
+  return date.toLocaleDateString("ko-KR");
+}
+
+function buildRanges(logs, valueKey, defaultMin, defaultMax) {
+  const now = Date.now();
+  const ranges = {};
+  for (const label of RANGE_OPTIONS) {
+    const windowMs = RANGE_WINDOW_MS[label];
+    const filtered = logs.filter((log) => now - new Date(log.recorded_at).getTime() <= windowMs);
+    const values = filtered.length > 0 ? filtered.map((log) => log[valueKey]) : [defaultMin, defaultMax];
+    const min = Math.min(defaultMin, ...values);
+    const max = Math.max(defaultMax, ...values);
+    ranges[label] = {
+      xAxisLabels: filtered.length > 0 ? filtered.map((log) => formatClock(log.recorded_at)) : ["-"],
+      data: values,
+      min,
+      max,
+      markerIndex: filtered.length > 0 ? filtered.length - 1 : null,
+    };
+  }
+  return ranges;
+}
 
 function TrendChart({ title, subtitle, yAxisLabels, ranges, lineColor = "#2B6FE3", markerColor }) {
   const [range, setRange] = useState("6시간");
   const { xAxisLabels, data, min, max, markerIndex } = ranges[range];
   const width = 600;
   const height = 160;
-  const step = width / (data.length - 1);
-  const points = data.map((value, index) => [index * step, height - ((value - min) / (max - min)) * height]);
+  const step = width / (data.length - 1 || 1);
+  const points = data.map((value, index) => [
+    index * step,
+    height - ((value - min) / (max - min || 1)) * height,
+  ]);
   const linePath = points.map(([x, y], index) => `${index === 0 ? "M" : "L"}${x} ${y}`).join(" ");
   const gridLines = [0, height / 3, (height / 3) * 2, height];
 
@@ -85,8 +127,8 @@ function TrendChart({ title, subtitle, yAxisLabels, ranges, lineColor = "#2B6FE3
             )}
           </svg>
           <div className="flex justify-between text-[11px] text-[#5A6B80]">
-            {xAxisLabels.map((label) => (
-              <span key={label}>{label}</span>
+            {xAxisLabels.map((label, index) => (
+              <span key={`${label}-${index}`}>{label}</span>
             ))}
           </div>
         </div>
@@ -97,14 +139,73 @@ function TrendChart({ title, subtitle, yAxisLabels, ranges, lineColor = "#2B6FE3
 
 function PatientDetail() {
   const { patientId } = useParams();
-  const displayName = patientId ? decodeURIComponent(patientId) : "이영희";
+  const [detail, setDetail] = useState(null);
+  const [vitalLogs, setVitalLogs] = useState([]);
+  const [alerts, setAlerts] = useState([]);
+  const [emergencyLogs, setEmergencyLogs] = useState([]);
+
+  useEffect(() => {
+    if (!patientId) return;
+    Promise.all([
+      apiClient.get(`/patients/${patientId}`),
+      apiClient.get(`/patients/${patientId}/vital-logs`),
+      apiClient.get(`/patients/${patientId}/alerts`),
+      apiClient.get(`/patients/${patientId}/emergency-logs`),
+    ])
+      .then(([detailRes, vitalLogsRes, alertsRes, emergencyLogsRes]) => {
+        setDetail(detailRes.data);
+        setVitalLogs(vitalLogsRes.data.vital_logs);
+        setAlerts(alertsRes.data.alerts);
+        setEmergencyLogs(emergencyLogsRes.data.emergency_logs);
+      })
+      .catch(() => {});
+  }, [patientId]);
+
+  if (!detail) {
+    return (
+      <div className="patient-detail flex min-h-screen bg-[#F5F7FA]">
+        <Sidebar active="patients" />
+        <div className="flex min-h-screen w-full flex-col">
+          <Header />
+          <div className="p-6 text-sm text-[#5A6B80]">불러오는 중...</div>
+        </div>
+      </div>
+    );
+  }
+
+  const { patient, guardian, device_serial: deviceSerial, current_vital: currentVital } = detail;
+  const age = calcAge(patient.birth_date);
+  const severity = VITAL_STATUS_TO_SEVERITY[alerts[0]?.status] ?? "normal";
+
+  const patientInfoRows = [
+    ["환자명", patient.name, false],
+    ["생년월일", age != null ? `${new Date(patient.birth_date).toLocaleDateString("ko-KR")} (${age}세)` : "-", false],
+    ["성별", GENDER_LABEL[patient.gender] ?? patient.gender, false],
+    ["병실·병상", `${patient.room_num}호 · ${patient.bed_num}번`, true],
+    ["부착 장치", deviceSerial ?? "미등록", true],
+  ];
+
+  const timelineItems = alerts.map((alert) => ({
+    key: alert.alert_id,
+    icon: "activity",
+    message: alert.message,
+    time: formatRelative(alert.sent_at),
+    severity: VITAL_STATUS_TO_SEVERITY[alert.status] ?? "normal",
+  }));
+
+  const emergencyEvents = emergencyLogs.map((log, index) => ({
+    key: `${log.created_at}-${index}`,
+    icon: "triangle-alert",
+    message: log.event_type,
+    meta: `${new Date(log.created_at).toLocaleString("ko-KR", { hour12: false })} · 심박 ${log.heart_rate}bpm · 호흡 ${log.resp_rate}회/분`,
+  }));
 
   return (
     <div className="patient-detail flex min-h-screen bg-[#F5F7FA]">
       <Sidebar active="patients" />
 
       <div className="flex min-h-screen w-full flex-col">
-        <Header notificationCount={2} />
+        <Header />
 
         <div className="flex flex-col gap-6 p-6">
           <Link to="/patients" className="flex w-fit items-center gap-[6px] text-[#2B6FE3]">
@@ -116,22 +217,22 @@ function PatientDetail() {
             <div className="flex items-center gap-4">
               <span className="h-16 w-16 shrink-0 rounded-full border border-[#DCE3EC] bg-[#EDF1F6]" />
               <div className="flex flex-col gap-[5px]">
-                <p className="text-2xl font-bold text-[#1E2A3A]">{displayName}</p>
+                <p className="text-2xl font-bold text-[#1E2A3A]">{patient.name}</p>
                 <div className="flex flex-wrap items-center gap-2 text-[13px] text-[#5A6B80]">
-                  <span>302호 · A-2</span>
-                  <span>여 · 67세</span>
-                  <span>담당 김간호 RN</span>
+                  <span>{patient.room_num}호 · {patient.bed_num}번</span>
+                  <span>{GENDER_LABEL[patient.gender] ?? patient.gender}{age != null ? ` · ${age}세` : ""}</span>
+                  <span>{patient.department}</span>
                 </div>
-                <div className="flex gap-[6px]">
-                  {["고혈압 병력", "야간 관찰 필요"].map((tag) => (
-                    <span key={tag} className="rounded-full bg-[#EDF1F6] px-[10px] py-1 text-[11px] text-[#5A6B80]">
-                      {tag}
+                {patient.special_notes && (
+                  <div className="flex gap-[6px]">
+                    <span className="rounded-full bg-[#EDF1F6] px-[10px] py-1 text-[11px] text-[#5A6B80]">
+                      {patient.special_notes}
                     </span>
-                  ))}
-                </div>
+                  </div>
+                )}
               </div>
             </div>
-            <StatusBadge severity="caution" size="lg" />
+            <StatusBadge severity={severity} size="lg" />
           </div>
 
           <div className="flex flex-col gap-6 xl:flex-row">
@@ -145,10 +246,14 @@ function PatientDetail() {
                       현재 심박
                     </div>
                     <div className="flex items-end gap-[6px]">
-                      <span className="text-[48px] font-extrabold leading-none text-[#1E2A3A]">104</span>
+                      <span className="text-[48px] font-extrabold leading-none text-[#1E2A3A]">
+                        {currentVital?.heart_rate ?? "--"}
+                      </span>
                       <span className="pb-1 text-base text-[#5A6B80]">bpm</span>
                     </div>
-                    <p className="text-[13px] text-[#E8A13B]">↑ 정상 범위보다 다소 높음</p>
+                    <p className="text-[13px] text-[#5A6B80]">
+                      {currentVital?.measured_at ? `${formatRelative(currentVital.measured_at)} 측정` : "측정 기록 없음"}
+                    </p>
                   </div>
                 </div>
 
@@ -160,10 +265,14 @@ function PatientDetail() {
                       현재 호흡
                     </div>
                     <div className="flex items-end gap-[6px]">
-                      <span className="text-[48px] font-extrabold leading-none text-[#1E2A3A]">18</span>
+                      <span className="text-[48px] font-extrabold leading-none text-[#1E2A3A]">
+                        {currentVital?.resp_rate ?? "--"}
+                      </span>
                       <span className="pb-1 text-base text-[#5A6B80]">회/분</span>
                     </div>
-                    <p className="text-[13px] text-[#2FA35C]">정상 범위 유지</p>
+                    <p className="text-[13px] text-[#5A6B80]">
+                      {currentVital?.measured_at ? `${formatRelative(currentVital.measured_at)} 측정` : "측정 기록 없음"}
+                    </p>
                   </div>
                 </div>
               </div>
@@ -173,55 +282,15 @@ function PatientDetail() {
                 subtitle="1분 평균 · vital_logs"
                 yAxisLabels={[120, 100, 80, 60]}
                 markerColor="#E8A13B"
-                ranges={{
-                  "1시간": {
-                    xAxisLabels: ["14:00", "14:10", "14:20", "14:30", "14:40", "14:50"],
-                    data: [98, 102, 106, 109, 111, 104],
-                    min: 60,
-                    max: 120,
-                    markerIndex: 4,
-                  },
-                  "6시간": {
-                    xAxisLabels: ["09:00", "10:00", "11:00", "12:00", "13:00", "14:00", "15:00"],
-                    data: [88, 92, 95, 101, 108, 111, 104],
-                    min: 60,
-                    max: 120,
-                    markerIndex: 5,
-                  },
-                  "24시간": {
-                    xAxisLabels: ["00:00", "04:00", "08:00", "12:00", "16:00", "20:00", "24:00"],
-                    data: [70, 66, 74, 92, 104, 111, 96],
-                    min: 60,
-                    max: 120,
-                    markerIndex: 5,
-                  },
-                }}
+                ranges={buildRanges(vitalLogs, "avg_heart_rate", 60, 120)}
               />
 
               <TrendChart
                 title="호흡수 추이"
                 subtitle="1분 평균 · vital_logs"
                 yAxisLabels={[24, 18, 12, 6]}
-                ranges={{
-                  "1시간": {
-                    xAxisLabels: ["14:00", "14:10", "14:20", "14:30", "14:40", "14:50"],
-                    data: [16, 17, 18, 19, 18, 18],
-                    min: 6,
-                    max: 24,
-                  },
-                  "6시간": {
-                    xAxisLabels: ["09:00", "10:00", "11:00", "12:00", "13:00", "14:00", "15:00"],
-                    data: [15, 16, 17, 16, 18, 19, 18],
-                    min: 6,
-                    max: 24,
-                  },
-                  "24시간": {
-                    xAxisLabels: ["00:00", "04:00", "08:00", "12:00", "16:00", "20:00", "24:00"],
-                    data: [14, 13, 15, 17, 18, 19, 16],
-                    min: 6,
-                    max: 24,
-                  },
-                }}
+                markerColor="#2FA35C"
+                ranges={buildRanges(vitalLogs, "avg_resp_rate", 6, 24)}
               />
             </div>
 
@@ -231,7 +300,7 @@ function PatientDetail() {
                   <p className="text-base font-bold text-[#1E2A3A]">환자 정보</p>
                 </div>
                 <div className="flex flex-col gap-[10px] p-[17px]">
-                  {PATIENT_INFO_ROWS.map(([label, value, mono]) => (
+                  {patientInfoRows.map(([label, value, mono]) => (
                     <div key={label} className="flex items-center justify-between">
                       <span className="text-[13px] text-[#5A6B80]">{label}</span>
                       <span className={`text-[13px] font-semibold text-[#1E2A3A] ${mono ? "font-mono" : ""}`}>
@@ -241,16 +310,20 @@ function PatientDetail() {
                   ))}
                   <div className="flex items-center justify-between">
                     <span className="text-[13px] text-[#5A6B80]">재실 여부</span>
-                    <PresenceBadge label="재실중" />
+                    <PresenceBadge label={patient.is_present ? "재실중" : "부재중"} />
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-[13px] text-[#5A6B80]">담당 병원</span>
-                    <span className="text-[13px] font-semibold text-[#1E2A3A]">우송대학교병원</span>
+                    <span className="text-[13px] font-semibold text-[#1E2A3A]">{patient.hospital}</span>
                   </div>
-                  <span className="text-[13px] text-[#5A6B80]">특이사항</span>
-                  <div className="flex gap-[6px]">
-                    <SpecialNoteTag icon="shield-alert" color="#E0442E" label="알레르기" showLabel />
-                  </div>
+                  {patient.special_notes && (
+                    <>
+                      <span className="text-[13px] text-[#5A6B80]">특이사항</span>
+                      <div className="flex gap-[6px]">
+                        <SpecialNoteTag icon="shield-alert" color="#E0442E" label={patient.special_notes} showLabel />
+                      </div>
+                    </>
+                  )}
                 </div>
               </div>
 
@@ -258,29 +331,33 @@ function PatientDetail() {
                 <div className="border-b border-[#DCE3EC] px-5 py-4">
                   <p className="text-base font-bold text-[#1E2A3A]">보호자</p>
                 </div>
-                <div className="flex flex-col gap-3 p-4">
-                  <div className="flex items-center gap-3">
-                    <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-[#DCE3EC] bg-[#EDF1F6] text-base font-bold text-[#1E2A3A]">
-                      박
-                    </span>
-                    <div className="flex flex-col gap-[3px]">
-                      <p className="text-[15px] font-bold text-[#1E2A3A]">박민수</p>
-                      <p className="text-xs text-[#5A6B80]">장남 (보호자)</p>
+                {guardian ? (
+                  <div className="flex flex-col gap-3 p-4">
+                    <div className="flex items-center gap-3">
+                      <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-[#DCE3EC] bg-[#EDF1F6] text-base font-bold text-[#1E2A3A]">
+                        {guardian.name.slice(0, 1)}
+                      </span>
+                      <div className="flex flex-col gap-[3px]">
+                        <p className="text-[15px] font-bold text-[#1E2A3A]">{guardian.name}</p>
+                        <p className="text-xs text-[#5A6B80]">보호자</p>
+                      </div>
                     </div>
+                    <div className="h-px bg-[#DCE3EC]" />
+                    <div className="flex items-center justify-between">
+                      <span className="text-[13px] text-[#5A6B80]">연락처</span>
+                      <span className="font-mono text-[13px] font-semibold text-[#1E2A3A]">{guardian.phone}</span>
+                    </div>
+                    <a
+                      href={`tel:${guardian.phone}`}
+                      className="flex h-[42px] items-center justify-center gap-2 rounded-lg bg-[#2B6FE3] text-sm font-bold text-white"
+                    >
+                      <Icon name="phone" size={16} className="text-white" />
+                      보호자에게 전화
+                    </a>
                   </div>
-                  <div className="h-px bg-[#DCE3EC]" />
-                  <div className="flex items-center justify-between">
-                    <span className="text-[13px] text-[#5A6B80]">연락처</span>
-                    <span className="font-mono text-[13px] font-semibold text-[#1E2A3A]">010-2233-8871</span>
-                  </div>
-                  <button
-                    type="button"
-                    className="flex h-[42px] items-center justify-center gap-2 rounded-lg bg-[#2B6FE3] text-sm font-bold text-white"
-                  >
-                    <Icon name="phone" size={16} className="text-white" />
-                    보호자에게 전화
-                  </button>
-                </div>
+                ) : (
+                  <p className="p-4 text-sm text-[#5A6B80]">등록된 보호자가 없습니다.</p>
+                )}
               </div>
 
               <div className="overflow-hidden rounded-xl border border-[#DCE3EC] bg-white shadow-[0_2px_3px_rgba(30,42,58,0.08)]">
@@ -288,16 +365,16 @@ function PatientDetail() {
                   <p className="text-base font-bold text-[#1E2A3A]">알림 타임라인</p>
                 </div>
                 <div className="flex flex-col">
-                  {TIMELINE_ITEMS.map((item) => (
+                  {timelineItems.length === 0 && (
+                    <p className="px-5 py-4 text-sm text-[#5A6B80]">알림 기록이 없습니다.</p>
+                  )}
+                  {timelineItems.map((item) => (
                     <div
-                      key={item.message}
+                      key={item.key}
                       className="flex items-center gap-3 border-b border-[#DCE3EC] px-5 py-[14px] last:border-b-0"
                     >
-                      <span
-                        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full"
-                        style={{ backgroundColor: item.iconBg }}
-                      >
-                        <Icon name={item.icon} size={16} style={{ color: item.iconColor }} />
+                      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#FCF0DC]">
+                        <Icon name={item.icon} size={16} style={{ color: "#E8A13B" }} />
                       </span>
                       <div className="flex min-w-0 flex-1 flex-col gap-[2px]">
                         <p className="truncate text-[13px] font-semibold text-[#1E2A3A]">{item.message}</p>
@@ -314,9 +391,12 @@ function PatientDetail() {
                   <p className="text-base font-bold text-[#1E2A3A]">응급 이벤트</p>
                 </div>
                 <div className="flex flex-col">
-                  {EMERGENCY_EVENTS.map((item) => (
+                  {emergencyEvents.length === 0 && (
+                    <p className="px-5 py-4 text-sm text-[#5A6B80]">응급 이벤트 기록이 없습니다.</p>
+                  )}
+                  {emergencyEvents.map((item) => (
                     <div
-                      key={item.message}
+                      key={item.key}
                       className="flex items-center gap-3 border-b border-[#DCE3EC] px-5 py-[14px] last:border-b-0"
                     >
                       <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#FDEDEA]">
@@ -326,7 +406,6 @@ function PatientDetail() {
                         <p className="truncate text-[13px] font-semibold text-[#1E2A3A]">{item.message}</p>
                         <p className="truncate text-[11px] text-[#5A6B80]">{item.meta}</p>
                       </div>
-                      <StatusBadge severity="normal" label="해결됨" />
                     </div>
                   ))}
                 </div>

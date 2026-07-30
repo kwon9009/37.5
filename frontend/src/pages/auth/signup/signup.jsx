@@ -3,7 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import HospitalSearchModal from "../../../components/modals/search-modal/search-modal.jsx";
 import PasswordStrengthMeter from "../../../components/password-strength-meter/password-strength-meter.jsx";
 import logo from "../../../components/icon/37.5.png";
-import { apiClient } from "../../../api/client.js";
+import { apiClient, getErrorMessage } from "../../../api/client.js";
 import { getPasswordStrength } from "../../../utils/password-strength.js";
 
 function Signup() {
@@ -22,6 +22,10 @@ function Signup() {
     event.preventDefault();
     setError("");
 
+    if (departmentName.trim().length < 2) {
+      setError("부서명을 2자 이상 입력해 주세요.");
+      return;
+    }
     if (!hospital) {
       setError("소속 병원을 검색해서 선택해 주세요.");
       return;
@@ -42,8 +46,7 @@ function Signup() {
     setIsSubmitting(true);
     try {
       await apiClient.post("/auth/register/department", {
-        hospital_name: hospital.name,
-        area: hospital.area,
+        hospital_id: hospital.hospital_id,
         department_name: departmentName,
         login_id: departmentLoginId,
         email,
@@ -52,7 +55,7 @@ function Signup() {
 
       navigate("/login", { state: { registered: true } });
     } catch (err) {
-      setError(err.response?.data?.detail ?? "회원가입 중 오류가 발생했습니다.");
+      setError(getErrorMessage(err, "회원가입 중 오류가 발생했습니다."));
     } finally {
       setIsSubmitting(false);
     }

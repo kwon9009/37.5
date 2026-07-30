@@ -174,9 +174,7 @@ function HospitalSearchModal({ isOpen, onClose, onSelect }) {
                   </span>
                   <span className="flex min-w-0 flex-1 flex-col gap-[2px]">
                     <span className="truncate text-sm font-bold text-[#1E2A3A]">{hospital.name}</span>
-                  </span>
-                  <span className="shrink-0 rounded-full bg-[#EDF1F6] px-[10px] py-1 text-[11px] font-bold text-[#5A6B80]">
-                    {hospital.area}
+                    <span className="truncate text-xs text-[#5A6B80]">{hospital.address}</span>
                   </span>
                 </button>
               </li>

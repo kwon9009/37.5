@@ -65,7 +65,7 @@ function IntegrationRequestDetail() {
       <Sidebar active="integration" />
 
       <div className="flex min-h-screen w-full flex-col">
-        <Header notificationCount={3} />
+        <Header />
 
         <div className="flex flex-col gap-5 p-6">
           <Link to="/integration-requests" className="flex w-fit items-center gap-[6px] text-[#2B6FE3]">
