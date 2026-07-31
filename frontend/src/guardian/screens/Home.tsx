@@ -39,6 +39,12 @@ export default function Home() {
   useEffect(() => setNotifItems(notifications), [notifications])
   const urgentCount = notifItems.filter((n) => n.type === "urgent").length
 
+  // 홈 화면에 상주한 지 10초가 지나면 응급 알림 이벤트 발생
+  useEffect(() => {
+    const timer = window.setTimeout(() => navigate("/guardian/emergency"), 10 * 1000)
+    return () => window.clearTimeout(timer)
+  }, [navigate])
+
   return (
     <Screen>
       <TopBar

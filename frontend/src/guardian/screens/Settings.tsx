@@ -1,11 +1,11 @@
 import { useState } from "react"
 import { useNavigate } from "react-router-dom"
-import { User, FileText, LogOut, ChevronRight, ChevronDown, VolumeX, Volume1, Volume2, CheckCircle2 } from "lucide-react"
+import { User, FileText, LogOut, ChevronRight, VolumeX, Volume1, Volume2, X } from "lucide-react"
 import { Screen, TopBar } from "@/guardian/components/Screen"
 import { BottomNav } from "@/guardian/components/BottomNav"
-import { cn } from "@/guardian/lib/utils"
 import { useGuardianData } from "@/guardian/lib/api"
 import { useAuthStore } from "@/store/auth-store.js"
+import { termsSections } from "@/guardian/lib/terms-content"
 
 const soundLevels = [
   { key: "off", label: "무음", Icon: VolumeX },
@@ -14,83 +14,6 @@ const soundLevels = [
   { key: "high", label: "크게", Icon: Volume2 },
 ]
 
-type Choice = "yes" | "no"
-
-// 회원가입 전 약관 동의(Terms)와 동일한 예/아니오 재동의 블록
-function ConsentRow({
-  required,
-  title,
-  body,
-  restriction,
-  value,
-  onChange,
-}: {
-  required?: boolean
-  title: string
-  body: string
-  restriction: string
-  value: Choice
-  onChange: (c: Choice) => void
-}) {
-  // 약관 제목을 누르면 본문이 아래로 펼쳐짐 (PatientInfo의 확장 토글 방식과 동일)
-  const [open, setOpen] = useState(false)
-
-  return (
-    <div className="space-y-2">
-      <button
-        type="button"
-        onClick={() => setOpen((o) => !o)}
-        aria-expanded={open}
-        className="flex w-full items-center gap-2 text-left"
-      >
-        <span
-          className={cn(
-            "rounded-full px-2 py-0.5 text-xs font-semibold",
-            required ? "bg-accent/15 text-accent" : "bg-primary/15 text-primary",
-          )}
-        >
-          {required ? "필수" : "선택"}
-        </span>
-        <span className="flex-1 text-sm font-medium text-foreground">{title}</span>
-        {open ? (
-          <ChevronDown size={16} className="text-muted-foreground" aria-hidden />
-        ) : (
-          <ChevronRight size={16} className="text-muted-foreground" aria-hidden />
-        )}
-      </button>
-
-      {/* 약관 본문 - 내용이 길 수 있어 패널 내부에서만 스크롤되게 함 */}
-      {open && (
-        <div className="max-h-40 overflow-y-auto rounded-xl bg-muted/60 p-3 text-xs leading-relaxed text-muted-foreground">
-          <p>{body}</p>
-          <p className="mt-2 text-muted-foreground/80">{restriction}</p>
-        </div>
-      )}
-
-      <div className="flex gap-2">
-        <button
-          onClick={() => onChange("yes")}
-          className={cn(
-            "h-10 flex-1 rounded-xl border text-sm font-semibold transition",
-            value === "yes" ? "border-primary bg-primary text-primary-foreground" : "border-border bg-card text-foreground",
-          )}
-        >
-          동의
-        </button>
-        <button
-          onClick={() => onChange("no")}
-          className={cn(
-            "h-10 flex-1 rounded-xl border text-sm font-semibold transition",
-            value === "no" ? "border-primary bg-primary text-primary-foreground" : "border-border bg-card text-foreground",
-          )}
-        >
-          비동의
-        </button>
-      </div>
-    </div>
-  )
-}
-
 export default function Settings() {
   const navigate = useNavigate()
   const logout = useAuthStore((state) => state.logout)
@@ -98,11 +21,8 @@ export default function Settings() {
   const [sound, setSound] = useState("mid")
   const current = soundLevels.find((l) => l.key === sound) ?? soundLevels[2]
 
-  // 이용약관 및 정책 재동의 (가입 시 동의한 상태로 시작)
+  // 이용약관 및 정책 - 회원가입 동의 화면과 별개로, 전문을 팝업으로 보여주기만 함
   const [termsOpen, setTermsOpen] = useState(false)
-  const [requiredConsent, setRequiredConsent] = useState<Choice>("yes")
-  const [optionalConsent, setOptionalConsent] = useState<Choice>("yes")
-  const [savedMsg, setSavedMsg] = useState("")
 
   return (
     <Screen>
@@ -162,79 +82,13 @@ export default function Settings() {
           </div>
           <div className="h-px bg-border" />
           <button
-            onClick={() => {
-              setTermsOpen((o) => !o)
-              setSavedMsg("")
-            }}
-            aria-expanded={termsOpen}
+            onClick={() => setTermsOpen(true)}
             className="flex w-full items-center gap-3 px-5 py-4 text-left hover:bg-muted/40"
           >
             <FileText size={20} className="text-primary" aria-hidden />
             <span className="flex-1 font-medium text-foreground">이용약관 및 정책</span>
-            {termsOpen ? (
-              <ChevronDown size={18} className="text-muted-foreground" aria-hidden />
-            ) : (
-              <ChevronRight size={18} className="text-muted-foreground" aria-hidden />
-            )}
+            <ChevronRight size={18} className="text-muted-foreground" aria-hidden />
           </button>
-          {termsOpen && (
-            <div className="space-y-4 border-t border-border bg-muted/30 px-5 py-4">
-              <p className="text-xs leading-relaxed text-muted-foreground">
-                이용약관 및 정책에 대한 동의 여부를 다시 선택할 수 있습니다. 필수 항목에 비동의 시 서비스 이용이 불가능합니다.
-              </p>
-              <ConsentRow
-                required
-                title="사용자 정보 보관에 대한 사항"
-                body="사용자 및 환자의 생체신호·계정 정보를 안전하게 보관하고 모니터링 목적에 한해 활용합니다."
-                restriction="거부 시 서비스 이용이 불가능합니다."
-                value={requiredConsent}
-                onChange={(c) => {
-                  // 필수 항목 비동의 시 실제 값은 바꾸지 않고 로그인 화면으로 이동
-                  if (c === "no") {
-                    logout()
-                    navigate("/guardian/login")
-                    return
-                  }
-                  setRequiredConsent(c)
-                  setSavedMsg("")
-                }}
-              />
-              <ConsentRow
-                title="이벤트 정보 수집 (선택)"
-                body="서비스 개선 및 맞춤 알림을 위한 이용 이벤트 정보를 수집합니다."
-                restriction="거부 시 서비스 최적화에 제약이 있을 수 있습니다."
-                value={optionalConsent}
-                onChange={(c) => {
-                  setOptionalConsent(c)
-                  setSavedMsg("")
-                }}
-              />
-              <button
-                onClick={() =>
-                  setSavedMsg(
-                    requiredConsent === "no"
-                      ? "필수 항목에 비동의하여 일부 서비스 이용이 제한됩니다."
-                      : "동의 설정이 저장되었습니다.",
-                  )
-                }
-                className="h-11 w-full rounded-xl bg-primary text-sm font-semibold text-primary-foreground transition hover:bg-primary/90"
-              >
-                변경 사항 저장
-              </button>
-              {savedMsg && (
-                <p
-                  className={cn(
-                    "flex items-center gap-1.5 text-xs font-medium",
-                    requiredConsent === "no" ? "text-danger" : "text-success",
-                  )}
-                  role="status"
-                >
-                  <CheckCircle2 size={14} aria-hidden />
-                  {savedMsg}
-                </p>
-              )}
-            </div>
-          )}
         </div>
 
         <button
@@ -251,6 +105,49 @@ export default function Settings() {
         <p className="mt-6 text-center text-xs text-muted-foreground">버전 1.0.0</p>
       </div>
       <BottomNav />
+
+      {/* 이용약관 및 정책 팝업 - 전문이 길어 팝업 내부에서만 스크롤됨 */}
+      {termsOpen && (
+        <div
+          className="absolute inset-0 z-50 flex items-end justify-center bg-foreground/40 sm:items-center sm:p-4"
+          onClick={() => setTermsOpen(false)}
+        >
+          <div
+            className="fade-up flex h-[85%] w-full max-w-[26rem] flex-col rounded-t-3xl bg-card sm:h-[80%] sm:rounded-3xl"
+            onClick={(e) => e.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            aria-label="이용약관 및 정책"
+          >
+            <div className="flex shrink-0 items-center justify-between border-b border-border px-5 py-4">
+              <h3 className="text-lg font-bold text-foreground">이용약관 및 정책</h3>
+              <button
+                aria-label="닫기"
+                onClick={() => setTermsOpen(false)}
+                className="grid h-9 w-9 place-items-center rounded-full text-muted-foreground hover:bg-muted"
+              >
+                <X size={20} aria-hidden />
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto px-5 py-4">
+              <div className="space-y-5">
+                {termsSections.map((section) => (
+                  <div key={section.heading}>
+                    <h4 className="text-sm font-bold text-foreground">{section.heading}</h4>
+                    <div className="mt-1.5 space-y-1.5">
+                      {section.body.map((line, i) => (
+                        <p key={i} className="text-xs leading-relaxed text-muted-foreground">
+                          {line}
+                        </p>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </Screen>
   )
 }
