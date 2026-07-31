@@ -1,29 +1,29 @@
 import { useNavigate } from "react-router-dom"
-import { Phone, Stethoscope, BedDouble, Activity } from "lucide-react"
+import { Phone, PhoneCall, Briefcase, Users } from "lucide-react"
 import { Screen, TopBar } from "@/guardian/components/Screen"
 
-// 심박수·호흡수 이상 응급 대응 - 보호자 관점
-// 요양병원 상주 의료진이 1차 대응하므로, 보호자는 원격에서
-// 환자 상태 확인과 생체신호 관찰에 집중하도록 구성.
+// 심박수·호흡수 이상 응급 대응 - 보호자는 환자와 떨어져 있고,
+// 병력·생체신호는 상주 의료진이 이미 파악·대응 중이므로
+// 보호자만 할 수 있는 조치(사실 확인, 방문 준비, 가족 공유)에 집중하도록 구성.
 // 각 단계에 픽토그램(아이콘)을 넣어 직관적으로 안내.
 const steps = [
   {
-    Icon: Stethoscope,
-    label: "의식·호흡 확인",
-    title: "환자의 호흡과 의식 상태를 확인하세요",
-    body: "말을 걸어 반응을 확인하고, 가슴 움직임으로 호흡이 원활한지 살펴보세요. 안색이나 입술이 창백하거나 청색을 띠는지도 확인합니다.",
+    Icon: PhoneCall,
+    label: "사실 확인",
+    title: "요양병원에 연락해 응급 상황을 확인하세요",
+    body: "병원에 전화해 실제 상황과 환자 상태를 확인하세요. 상주 의료진이 이미 대응 중이니, 침착하게 현재 상태와 필요한 조치를 안내받으세요.",
   },
   {
-    Icon: BedDouble,
-    label: "안정 자세",
-    title: "환자를 편안한 자세로 안정시키세요",
-    body: "상체를 약간 세운 자세로 눕히고 목과 가슴을 조이는 옷은 풀어주세요. 무리하게 움직이지 않도록 안정을 취하게 합니다.",
+    Icon: Briefcase,
+    label: "방문 준비",
+    title: "병원 방문이 필요한지 확인하고 준비하세요",
+    body: "의료진 안내에 따라 직접 방문이 필요하면 신분증, 건강보험증 등을 챙겨 이동을 준비하세요.",
   },
   {
-    Icon: Activity,
-    label: "생체신호 관찰",
-    title: "실시간 생체신호를 지속적으로 관찰하세요",
-    body: "심박수·호흡수가 정상 범위로 돌아오는지 확인하고, 증상이 악화되면 즉시 119에 신고하거나 병원에 재연락하세요.",
+    Icon: Users,
+    label: "가족에게 알리기",
+    title: "다른 가족에게 상황을 알리고 연락 가능한 상태를 유지하세요",
+    body: "추가 안내나 상황 변화에 대비해 휴대폰을 곁에 두고, 필요하다면 다른 가족에게도 상황을 공유하세요.",
   },
 ]
 
