@@ -5,6 +5,10 @@ import { Screen, TopBar } from "@/guardian/components/Screen"
 import { BottomNav } from "@/guardian/components/BottomNav"
 import { useGuardianData } from "@/guardian/lib/api"
 
+// 백엔드 미연결 시에도 응급 상황(10초 타이머) 데모가 특이사항까지 보여주도록 하는 폴백
+const DEMO_SPECIAL_NOTE =
+  "고혈압·협심증 병력, 심장질환 관리 중이며 항혈전제·심장약 규칙적 복용 필요, 흉통 호소 여부 확인 요망."
+
 function VitalCard({
   icon,
   label,
@@ -155,10 +159,10 @@ export default function Home() {
             onClick={(e) => e.stopPropagation()}
             role="dialog"
             aria-modal="true"
-            aria-label="특이사항"
+            aria-label="응급 스크리닝 필요"
           >
             <div className="mb-3 flex items-center justify-between">
-              <h3 className="text-lg font-bold text-foreground">특이사항</h3>
+              <h3 className="text-lg font-bold text-foreground">응급 스크리닝 필요</h3>
               <button
                 aria-label="닫기"
                 onClick={() => setShowNote(false)}
@@ -167,7 +171,7 @@ export default function Home() {
                 <X size={20} aria-hidden />
               </button>
             </div>
-            <p className="leading-relaxed text-foreground">{specialNote}</p>
+            <p className="leading-relaxed text-foreground">{specialNote || DEMO_SPECIAL_NOTE}</p>
             <button
               onClick={() => setShowNote(false)}
               className="mt-6 h-12 w-full rounded-2xl bg-primary font-semibold text-primary-foreground"

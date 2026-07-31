@@ -5,6 +5,10 @@ import { cn } from "@/guardian/lib/utils"
 import { Screen } from "@/guardian/components/Screen"
 import { useGuardianData } from "@/guardian/lib/api"
 
+// 백엔드 미연결 시에도 응급 상황(10초 타이머) 데모가 특이사항까지 보여주도록 하는 폴백
+const DEMO_SPECIAL_NOTE =
+  "고혈압·협심증 병력, 심장질환 관리 중이며 항혈전제·심장약 규칙적 복용 필요, 흉통 호소 여부 확인 요망."
+
 export default function Emergency() {
   const navigate = useNavigate()
   const { patient, emergencyEvent, specialNote } = useGuardianData()
@@ -168,15 +172,15 @@ export default function Emergency() {
         </div>
 
         {/* 환자 특이사항 */}
-        {specialNote && (
-          <div className="mt-4 w-full rounded-2xl bg-danger-foreground/15 p-4 text-left">
-            <p className="flex items-center gap-1.5 text-xs font-semibold text-danger-foreground/90">
-              <FileText size={14} aria-hidden />
-              환자 특이사항
-            </p>
-            <p className="mt-1 text-sm leading-relaxed text-danger-foreground/80">{specialNote}</p>
-          </div>
-        )}
+        <div className="mt-4 w-full rounded-2xl bg-danger-foreground/15 p-4 text-left">
+          <p className="flex items-center gap-1.5 text-xs font-semibold text-danger-foreground/90">
+            <FileText size={14} aria-hidden />
+            환자 특이사항
+          </p>
+          <p className="mt-1 text-sm leading-relaxed text-danger-foreground/80">
+            {specialNote || DEMO_SPECIAL_NOTE}
+          </p>
+        </div>
 
         {/* 경고음 음소거 토글 */}
         <button
