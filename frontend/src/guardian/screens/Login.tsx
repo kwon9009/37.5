@@ -79,9 +79,13 @@ export default function Login() {
         </form>
 
         <div className="mt-5 flex items-center justify-center gap-3 text-sm text-muted-foreground">
-          <button className="hover:text-foreground">아이디 찾기</button>
+          <button className="hover:text-foreground" onClick={() => navigate("/guardian/find-id")}>
+            아이디 찾기
+          </button>
           <span className="h-3 w-px bg-border" />
-          <button className="hover:text-foreground">비밀번호 찾기</button>
+          <button className="hover:text-foreground" onClick={() => navigate("/guardian/find-password")}>
+            비밀번호 찾기
+          </button>
         </div>
       </div>
       <div className="px-6 pb-10">
