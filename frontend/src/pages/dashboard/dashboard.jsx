@@ -9,6 +9,9 @@ import { apiClient } from "../../api/client.js";
 
 const SEVERITY_ORDER = { emergency: 0, warning: 1, caution: 2, normal: 3 };
 
+// 센서가 1초마다 값을 보내므로 화면도 주기적으로 다시 불러온다(실시간 표시)
+const REFRESH_MS = 5000;
+
 const KPI_META = [
   { key: "all", label: "전체 환자", color: "#1E2A3A", bg: "#FFFFFF" },
   { key: "normal", label: "정상", color: "#2FA35C", bg: "#FFFFFF" },
@@ -94,6 +97,7 @@ function Dashboard() {
 
         if (cancelled) return;
 
+        setError("");          // 일시적 오류 뒤 복구되면 경고를 지운다
         setSummary(summaryRes.data);
 
         setPatients(
@@ -126,8 +130,10 @@ function Dashboard() {
     }
 
     loadDashboard();
+    const timer = setInterval(loadDashboard, REFRESH_MS);   // 주기적 갱신
     return () => {
       cancelled = true;
+      clearInterval(timer);
     };
   }, []);
 

@@ -131,11 +131,14 @@ def ingest_vitals(
         is_present=request.presence,
     )
 
-    # 사람이 없거나 신호가 끊기면 생체값은 갱신하지 않는다.
+    # 아래 경우엔 생체값을 갱신하지 않고 마지막 정상값을 남겨둔다.
+    #  - 사람이 없거나 신호가 끊김
+    #  - 센서가 아직 안정화 중(lock을 잡는 동안 값이 무의미하게 나옴)
     # (vital_checks의 심박/호흡은 NOT NULL이라 빈 값을 넣을 수 없고,
     #  마지막 정상값을 남겨두는 편이 화면에서도 자연스럽다)
     if (
         not request.presence
+        or request.stabilizing
         or request.heart_rate is None
         or request.breath_rate is None
     ):
