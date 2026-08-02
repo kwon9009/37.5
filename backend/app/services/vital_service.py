@@ -3,6 +3,11 @@
 - vital_checks       : 환자당 1행 UPDATE(덮어쓰기) - 행을 쌓지 않음
 - vital_logs         : 1분 평균만 append
 - patients.is_present: 재실 여부 갱신
+
+등급 판정 기준은 NEWS2(National Early Warning Score 2, 영국 왕립의사회 2017)를
+따른다. 환자 상태 악화를 조기에 발견하기 위한 국제 표준 척도로, 심박·호흡 모두
+'너무 높을 때'와 '너무 낮을 때'를 같은 위험도로 본다.
+주의: NEWS2는 성인(16세 이상) 기준이며 소아·임신부에게는 적용하지 않는다.
 """
 
 import time
@@ -10,6 +15,7 @@ import time
 from fastapi import HTTPException, status as http_status
 from sqlalchemy.orm import Session
 
+from app.core.config import settings
 from app.crud import vital_crud
 from app.models.enums import VitalStatus
 from app.schemas.vitals.vitals_ingest_request import VitalsIngestRequest
@@ -18,56 +24,74 @@ from app.schemas.vitals.vitals_ingest_request import VitalsIngestRequest
 _LOG_INTERVAL_SEC = 60
 _buffers: dict[int, dict] = {}
 
-# 등급별 위험도 (숫자가 클수록 위험)
-_SEVERITY = {
-    VitalStatus.NORMAL: 0,
-    VitalStatus.WARNING: 1,
-    VitalStatus.ALERT: 2,
-    VitalStatus.DANGER: 3,
+# NEWS2 점수 -> 우리 등급
+_SCORE_TO_STATUS = {
+    0: VitalStatus.NORMAL,
+    1: VitalStatus.WARNING,
+    2: VitalStatus.ALERT,
+    3: VitalStatus.DANGER,
 }
 
 
-# 심박수 등급 (scripts/seed.py가 쓰는 구간과 동일 + 서맥 쪽도 판정)
-def _heart_rate_status(heart_rate: int) -> VitalStatus:
+# 심박수 NEWS2 점수
+#   <=40:3  41~50:1  51~90:0  91~110:1  111~130:2  >=131:3
+def _heart_rate_score(heart_rate: int) -> int:
 
-    if heart_rate >= 133 or heart_rate < 40:
-        return VitalStatus.DANGER
+    if heart_rate <= 40 or heart_rate >= 131:
+        return 3
 
-    if heart_rate >= 108 or heart_rate < 45:
-        return VitalStatus.ALERT
+    if 111 <= heart_rate <= 130:
+        return 2
 
-    if heart_rate >= 89 or heart_rate < 50:
-        return VitalStatus.WARNING
+    if 41 <= heart_rate <= 50 or 91 <= heart_rate <= 110:
+        return 1
 
-    return VitalStatus.NORMAL
+    return 0
 
 
-# 호흡수 등급
-def _resp_rate_status(resp_rate: int) -> VitalStatus:
+# 호흡수 NEWS2 점수
+#   <=8:3  9~11:1  12~20:0  21~24:2  >=25:3
+def _resp_rate_score(resp_rate: int) -> int:
 
-    if resp_rate >= 29 or resp_rate < 6:
-        return VitalStatus.DANGER
+    if resp_rate <= 8 or resp_rate >= 25:
+        return 3
 
-    if resp_rate >= 23 or resp_rate < 8:
-        return VitalStatus.ALERT
+    if 21 <= resp_rate <= 24:
+        return 2
 
-    if resp_rate >= 19 or resp_rate < 10:
-        return VitalStatus.WARNING
+    if 9 <= resp_rate <= 11:
+        return 1
 
-    return VitalStatus.NORMAL
+    return 0
 
 
 # 심박·호흡 중 더 위험한 쪽을 최종 등급으로 삼는다
+# (NEWS2도 한 항목만 3점이어도 즉시 의료진 확인 대상으로 본다)
 def judge_status(
     heart_rate: int,
     resp_rate: int,
 ) -> VitalStatus:
 
-    return max(
-        _heart_rate_status(heart_rate),
-        _resp_rate_status(resp_rate),
-        key=lambda vital_status: _SEVERITY[vital_status],
+    score = max(_heart_rate_score(heart_rate), _resp_rate_score(resp_rate))
+
+    return _SCORE_TO_STATUS[score]
+
+
+# 1단계 필터: 사람이 유지할 수 없는 값이면 센서 오류로 본다
+def _is_plausible(heart_rate: int, resp_rate: int) -> bool:
+
+    return (
+        settings.PLAUSIBLE_HR_MIN <= heart_rate <= settings.PLAUSIBLE_HR_MAX
+        and settings.PLAUSIBLE_RR_MIN <= resp_rate <= settings.PLAUSIBLE_RR_MAX
     )
+
+
+# 2단계 필터: 호흡만 위험 구간인데 심박이 멀쩡하면 센서 오류를 의심한다.
+# 실제로 환자 상태가 나빠지면 심박·호흡이 함께 무너지므로,
+# 호흡만 튀는 경우는 레이더가 흉곽 움직임을 놓친 것으로 보는 편이 안전하다.
+def _is_resp_suspicious(heart_rate: int, resp_rate: int) -> bool:
+
+    return _resp_rate_score(resp_rate) == 3 and _heart_rate_score(heart_rate) == 0
 
 
 # 1초값을 모아 1분마다 평균을 vital_logs에 append
@@ -145,24 +169,62 @@ def ingest_vitals(
         _buffers.pop(request.patient_id, None)
         return {"saved": False, "presence": request.presence, "status": None}
 
+    heart_rate = request.heart_rate
+    resp_rate = request.breath_rate  # 하드웨어 breath_rate -> DB resp_rate
+
+    # 1단계: 사람이 유지할 수 없는 값이면 통째로 버린다
+    if not _is_plausible(heart_rate, resp_rate):
+        _buffers.pop(request.patient_id, None)
+        return {
+            "saved": False,
+            "presence": True,
+            "status": None,
+            "rejected": "implausible",
+        }
+
+    # 2단계: 호흡만 위험 구간이고 심박은 정상이면 호흡을 신뢰하지 않는다.
+    # 심박은 살아있으므로 직전 호흡값을 이어 쓰고 심박만 갱신한다.
+    resp_replaced = False
+    if _is_resp_suspicious(heart_rate, resp_rate):
+        previous = vital_crud.get_vital_check(db=db, patient_id=request.patient_id)
+
+        if previous is None:
+            # 비교할 직전 값이 없으면 이번 측정은 넘긴다
+            return {
+                "saved": False,
+                "presence": True,
+                "status": None,
+                "rejected": "resp_suspicious",
+            }
+
+        resp_rate = previous.resp_rate
+        resp_replaced = True
+
     vital_status = judge_status(
-        heart_rate=request.heart_rate,
-        resp_rate=request.breath_rate,
+        heart_rate=heart_rate,
+        resp_rate=resp_rate,
     )
 
     vital_crud.upsert_vital_check(
         db=db,
         patient_id=request.patient_id,
-        heart_rate=request.heart_rate,
-        resp_rate=request.breath_rate,  # 하드웨어 breath_rate -> DB resp_rate
+        heart_rate=heart_rate,
+        resp_rate=resp_rate,
         status=vital_status,
     )
 
-    _accumulate(
-        db=db,
-        patient_id=request.patient_id,
-        heart_rate=request.heart_rate,
-        resp_rate=request.breath_rate,
-    )
+    # 대체한 호흡값은 이번에 측정된 값이 아니므로 평균에 넣지 않는다
+    if not resp_replaced:
+        _accumulate(
+            db=db,
+            patient_id=request.patient_id,
+            heart_rate=heart_rate,
+            resp_rate=resp_rate,
+        )
 
-    return {"saved": True, "presence": True, "status": vital_status.value}
+    return {
+        "saved": True,
+        "presence": True,
+        "status": vital_status.value,
+        "resp_replaced": resp_replaced,
+    }
