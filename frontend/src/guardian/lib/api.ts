@@ -50,6 +50,9 @@ export type GuardianData = {
 const HR_NORMAL = { min: 60, max: 100 }
 const RR_NORMAL = { min: 12, max: 20 }
 
+// 센서가 1초마다 값을 보내므로 화면도 주기적으로 다시 불러온다(실시간 표시)
+const REFRESH_MS = 5000
+
 function relativeTime(sentAt: string): string {
   const diffMs = Date.now() - new Date(sentAt).getTime()
   const min = Math.round(diffMs / 60000)
@@ -195,8 +198,10 @@ export function useGuardianData(): GuardianData {
     }
 
     load()
+    const timer = setInterval(load, REFRESH_MS)   // 주기적 갱신
     return () => {
       cancelled = true
+      clearInterval(timer)
     }
   }, [])
 
