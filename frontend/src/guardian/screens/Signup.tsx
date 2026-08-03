@@ -1,6 +1,6 @@
 import { useState } from "react"
 import { useNavigate } from "react-router-dom"
-import { AlertCircle, CheckCircle2, Check } from "lucide-react"
+import { AlertCircle, CheckCircle2, Check, ChevronDown } from "lucide-react"
 import { Screen, TopBar, StickyAction } from "@/guardian/components/Screen"
 import { Button, Field } from "@/guardian/components/ui"
 import { cn } from "@/guardian/lib/utils"
@@ -11,6 +11,9 @@ const DEMO_CODE = "123456"
 
 // 데모용 이미 사용 중인 아이디
 const TAKEN_IDS = ["admin", "test", "user123", "hong", "guardian"]
+
+// 본인인증용 통신사 목록
+const CARRIERS = ["SKT", "KT", "LG U+", "알뜰폰(SKT)", "알뜰폰(KT)", "알뜰폰(LG U+)"]
 
 const pwRules = [
   { key: "letter", label: "영문(대/소문자)", test: (v: string) => /[a-zA-Z]/.test(v) },
@@ -32,6 +35,11 @@ export default function Signup() {
   const [name, setName] = useState("")
   const [nameWarning, setNameWarning] = useState("")
   const [nameShake, setNameShake] = useState(false)
+
+  // 통신사 상태 (토글로 목록을 아래로 펼쳐서 선택)
+  const [carrier, setCarrier] = useState("")
+  const [carrierOpen, setCarrierOpen] = useState(false)
+  const [carrierWarning, setCarrierWarning] = useState("")
 
   // 연락처 상태 (010-XXXX-XXXX)
   const [phone, setPhone] = useState("")
@@ -196,6 +204,75 @@ export default function Signup() {
             )}
           </div>
 
+          {/* 통신사 - 토글을 누르면 목록이 아래로 펼쳐지고, 항목을 누르면 선택되고 닫힘 */}
+          <div>
+            <span className="mb-1.5 block text-sm font-medium text-muted-foreground">통신사</span>
+            <button
+              type="button"
+              onClick={() => setCarrierOpen((s) => !s)}
+              aria-expanded={carrierOpen}
+              aria-haspopup="listbox"
+              className={cn(
+                "flex h-13 w-full items-center justify-between rounded-2xl border px-4 text-base transition",
+                carrierOpen ? "border-primary bg-primary/10" : "border-input bg-card",
+                carrier ? "text-foreground" : "text-muted-foreground/60",
+                carrierWarning && "verify-error-border",
+              )}
+            >
+              {/* 선택 전 안내 문구는 진짜 placeholder 가 아니라 span 이므로,
+                  다른 칸의 자리표시 문구와 같은 크기(14px)로 직접 맞춰준다 */}
+              <span className={cn("truncate", !carrier && "text-sm")}>{carrier || "통신사를 선택하세요"}</span>
+              <ChevronDown
+                size={18}
+                className={cn(
+                  "ml-2 shrink-0 text-muted-foreground transition-transform",
+                  carrierOpen && "rotate-180",
+                )}
+                aria-hidden
+              />
+            </button>
+
+            {carrierOpen && (
+              <ul
+                role="listbox"
+                aria-label="통신사 선택"
+                className="fade-up mt-2 overflow-hidden rounded-2xl border border-border bg-card"
+              >
+                {CARRIERS.map((c) => {
+                  const selected = c === carrier
+                  return (
+                    <li key={c}>
+                      <button
+                        type="button"
+                        role="option"
+                        aria-selected={selected}
+                        onClick={() => {
+                          setCarrier(c)
+                          setCarrierOpen(false)
+                          setCarrierWarning("")
+                        }}
+                        className={cn(
+                          "flex w-full items-center justify-between border-b border-border px-4 py-3.5 text-left text-base transition last:border-b-0",
+                          selected ? "bg-primary/10 font-semibold text-foreground" : "text-foreground hover:bg-muted",
+                        )}
+                      >
+                        {c}
+                        {selected && <Check size={16} strokeWidth={3} className="text-success" aria-hidden />}
+                      </button>
+                    </li>
+                  )
+                })}
+              </ul>
+            )}
+
+            {carrierWarning && (
+              <p className="verify-warning" role="alert">
+                <AlertCircle size={14} aria-hidden />
+                {carrierWarning}
+              </p>
+            )}
+          </div>
+
           {/* 연락처 + 인증번호 발급 */}
           <div>
             <span className="mb-1.5 block text-sm font-medium text-muted-foreground">연락처</span>
@@ -222,6 +299,12 @@ export default function Signup() {
                 variant="outline"
                 className="h-13 w-28 shrink-0 whitespace-nowrap px-0 text-sm"
                 onClick={() => {
+                  // 통신사는 본인인증에 필요하므로 발급 전에 선택돼 있어야 함
+                  if (!carrier) {
+                    setCarrierWarning("통신사를 선택해 주세요.")
+                    setCarrierOpen(true)
+                    return
+                  }
                   if (!/^010-\d{4}-\d{4}$/.test(phone)) {
                     setPhoneWarning("010-XXXX-XXXX 형태로 입력해 주세요.")
                     setPhoneShake(true)
