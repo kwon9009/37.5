@@ -43,7 +43,12 @@ export default function Login() {
 
   return (
     <Screen>
-      <div className="flex flex-1 flex-col justify-center px-6">
+      {/* 스크롤 영역 + m-auto 정렬.
+          이전에는 스크롤 없이 justify-center 만 있어서, 키보드가 올라와 화면이 짧아지면
+          로그인·회원가입 버튼이 화면 밖으로 잘리고 스크롤로도 볼 수 없었다.
+          m-auto 는 공간이 남으면 가운데, 부족하면 위쪽 정렬이 되어 전부 스크롤된다. */}
+      <div className="flex flex-1 flex-col overflow-y-auto px-6 py-6">
+        <div className="m-auto w-full">
         <div className="mb-10 flex flex-col items-center">
           <img
             src="/images/37-5-logo.png"
@@ -87,8 +92,9 @@ export default function Login() {
             비밀번호 찾기
           </button>
         </div>
+        </div>
       </div>
-      <div className="px-6 pb-10">
+      <div className="shrink-0 px-6 pb-10">
         <Button variant="outline" onClick={() => navigate("/guardian/terms")}>
           회원가입
         </Button>
