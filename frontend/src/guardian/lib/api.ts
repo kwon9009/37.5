@@ -1,5 +1,6 @@
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { apiClient } from "@/api/client.js"
+import { openVitalStream } from "@/api/vital-stream.js"
 import type { NotiType } from "./schema-view"
 
 export type Noti = {
@@ -18,6 +19,8 @@ export type HistoryItem = {
 
 export type GuardianData = {
   loading: boolean
+  /** 심박·호흡이 실시간 스트림(SSE)으로 들어오고 있는지 */
+  realtime: boolean
   patient: {
     patientId: number | null
     name: string
@@ -50,8 +53,12 @@ export type GuardianData = {
 const HR_NORMAL = { min: 60, max: 100 }
 const RR_NORMAL = { min: 12, max: 20 }
 
-// 센서가 1초마다 값을 보내므로 화면도 주기적으로 다시 불러온다(실시간 표시)
-const REFRESH_MS = 5000
+// 심박·호흡은 실시간 스트림(SSE)으로 즉시 받는다.
+// 아래 간격은 알림·기록처럼 스트림으로 오지 않는 나머지 데이터를 다시 불러오는 주기다.
+//  - 스트림이 살아있으면 느리게(서버 부담 줄이기)
+//  - 스트림이 끊기면 빠르게(폴링만으로 버티기 = 폴백)
+const POLL_SLOW_MS = 30000
+const POLL_FAST_MS = 5000
 
 function relativeTime(sentAt: string): string {
   const diffMs = Date.now() - new Date(sentAt).getTime()
@@ -78,6 +85,7 @@ function hourLabel(iso: string): string {
 
 const EMPTY: GuardianData = {
   loading: true,
+  realtime: false,
   patient: { patientId: null, name: "-", guardian: "-", relation: "-", hospital: "-", room: "-" },
   vitals: { heartRate: 0, respiration: 0, present: false },
   emergencyEvent: {
@@ -100,6 +108,13 @@ const EMPTY: GuardianData = {
 // 그 환자의 상세/생체로그/알림/응급기록을 한 번에 불러와 화면용 모양으로 가공한다.
 export function useGuardianData(): GuardianData {
   const [data, setData] = useState<GuardianData>(EMPTY)
+  // 스트림으로 들어온 심박·호흡. 폴링 결과가 덮어쓰지 않도록 따로 들고 있다가
+  // 화면에 돌려줄 때 합친다.
+  const [liveVitals, setLiveVitals] = useState<GuardianData["vitals"] | null>(null)
+  const [realtime, setRealtime] = useState(false)
+  // 스트림 값이 아직 없을 때 기준으로 삼을 마지막 폴링값
+  const polledVitals = useRef(EMPTY.vitals)
+  const patientId = data.patient.patientId
 
   useEffect(() => {
     let cancelled = false
@@ -162,8 +177,15 @@ export function useGuardianData(): GuardianData {
           })),
         ].sort((a, b) => (a.date < b.date ? 1 : -1))
 
+        polledVitals.current = {
+          heartRate: detail.current_vital?.heart_rate ?? 0,
+          respiration: detail.current_vital?.resp_rate ?? 0,
+          present: myPatient.is_present,
+        }
+
         setData({
           loading: false,
+          realtime: false, // 실제 값은 아래 return에서 채운다
           patient: {
             patientId: myPatient.patient_id,
             name: myPatient.name,
@@ -172,11 +194,7 @@ export function useGuardianData(): GuardianData {
             hospital: detail.patient.hospital,
             room: `${myPatient.room_num}호`,
           },
-          vitals: {
-            heartRate: detail.current_vital?.heart_rate ?? 0,
-            respiration: detail.current_vital?.resp_rate ?? 0,
-            present: myPatient.is_present,
-          },
+          vitals: polledVitals.current,
           emergencyEvent: {
             heartRate: evHeart,
             respiration: evResp,
@@ -198,12 +216,40 @@ export function useGuardianData(): GuardianData {
     }
 
     load()
-    const timer = setInterval(load, REFRESH_MS)   // 주기적 갱신
+    // 스트림이 살아있으면 느리게, 끊겼으면 빠르게 다시 불러온다
+    const timer = setInterval(load, realtime ? POLL_SLOW_MS : POLL_FAST_MS)
     return () => {
       cancelled = true
       clearInterval(timer)
     }
-  }, [])
+  }, [realtime])
 
-  return data
+  // 심박·호흡은 서버가 센서 값을 받는 즉시 밀어준다(폴링 간격을 기다리지 않음)
+  useEffect(() => {
+    if (patientId == null) return
+
+    return openVitalStream({
+      scope: "patient",
+      patientId,
+      onVitals: (payload) => {
+        setLiveVitals((prev) => {
+          const base = prev ?? polledVitals.current
+          return {
+            // null이면 "이번엔 갱신할 값이 없음"(부재중·안정화중·측정오류)이라는 뜻이라
+            // 직전 값을 그대로 유지한다. DB도 같은 방식으로 마지막 값을 남긴다.
+            heartRate: payload.heart_rate ?? base.heartRate,
+            respiration: payload.resp_rate ?? base.respiration,
+            present: payload.presence,
+          }
+        })
+      },
+      onConnectionChange: setRealtime,
+    })
+  }, [patientId])
+
+  return {
+    ...data,
+    realtime,
+    vitals: liveVitals ?? data.vitals,
+  }
 }
