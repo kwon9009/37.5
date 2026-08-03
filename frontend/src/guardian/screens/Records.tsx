@@ -28,9 +28,11 @@ function Chart({ data, color, unit }: { data: { t: string; value: number }[]; co
           </defs>
           <XAxis dataKey="t" tickLine={false} axisLine={false} fontSize={11} stroke="#806467" />
           <YAxis tickLine={false} axisLine={false} fontSize={11} stroke="#806467" width={34} />
+          {/* formatter: 타입 표기(v: number)를 빼서 Recharts 가 주는 값을 그대로 받는다.
+              값이 없는 구간(undefined)에 마우스를 올리면 "undefined bpm" 이 뜨므로 "-" 로 대체. */}
           <Tooltip
             contentStyle={{ borderRadius: 12, border: "1px solid #f1d6d0", fontSize: 12 }}
-            formatter={(v: number) => [`${v} ${unit}`, ""]}
+            formatter={(v) => [v == null ? "-" : `${v} ${unit}`, ""]}
             labelFormatter={(l) => `${l}시`}
           />
           <Area type="monotone" dataKey="value" stroke={color} strokeWidth={2.5} fill={`url(#g-${color})`} />
