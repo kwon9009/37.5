@@ -1,12 +1,13 @@
 from sqlalchemy.orm import Session
 
-from app.crud import department_crud, monitoring_crud
+from app.crud import monitoring_crud
 from app.models.enums import VitalStatus
 from app.schemas.monitoring.monitoring_response import (
     RealtimeMonitoringResponse,
     RealtimePatientResponse,
     WardResponse,
 )
+from app.services import permission_service
 
 
 # 실시간 모니터링 조회
@@ -15,7 +16,7 @@ def get_realtime_monitoring(
     user_id: int,
 ) -> RealtimeMonitoringResponse:
 
-    department = department_crud.get_by_user_id(
+    department = permission_service.get_department_or_403(
         db=db,
         user_id=user_id,
     )
