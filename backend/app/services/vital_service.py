@@ -11,6 +11,7 @@
 """
 
 import time
+from datetime import datetime
 
 from fastapi import HTTPException, status as http_status
 from sqlalchemy.orm import Session
@@ -18,7 +19,9 @@ from sqlalchemy.orm import Session
 from app.core.config import settings
 from app.crud import vital_crud
 from app.models.enums import VitalStatus
+from app.models.patient import Patient
 from app.schemas.vitals.vitals_ingest_request import VitalsIngestRequest
+from app.services import stream_service
 
 # 1분 평균을 만들기 위한 환자별 임시 버퍼 (서버 메모리)
 _LOG_INTERVAL_SEC = 60
@@ -134,7 +137,7 @@ def _accumulate(
     }
 
 
-# 측정값 1건을 받아 DB에 반영
+# 측정값 1건을 받아 DB에 반영하고, 접속 중인 화면에 즉시 방송한다
 def ingest_vitals(
     db: Session,
     request: VitalsIngestRequest,
@@ -147,6 +150,35 @@ def ingest_vitals(
             status_code=http_status.HTTP_404_NOT_FOUND,
             detail="존재하지 않는 환자입니다.",
         )
+
+    result = _apply(db=db, patient=patient, request=request)
+
+    # 화면이 다시 물어보기(폴링)를 기다리지 않도록 값이 들어온 즉시 밀어준다.
+    # heart_rate/resp_rate가 None이면 "이번엔 갱신할 값이 없음"이라는 뜻이라
+    # 화면은 직전 값을 그대로 유지하고 재실/등급만 반영한다.
+    stream_service.publish(
+        {
+            "patient_id": patient.patient_id,
+            "department_id": patient.department_id,
+            "heart_rate": result["heart_rate"],
+            "resp_rate": result["resp_rate"],
+            "status": result["status"],
+            "presence": result["presence"],
+            "stabilizing": request.stabilizing,
+            "saved": result["saved"],
+            "measured_at": (request.measured_at or datetime.now()).isoformat(),
+        }
+    )
+
+    return result
+
+
+# 실제 판정·저장 로직 (방송은 위 ingest_vitals가 담당)
+def _apply(
+    db: Session,
+    patient: Patient,
+    request: VitalsIngestRequest,
+) -> dict:
 
     # 재실 여부는 측정값이 없어도 항상 갱신한다
     vital_crud.update_presence(
@@ -167,7 +199,13 @@ def ingest_vitals(
         or request.breath_rate is None
     ):
         _buffers.pop(request.patient_id, None)
-        return {"saved": False, "presence": request.presence, "status": None}
+        return {
+            "saved": False,
+            "presence": request.presence,
+            "status": None,
+            "heart_rate": None,
+            "resp_rate": None,
+        }
 
     heart_rate = request.heart_rate
     resp_rate = request.breath_rate  # 하드웨어 breath_rate -> DB resp_rate
@@ -179,6 +217,8 @@ def ingest_vitals(
             "saved": False,
             "presence": True,
             "status": None,
+            "heart_rate": None,
+            "resp_rate": None,
             "rejected": "implausible",
         }
 
@@ -194,6 +234,8 @@ def ingest_vitals(
                 "saved": False,
                 "presence": True,
                 "status": None,
+                "heart_rate": None,
+                "resp_rate": None,
                 "rejected": "resp_suspicious",
             }
 
@@ -226,5 +268,7 @@ def ingest_vitals(
         "saved": True,
         "presence": True,
         "status": vital_status.value,
+        "heart_rate": heart_rate,
+        "resp_rate": resp_rate,
         "resp_replaced": resp_replaced,
     }

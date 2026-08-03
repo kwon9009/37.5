@@ -22,6 +22,10 @@ class Settings(BaseSettings):
     PLAUSIBLE_RR_MIN: int = 5
     PLAUSIBLE_RR_MAX: int = 50
 
+    # 실시간 스트림(SSE) 접속 티켓 유효시간(초).
+    # 짧을수록 안전하고, 화면이 티켓을 받아 접속하는 데 걸리는 시간보다는 길어야 한다.
+    STREAM_TICKET_TTL_SEC: int = 60
+
     # CORS
 
     model_config = SettingsConfigDict(
