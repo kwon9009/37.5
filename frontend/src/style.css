@@ -19,6 +19,14 @@ body {
   margin: 0;
 }
 
+/* ────────────────────────────────────────────────────────────────
+   개발용 임시 화면(/dev/vitals) 전용 스타일.
+   주의: 여기 규칙을 `h1 { ... }` 처럼 전역(태그) 선택자로 두면
+   병원 대시보드와 보호자 앱의 Tailwind 글씨 크기(text-2xl, text-base 등)를
+   전부 덮어써서 제목이 잘려 보입니다.
+   (Tailwind v4의 유틸리티는 @layer 안에 있어, 레이어 밖의 태그 규칙에 밀립니다.)
+   그래서 반드시 `.app` 안쪽으로만 적용되도록 한정합니다.
+   ──────────────────────────────────────────────────────────────── */
 .app {
   min-height: 100vh;
   display: grid;
@@ -26,7 +34,7 @@ body {
   padding: 24px;
 }
 
-.panel {
+.app .panel {
   width: min(100%, 420px);
   padding: 28px;
   border: 1px solid #d7e0e7;
@@ -34,31 +42,31 @@ body {
   background: #ffffff;
 }
 
-.label {
+.app .label {
   margin: 0 0 8px;
   color: #60717d;
   font-size: 14px;
 }
 
-h1 {
+.app h1 {
   margin: 0 0 24px;
   font-size: 28px;
   font-weight: 700;
 }
 
-.metric {
+.app .metric {
   display: flex;
   align-items: baseline;
   gap: 10px;
 }
 
-.metric span {
+.app .metric span {
   font-size: 64px;
   font-weight: 700;
   line-height: 1;
 }
 
-.metric small {
+.app .metric small {
   color: #60717d;
   font-size: 18px;
 }
