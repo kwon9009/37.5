@@ -14,4 +14,6 @@ class VitalsIngestRequest(BaseModel):
     heart_rate: int | None = None
     breath_rate: int | None = None
     presence: bool = True
+    # 센서가 lock을 잡는 중(안정화 대기)이라 값을 아직 못 믿는 상태
+    stabilizing: bool = False
     measured_at: datetime | None = None

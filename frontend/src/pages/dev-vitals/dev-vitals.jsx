@@ -1,12 +1,12 @@
 import { useVitals } from "../../api/useVitals";
 
 function DevVitals() {
-  const { vitals, status } = useVitals("test-001");
+  const { vitals, status } = useVitals(1);
 
   return (
     <main className="app">
       <section className="panel">
-        <p className="label">Patient test-001</p>
+        <p className="label">Patient 1</p>
         <h1>Heart Rate</h1>
 
         {status === "loading" && <p className="label">연결 중...</p>}

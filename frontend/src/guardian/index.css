@@ -1,9 +1,6 @@
 @import "tailwindcss";
 
 @theme {
-  --font-sans: "Pretendard", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Apple SD Gothic Neo",
-    "Noto Sans KR", sans-serif;
-
   --color-background: #fff8f6;
   --color-foreground: #412b2d;
 
@@ -31,16 +28,14 @@
   --radius: 1rem;
 }
 
-html,
-body,
-#root {
-  height: 100%;
-}
-
-/* 병원 화면까지 전역으로 덮어쓰지 않도록, 보호자 화면 배경/글자색은
-   .app-shell(Screen 컴포넌트)에 Tailwind 클래스로 이미 적용돼 있음.
-   여기서 body에 직접 걸면 병원 쪽 style.css보다 나중에 로드되어 전체를
-   보호자 테마 색으로 덮어써버린다. */
+/* 병원(웹) 화면까지 전역으로 덮어쓰지 않도록, 보호자 앱 전용 설정은
+   전부 .app-shell(Screen 컴포넌트) 안쪽으로만 적용한다.
+   html/body/:root 에 직접 걸면 병원 대시보드에도 그대로 반영되므로 금지.
+   - 글꼴: @theme 의 --font-sans 를 바꾸면 문서 전체 기본 글꼴이 바뀌므로
+     여기서 .app-shell 에만 지정한다.
+   - 글자색: :root 에 있는 병원용 색(#172026)을 물려받지 않도록
+     Screen 컴포넌트에서 text-foreground 클래스로 지정한다
+     (화면별로 색을 바꿀 수 있어야 해서 CSS 대신 Tailwind 클래스 사용). */
 
 /* App is presented as a phone frame centered on larger screens */
 .app-shell {
@@ -49,11 +44,26 @@ body,
   margin: 0 auto;
   min-height: 100%;
   position: relative;
+  font-family: "Pretendard", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Apple SD Gothic Neo",
+    "Noto Sans KR", sans-serif;
 }
 
 @media (min-width: 480px) {
   .app-shell {
     box-shadow: 0 20px 60px -20px rgba(215, 103, 115, 0.24);
+  }
+}
+
+@layer base {
+  /* 자리표시 문구(placeholder)는 실제로 입력한 글씨보다 한 단계 작게(14px) 보여준다.
+     - 입력 글씨 자체는 16px 그대로 둔다: iOS 사파리는 입력칸 글씨가 16px보다 작으면
+       칸을 누를 때 화면을 확대해버려서, 16px 미만으로 내리면 안 된다.
+     - .app-shell 안(보호자 앱)에만 적용되므로 병원 웹 화면에는 영향이 없다.
+     - @layer base 안에 두었기 때문에, 특정 칸만 다르게 하고 싶으면
+       그 칸에 placeholder:text-xs 같은 Tailwind 클래스를 주면 그쪽이 우선한다. */
+  .app-shell input::placeholder,
+  .app-shell textarea::placeholder {
+    font-size: 0.875rem;
   }
 }
 

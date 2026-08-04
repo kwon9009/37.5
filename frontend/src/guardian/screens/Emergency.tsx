@@ -1,13 +1,17 @@
 import { useEffect, useRef, useState } from "react"
 import { useNavigate } from "react-router-dom"
-import { AlertTriangle, Phone, BookOpen, Heart, Wind, Volume2, VolumeX } from "lucide-react"
+import { AlertTriangle, BookOpen, Heart, Wind, Volume2, VolumeX, FileText } from "lucide-react"
 import { cn } from "@/guardian/lib/utils"
 import { Screen } from "@/guardian/components/Screen"
 import { useGuardianData } from "@/guardian/lib/api"
 
+// 백엔드 미연결 시에도 응급 상황(10초 타이머) 데모가 특이사항까지 보여주도록 하는 폴백
+const DEMO_SPECIAL_NOTE =
+  "고혈압·협심증 병력, 심장질환 관리 중이며 항혈전제·심장약 규칙적 복용 필요, 흉통 호소 여부 확인 요망."
+
 export default function Emergency() {
   const navigate = useNavigate()
-  const { patient, emergencyEvent } = useGuardianData()
+  const { patient, emergencyEvent, specialNote } = useGuardianData()
   const [countdown, setCountdown] = useState(5)
   const [muted, setMuted] = useState(false)
   // 브라우저 자동재생 정책으로 경고음이 막힌 상태
@@ -114,7 +118,12 @@ export default function Emergency() {
 
   return (
     <Screen className="bg-danger text-danger-foreground">
-      <div className="flex flex-1 flex-col items-center justify-center overflow-y-auto px-8 py-8 text-center">
+      {/* 세로 가운데 정렬을 justify-center 로 하면, 내용이 화면보다 길어졌을 때
+          넘친 부분이 스크롤 시작점보다 위로 밀려나 "영영 볼 수 없게" 잘린다.
+          그래서 정렬은 안쪽 래퍼의 m-auto 로 한다. m-auto 는 남는 공간이 있을 때만
+          가운데로 밀고, 공간이 없으면 자동으로 위쪽 정렬이 되어 전부 스크롤된다. */}
+      <div className="flex flex-1 flex-col items-center overflow-y-auto px-8 py-8 text-center">
+        <div className="m-auto flex w-full flex-col items-center">
         <div className="relative mb-6">
           <span className="pulse-ring absolute inset-0 rounded-full bg-danger-foreground/40" />
           <div className="relative grid h-24 w-24 place-items-center rounded-full bg-danger-foreground/20">
@@ -122,10 +131,12 @@ export default function Emergency() {
           </div>
         </div>
         <h1 className="text-3xl font-bold">긴급 상황 발생</h1>
-        <p className="mt-3 text-balance text-lg font-semibold text-danger-foreground/90">
+        {/* break-keep: 한글은 기본값이면 "환자입니다" 가 "환자 / 입니다" 처럼
+            단어 중간에서 줄바꿈된다. 띄어쓰기 단위로만 끊기게 한다. */}
+        <p className="mt-3 text-balance break-keep text-lg font-semibold text-danger-foreground/90">
           {patient.name} 님의 {abnormalText}
         </p>
-        <p className="mt-2 text-balance leading-relaxed text-danger-foreground/80">
+        <p className="mt-2 text-balance break-keep leading-relaxed text-danger-foreground/80">
           심장질환 이력이 있는 환자입니다. 아래 생체신호를 확인하고 즉시 대응해 주세요.
         </p>
 
@@ -167,6 +178,17 @@ export default function Emergency() {
           </div>
         </div>
 
+        {/* 환자 특이사항 */}
+        <div className="mt-4 w-full rounded-2xl bg-danger-foreground/15 p-4 text-left">
+          <p className="flex items-center gap-1.5 text-xs font-semibold text-danger-foreground/90">
+            <FileText size={14} aria-hidden />
+            환자 특이사항
+          </p>
+          <p className="mt-1 text-sm leading-relaxed text-danger-foreground/80">
+            {specialNote || DEMO_SPECIAL_NOTE}
+          </p>
+        </div>
+
         {/* 경고음 음소거 토글 */}
         <button
           onClick={() => setMuted((m) => !m)}
@@ -181,19 +203,13 @@ export default function Emergency() {
             화면을 한 번 터치하면 경고음이 재생됩니다.
           </p>
         )}
+        </div>
       </div>
 
       <div className="shrink-0 space-y-3 px-6 pb-10">
-        <a
-          href="tel:0000000000"
-          className="flex h-14 w-full items-center justify-center gap-2 rounded-2xl bg-danger-foreground font-semibold text-danger"
-        >
-          <Phone size={20} aria-hidden />
-          병원 연락하기
-        </a>
         <button
           onClick={() => navigate("/guardian/emergency/guide")}
-          className="flex h-14 w-full items-center justify-center gap-2 rounded-2xl border border-danger-foreground/40 font-semibold text-danger-foreground"
+          className="flex h-14 w-full items-center justify-center gap-2 rounded-2xl bg-danger-foreground font-semibold text-danger"
         >
           <BookOpen size={20} aria-hidden />
           응급 대응 가이드 이동

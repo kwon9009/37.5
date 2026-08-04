@@ -77,7 +77,7 @@ export default function Help() {
           <p className="font-semibold text-foreground">원하는 답변을 찾지 못하셨나요?</p>
           <p className="mt-1 text-sm text-muted-foreground">아래 문의 양식을 통해 궁금한 점을 남겨 주세요.</p>
           <a
-            href="https://docs.google.com/forms/d/e/1FAIpQLSd_37_5_health_inquiry/viewform"
+            href="https://forms.gle/mRH5EU7Km1e6iPs39"
             target="_blank"
             rel="noopener noreferrer"
             className="mt-4 inline-flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-primary font-semibold text-primary-foreground transition hover:bg-primary/90"

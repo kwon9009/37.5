@@ -6,8 +6,28 @@ import PatientCard from "../../components/patient-card/patient-card.jsx";
 import Icon from "../../components/icon/icon.jsx";
 import EmergencyScreeningOverlay from "../../components/emergency-screening-overlay/emergency-screening-overlay.jsx";
 import { apiClient } from "../../api/client.js";
+import { openVitalStream } from "../../api/vital-stream.js";
 
 const SEVERITY_ORDER = { emergency: 0, warning: 1, caution: 2, normal: 3 };
+
+// 서버 등급(NEWS2 판정 결과) -> 화면 심각도
+const SEVERITY_BY_STATUS = {
+  NORMAL: "normal",
+  WARNING: "warning",
+  ALERT: "caution",
+  DANGER: "emergency",
+};
+
+// 심박·호흡은 실시간 스트림(SSE)으로 즉시 받는다.
+// 아래 간격은 알림 목록처럼 스트림으로 오지 않는 나머지 데이터를 다시 불러오는 주기다.
+//  - 스트림이 살아있으면 느리게(서버 부담 줄이기)
+//  - 스트림이 끊기면 빠르게(폴링만으로 버티기 = 폴백)
+const POLL_SLOW_MS = 30000;
+const POLL_FAST_MS = 5000;
+
+function sortBySeverity(list) {
+  return [...list].sort((a, b) => SEVERITY_ORDER[a.severity] - SEVERITY_ORDER[b.severity]);
+}
 
 const KPI_META = [
   { key: "all", label: "전체 환자", color: "#1E2A3A", bg: "#FFFFFF" },
@@ -75,6 +95,7 @@ function Dashboard() {
   const [patients, setPatients] = useState([]);
   const [alerts, setAlerts] = useState([]);
   const [error, setError] = useState("");
+  const [realtime, setRealtime] = useState(false);
 
   useEffect(() => {
     const interval = setInterval(() => setNow(new Date()), 1000);
@@ -94,11 +115,12 @@ function Dashboard() {
 
         if (cancelled) return;
 
+        setError("");          // 일시적 오류 뒤 복구되면 경고를 지운다
         setSummary(summaryRes.data);
 
         setPatients(
-          patientsRes.data
-            .map((patient) => ({
+          sortBySeverity(
+            patientsRes.data.map((patient) => ({
               id: patient.patient_id,
               name: patient.name,
               room: patient.room,
@@ -109,8 +131,8 @@ function Dashboard() {
               sensorStatus: patient.sensor_status,
               timestamp: toClockString(patient.timestamp),
               specialNotes: patient.notes,
-            }))
-            .sort((a, b) => SEVERITY_ORDER[a.severity] - SEVERITY_ORDER[b.severity]),
+            })),
+          ),
         );
 
         setAlerts(
@@ -127,9 +149,40 @@ function Dashboard() {
     }
 
     loadDashboard();
+    // 스트림이 살아있으면 느리게, 끊겼으면 빠르게 다시 불러온다
+    const timer = setInterval(loadDashboard, realtime ? POLL_SLOW_MS : POLL_FAST_MS);
     return () => {
       cancelled = true;
+      clearInterval(timer);
     };
+  }, [realtime]);
+
+  // 우리 부서 환자들의 심박·호흡을 서버가 값을 받는 즉시 받아본다(폴링 간격을 기다리지 않음)
+  useEffect(() => {
+    return openVitalStream({
+      scope: "department",
+      onVitals: (payload) => {
+        setPatients((prev) =>
+          sortBySeverity(
+            prev.map((patient) =>
+              patient.id !== payload.patient_id
+                ? patient
+                : {
+                    ...patient,
+                    // null이면 "이번엔 갱신할 값이 없음"(부재중·안정화중·측정오류)이라
+                    // 직전 값을 그대로 유지한다
+                    heartRate: payload.heart_rate ?? patient.heartRate,
+                    respirationRate: payload.resp_rate ?? patient.respirationRate,
+                    severity: SEVERITY_BY_STATUS[payload.status] ?? patient.severity,
+                    presenceLabel: payload.presence ? "재실중" : "부재중",
+                    timestamp: toClockString(payload.measured_at),
+                  },
+            ),
+          ),
+        );
+      },
+      onConnectionChange: setRealtime,
+    });
   }, []);
 
   useEffect(() => {
@@ -139,17 +192,20 @@ function Dashboard() {
     return () => clearTimeout(timeout);
   }, []);
 
+  // 등급별 인원은 화면에 떠 있는 환자 카드에서 직접 센다.
+  // 스트림으로 등급이 바뀌었을 때 KPI 숫자와 카드 목록이 어긋나지 않게 하려는 것.
+  // (전체 인원은 센서가 없는 환자도 포함하므로 서버 요약값을 그대로 쓴다)
+  const severityCounts = patients.reduce((acc, patient) => {
+    acc[patient.severity] = (acc[patient.severity] ?? 0) + 1;
+    return acc;
+  }, {});
+
   const kpis = KPI_META.map((meta) => ({
     ...meta,
-    value: summary
-      ? {
-          all: summary.total_patients,
-          normal: summary.normal_count,
-          caution: summary.alert_count,
-          warning: summary.warning_count,
-          emergency: summary.danger_count,
-        }[meta.key]
-      : 0,
+    value:
+      meta.key === "all"
+        ? (summary?.total_patients ?? patients.length)
+        : (severityCounts[meta.key] ?? 0),
   }));
 
   const emergencyEvents = patients
@@ -192,7 +248,15 @@ function Dashboard() {
               <h1 className="text-2xl font-bold text-[#1E2A3A]">실시간 대시보드</h1>
               <p className="text-sm text-[#5A6B80]">비접촉 환자 모니터링 · 서울중앙병원 3층 병동</p>
             </div>
-            <p className="text-xs font-bold tracking-wide text-[#5A6B80]">마지막 업데이트 {formatClock(now)}</p>
+            <div className="flex items-center gap-2">
+              <span
+                className={`h-2 w-2 rounded-full ${realtime ? "bg-[#2FA35C]" : "bg-[#E8A13B]"}`}
+                aria-hidden="true"
+              />
+              <p className="text-xs font-bold tracking-wide text-[#5A6B80]">
+                {realtime ? "실시간 연결됨" : "재연결 중"} · {formatClock(now)}
+              </p>
+            </div>
           </div>
 
           {error && (
