@@ -108,6 +108,7 @@ function Dashboard() {
               respirationRate: patient.respiration_rate,
               sensorStatus: patient.sensor_status,
               timestamp: toClockString(patient.timestamp),
+              specialNotes: patient.notes,
             }))
             .sort((a, b) => SEVERITY_ORDER[a.severity] - SEVERITY_ORDER[b.severity]),
         );

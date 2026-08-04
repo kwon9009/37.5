@@ -22,6 +22,25 @@ def get_by_id(
     return db.query(Patient).filter(Patient.patient_id == patient_id).first()
 
 
+# 환자 특이사항 수정
+def update_special_notes(
+    db: Session,
+    patient_id: int,
+    special_notes: str,
+) -> Patient | None:
+
+    patient = db.query(Patient).filter(Patient.patient_id == patient_id).first()
+
+    if patient is None:
+        return None
+
+    patient.special_notes = special_notes
+    db.commit()
+    db.refresh(patient)
+
+    return patient
+
+
 # 환자 상세 조회
 def get_patient_detail(
     db: Session,

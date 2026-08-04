@@ -6,7 +6,9 @@ import Icon from "../../components/icon/icon.jsx";
 import StatusBadge from "../../components/status-badge/status-badge.jsx";
 import PresenceBadge from "../../components/presence-badge/presence-badge.jsx";
 import SpecialNoteTag from "../../components/special-note-tag/special-note-tag.jsx";
+import SpecialNoteChips from "../../components/special-note-chips/special-note-chips.jsx";
 import { apiClient } from "../../api/client.js";
+import { composeSpecialNotes, parseSpecialNotes, splitForEditing } from "../../lib/special-notes.js";
 
 const RANGE_OPTIONS = ["1시간", "6시간", "24시간"];
 const RANGE_WINDOW_MS = { "1시간": 60 * 60 * 1000, "6시간": 6 * 60 * 60 * 1000, "24시간": 24 * 60 * 60 * 1000 };
@@ -143,6 +145,11 @@ function PatientDetail() {
   const [vitalLogs, setVitalLogs] = useState([]);
   const [alerts, setAlerts] = useState([]);
   const [emergencyLogs, setEmergencyLogs] = useState([]);
+  const [isEditingNotes, setIsEditingNotes] = useState(false);
+  const [noteKeys, setNoteKeys] = useState([]);
+  const [noteOtherText, setNoteOtherText] = useState("");
+  const [noteSaveError, setNoteSaveError] = useState("");
+  const [isSavingNotes, setIsSavingNotes] = useState(false);
 
   useEffect(() => {
     if (!patientId) return;
@@ -176,6 +183,34 @@ function PatientDetail() {
   const { patient, guardian, device_serial: deviceSerial, current_vital: currentVital } = detail;
   const age = calcAge(patient.birth_date);
   const severity = VITAL_STATUS_TO_SEVERITY[alerts[0]?.status] ?? "normal";
+  const specialNoteTags = parseSpecialNotes(patient.special_notes);
+
+  const openNotesEditor = () => {
+    const { selectedKeys, otherText } = splitForEditing(patient.special_notes);
+    setNoteKeys(selectedKeys);
+    setNoteOtherText(otherText);
+    setNoteSaveError("");
+    setIsEditingNotes(true);
+  };
+
+  const toggleNoteKey = (key) => {
+    setNoteKeys((current) => (current.includes(key) ? current.filter((item) => item !== key) : [...current, key]));
+  };
+
+  const saveNotes = async () => {
+    const composed = composeSpecialNotes(noteKeys, noteOtherText);
+    setIsSavingNotes(true);
+    setNoteSaveError("");
+    try {
+      await apiClient.patch(`/patients/${patientId}/special-notes`, { special_notes: composed });
+      setDetail((current) => ({ ...current, patient: { ...current.patient, special_notes: composed } }));
+      setIsEditingNotes(false);
+    } catch {
+      setNoteSaveError("특이사항 저장에 실패했습니다. 다시 시도해 주세요.");
+    } finally {
+      setIsSavingNotes(false);
+    }
+  };
 
   const patientInfoRows = [
     ["환자명", patient.name, false],
@@ -223,11 +258,21 @@ function PatientDetail() {
                   <span>{GENDER_LABEL[patient.gender] ?? patient.gender}{age != null ? ` · ${age}세` : ""}</span>
                   <span>{patient.department}</span>
                 </div>
-                {patient.special_notes && (
-                  <div className="flex gap-[6px]">
-                    <span className="rounded-full bg-[#EDF1F6] px-[10px] py-1 text-[11px] text-[#5A6B80]">
-                      {patient.special_notes}
-                    </span>
+                {specialNoteTags.length > 0 && (
+                  <div className="flex flex-wrap gap-[6px]">
+                    {specialNoteTags.map((tag, index) => (
+                      <span
+                        key={`${tag.label}-${index}`}
+                        className="rounded-full px-[10px] py-1 text-[11px] font-semibold"
+                        style={
+                          tag.critical
+                            ? { backgroundColor: "#FDEDEA", color: "#E0442E" }
+                            : { backgroundColor: "#EDF1F6", color: "#5A6B80" }
+                        }
+                      >
+                        {tag.label}
+                      </span>
+                    ))}
                   </div>
                 )}
               </div>
@@ -316,13 +361,64 @@ function PatientDetail() {
                     <span className="text-[13px] text-[#5A6B80]">담당 병원</span>
                     <span className="text-[13px] font-semibold text-[#1E2A3A]">{patient.hospital}</span>
                   </div>
-                  {patient.special_notes && (
-                    <>
-                      <span className="text-[13px] text-[#5A6B80]">특이사항</span>
-                      <div className="flex gap-[6px]">
-                        <SpecialNoteTag icon="shield-alert" color="#E0442E" label={patient.special_notes} showLabel />
+                  <div className="flex items-center justify-between">
+                    <span className="text-[13px] text-[#5A6B80]">특이사항</span>
+                    {!isEditingNotes && (
+                      <button
+                        type="button"
+                        onClick={openNotesEditor}
+                        className="flex items-center gap-1 text-[12px] font-bold text-[#2B6FE3]"
+                      >
+                        <Icon name="pencil" size={12} />
+                        수정
+                      </button>
+                    )}
+                  </div>
+
+                  {isEditingNotes ? (
+                    <div className="flex flex-col gap-2">
+                      <SpecialNoteChips selectedKeys={noteKeys} onToggle={toggleNoteKey} />
+                      <input
+                        type="text"
+                        value={noteOtherText}
+                        onChange={(event) => setNoteOtherText(event.target.value)}
+                        placeholder="위 항목에 없는 내용은 직접 입력하세요"
+                        className="h-10 rounded-lg border border-[#DCE3EC] bg-[#F5F7FA] px-[14px] text-[13px] text-[#1E2A3A] placeholder:text-[#5A6B80] focus:outline-none"
+                      />
+                      {noteSaveError && <p className="text-[12px] font-semibold text-[#E0442E]">{noteSaveError}</p>}
+                      <div className="flex justify-end gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setIsEditingNotes(false)}
+                          disabled={isSavingNotes}
+                          className="rounded-lg border border-[#DCE3EC] bg-white px-4 py-[8px] text-[13px] font-semibold text-[#1E2A3A]"
+                        >
+                          취소
+                        </button>
+                        <button
+                          type="button"
+                          onClick={saveNotes}
+                          disabled={isSavingNotes}
+                          className="rounded-lg bg-[#2B6FE3] px-4 py-[8px] text-[13px] font-bold text-white disabled:opacity-60"
+                        >
+                          {isSavingNotes ? "저장 중..." : "저장"}
+                        </button>
                       </div>
-                    </>
+                    </div>
+                  ) : specialNoteTags.length > 0 ? (
+                    <div className="flex flex-wrap gap-[6px]">
+                      {specialNoteTags.map((tag, index) => (
+                        <SpecialNoteTag
+                          key={`${tag.label}-${index}`}
+                          icon={tag.icon}
+                          color={tag.critical ? "#E0442E" : "#5A6B80"}
+                          label={tag.label}
+                          showLabel
+                        />
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-[13px] text-[#5A6B80]">등록된 특이사항이 없습니다.</p>
                   )}
                 </div>
               </div>
