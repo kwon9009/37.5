@@ -25,26 +25,20 @@ const SEVERITY_BY_STATUS = {
   DANGER: "emergency",
 };
 
-// 서버가 주는 병실 문자열은 "3병동 · 301호 · 1번" 형태다.
-// 병동 탭과 카드 표시를 위해 앞부분(병동)과 나머지를 나눈다.
-function splitRoom(room) {
-  const [ward, ...rest] = String(room ?? "").split(" · ");
-  return { ward: ward || "미지정", room: rest.join(" · ") || ward || "-" };
-}
-
 function toMonitorCard(item) {
-  const { ward, room } = splitRoom(item.room);
-  const connected = item.sensor_status === "연결됨";
+  const connected = item.device_status === "ACTIVE";
+  const severity = SEVERITY_BY_STATUS[item.vital_status] ?? "normal";
   return {
     id: item.patient_id,
     name: item.name,
-    ward,
-    room,
+    ward: item.ward,
+    room: item.room,
     // 센서가 끊기면 생체값 대신 '센서 확인 필요'를 보여준다
-    severity: connected ? item.severity : "offline",
-    onlineSeverity: item.severity,
+    severity: connected ? severity : "offline",
+    onlineSeverity: severity,
     heartRate: item.heart_rate,
-    respirationRate: item.respiration_rate,
+    respirationRate: item.resp_rate,
+    present: item.is_present,
     connected,
     battery: null, // 장치 배터리는 아직 서버가 내려주지 않는다
   };
@@ -142,6 +136,7 @@ function MonitorCard({ patient }) {
 
 function RealtimeMonitoring() {
   const [activeWard, setActiveWard] = useState(null);
+  const [wards, setWards] = useState([]);
   const [patients, setPatients] = useState([]);
   const [now, setNow] = useState(() => new Date());
 
@@ -167,6 +162,7 @@ function RealtimeMonitoring() {
                 severity: patient.connected
                   ? (SEVERITY_BY_STATUS[payload.status] ?? patient.severity)
                   : "offline",
+                present: payload.presence,
               },
         ),
       );
@@ -179,9 +175,11 @@ function RealtimeMonitoring() {
 
     function load() {
       apiClient
-        .get("/dashboard/patients")
+        .get("/monitoring")
         .then(({ data }) => {
-          if (!cancelled) setPatients(data.map(toMonitorCard));
+          if (cancelled) return;
+          setWards(data.wards.map((item) => ({ name: item.ward, count: item.count })));
+          setPatients(data.patients.map(toMonitorCard));
         })
         .catch(() => {});
     }
@@ -193,15 +191,6 @@ function RealtimeMonitoring() {
       clearInterval(timer);
     };
   }, [realtime]);
-
-  // 병동 탭은 실제 환자들이 있는 병동에서 뽑아낸다
-  const wards = useMemo(() => {
-    const counts = new Map();
-    for (const patient of patients) {
-      counts.set(patient.ward, (counts.get(patient.ward) ?? 0) + 1);
-    }
-    return [...counts].map(([name, count]) => ({ name, count }));
-  }, [patients]);
 
   // 아직 병동을 고르지 않았으면 첫 병동을 보여준다
   const currentWard = activeWard ?? wards[0]?.name ?? null;

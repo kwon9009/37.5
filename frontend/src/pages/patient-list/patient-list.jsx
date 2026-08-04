@@ -128,6 +128,7 @@ function PatientList() {
         respirationRate: "--",
         nurse: "-",
         lastUpdate: toClock(new Date()),
+        specialNotes: form.special_notes || "",
       },
       ...current,
     ]);

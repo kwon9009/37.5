@@ -147,6 +147,7 @@ function Dashboard() {
               respirationRate: patient.respiration_rate,
               sensorStatus: patient.sensor_status,
               timestamp: toClockString(patient.timestamp),
+              specialNotes: patient.notes,
             })),
           ),
         );

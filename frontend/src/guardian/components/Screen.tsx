@@ -14,7 +14,11 @@ export function Screen({ children, className }: ScreenProps) {
     <div className="flex h-dvh justify-center overflow-hidden bg-muted/40">
       {/* h-dvh + overflow-hidden: 바깥 스크롤을 없애 스크롤바가 상단 제목 칸(TopBar) 위로 겹치지 않게 함.
           실제 스크롤은 각 화면 내부의 overflow-y-auto 영역에서만 발생. */}
-      <div className={cn("app-shell flex h-dvh flex-col overflow-hidden bg-background", className)}>{children}</div>
+      {/* text-foreground: 병원용 전역 글자색(:root)을 물려받지 않도록 앱 프레임에서 보호자 색으로 고정.
+          화면별로 className 에 text-* 를 주면 그 색이 우선한다(Splash/Emergency). */}
+      <div className={cn("app-shell flex h-dvh flex-col overflow-hidden bg-background text-foreground", className)}>
+        {children}
+      </div>
     </div>
   )
 }

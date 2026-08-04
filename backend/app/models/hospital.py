@@ -9,6 +9,7 @@ from app.core.database import Base
 
 if TYPE_CHECKING:
     from app.models.department import Department
+    from app.models.patient_link_request import PatientLinkRequest
 
 
 class Hospital(Base):
@@ -34,6 +35,11 @@ class Hospital(Base):
         "Department",
         back_populates="hospital",
         passive_deletes=True,
+    )
+
+    patient_link_requests: Mapped[list["PatientLinkRequest"]] = relationship(
+        "PatientLinkRequest",
+        back_populates="hospital",
     )
 
     def __repr__(self) -> str:
