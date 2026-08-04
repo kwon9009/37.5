@@ -23,6 +23,7 @@ from app.models.alert import Alert
 from app.models.emergency_log import EmergencyLog
 from app.models.admin import Admin
 from app.models.admin_hospital import AdminHospital
+from app.models.patient_link_request import PatientLinkRequest
 
 from app.models.enums import (
     Gender,
@@ -287,6 +288,49 @@ def create_patients(db: Session):
     db.commit()
 
     log("Patients")
+
+
+# --------------------------------------------------
+# Patient Link Requests
+# --------------------------------------------------
+
+
+def create_patient_link_requests(db: Session):
+
+    guardians = db.query(Guardian).order_by(Guardian.guardian_id).all()
+    hospitals = db.query(Hospital).order_by(Hospital.hospital_id).all()
+    patients = db.query(Patient).order_by(Patient.patient_id).all()
+
+    requests = []
+
+    statuses = [
+        "PENDING",
+        "PENDING",
+        "APPROVED",
+        "REJECTED",
+    ]
+
+    for i in range(8):
+
+        patient = patients[i]
+        guardian = guardians[i % len(guardians)]
+        hospital = hospitals[i % len(hospitals)]
+
+        requests.append(
+            PatientLinkRequest(
+                guardian_id=guardian.guardian_id,
+                hospital_id=hospital.hospital_id,
+                patient_name=patient.name,
+                birthdate=patient.birthdate,
+                relation="아들" if i % 2 == 0 else "배우자",
+                status=statuses[i % len(statuses)],
+            )
+        )
+
+    db.add_all(requests)
+    db.commit()
+
+    log("Patient Link Requests")
 
 
 # --------------------------------------------------
@@ -560,6 +604,7 @@ def main():
         create_departments(db)
         create_guardians(db)
         create_patients(db)
+        create_patient_link_requests(db)
         create_patient_guardians(db)
         create_devices(db)
         create_vital_checks(db)
