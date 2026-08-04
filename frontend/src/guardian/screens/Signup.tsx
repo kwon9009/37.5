@@ -48,7 +48,7 @@ export default function Signup() {
 
   // 아이디 상태 (중복검사)
   const [userid, setUserid] = useState("")
-  const [useridStatus, setUseridStatus] = useState<"idle" | "ok" | "taken" | "invalid">("idle")
+  const [useridStatus, setUseridStatus] = useState<"idle" | "ok" | "taken" | "invalid" | "empty">("idle")
   const [useridShake, setUseridShake] = useState(false)
 
   // 비밀번호 상태
@@ -63,6 +63,8 @@ export default function Signup() {
   function handleNameBlur() {
     if (!name) {
       setNameWarning("성명을 입력해주세요.")
+      // 다른 오류(형식 오류·연락처·아이디)와 동일하게 흔들림 모션으로 알림
+      setNameShake(true)
       return
     }
     if (!/^[가-힣]{2,}$/.test(name)) {
@@ -146,12 +148,34 @@ export default function Signup() {
     setCodeWarning("")
   }
 
+  // 미입력 검사는 브라우저 기본 말풍선("이 입력란을 작성하세요") 대신
+  // 화면 위에서 아래 순서대로 앱 경고 문구를 띄운다. 그래서 input 에 required 를 쓰지 않는다.
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     // 성명 미입력 시 안내 문구 표시
     if (!name) {
       setNameWarning("성명을 입력해주세요.")
       setNameShake(true)
+      return
+    }
+    if (!carrier) {
+      setCarrierWarning("통신사를 선택해 주세요.")
+      setCarrierOpen(true)
+      return
+    }
+    if (!phone) {
+      setPhoneWarning("연락처를 입력해주세요.")
+      setPhoneShake(true)
+      return
+    }
+    if (!userid) {
+      setUseridStatus("empty")
+      setUseridShake(true)
+      return
+    }
+    if (!pw || !pw2) {
+      setPwWarning("비밀번호를 입력해주세요.")
+      setPwShake(true)
       return
     }
     // 비밀번호 요구사항 미충족 시 진동 + 입력값 삭제
@@ -292,7 +316,6 @@ export default function Signup() {
                 onChange={handlePhoneChange}
                 onBlur={handlePhoneBlur}
                 onAnimationEnd={() => setPhoneShake(false)}
-                required
               />
               <Button
                 type="button"
@@ -398,7 +421,6 @@ export default function Signup() {
                   setUseridStatus("idle")
                 }}
                 onAnimationEnd={() => setUseridShake(false)}
-                required
               />
               <Button
                 type="button"
@@ -410,6 +432,12 @@ export default function Signup() {
                 {useridStatus === "ok" ? "확인됨" : "중복검사"}
               </Button>
             </div>
+            {useridStatus === "empty" && (
+              <p className="verify-warning" role="alert">
+                <AlertCircle size={14} aria-hidden />
+                아이디를 입력해주세요.
+              </p>
+            )}
             {useridStatus === "invalid" && (
               <p className="verify-warning" role="alert">
                 <AlertCircle size={14} aria-hidden />
@@ -444,7 +472,6 @@ export default function Signup() {
               }}
               onAnimationEnd={() => setPwShake(false)}
               className={cn(pwShake && "verify-shake", pwWarning && "verify-error-border")}
-              required
             />
             <ul className="mt-2 flex items-center gap-3">
               {pwRules.map((r) => {
@@ -485,7 +512,6 @@ export default function Signup() {
               }}
               onAnimationEnd={() => setPwShake(false)}
               className={cn(pwShake && "verify-shake", pwWarning && "verify-error-border")}
-              required
             />
             {pwWarning && (
               <p className="verify-warning" role="alert">
