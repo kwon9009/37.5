@@ -109,8 +109,42 @@ def _is_resp_suspicious(heart_rate: int, resp_rate: int) -> bool:
     return _resp_rate_score(resp_rate) == 3 and _heart_rate_score(heart_rate) == 0
 
 
+# 직전에 '믿은' 호흡값과 그 시각 (환자별). 급변 판정에만 쓴다.
+_last_resp: dict[int, tuple[int, float]] = {}
+
+
+# 직전에 믿었던 호흡값에서 1초 만에 크게 튀었는가.
+# 사람의 호흡수는 그렇게 빨리 변하지 않는다. 레이더가 흉곽 대신 다른 움직임을
+# 잡으면 18 -> 6 처럼 튀는데, 그대로 받으면 멀쩡한 사람이 갑자기
+# '호흡 위험'으로 판정되어 가짜 응급이 발송된다.
+def _is_resp_jump(
+    patient_id: int,
+    resp_rate: int,
+    now: float,
+) -> bool:
+
+    previous = _last_resp.get(patient_id)
+
+    if previous is None:
+        return False
+
+    value, measured_at = previous
+
+    # 신호가 한참 끊겼다 다시 잡힌 경우는 급변이 아니라 재측정으로 본다
+    if now - measured_at > settings.RESP_JUMP_WINDOW_SEC:
+        return False
+
+    return abs(resp_rate - value) >= settings.RESP_MAX_JUMP
+
+
 # 호흡을 믿을 수 있는가. 심박과 별개로 판단한다.
-def _is_resp_rate_trustworthy(heart_rate: int, resp_rate: int | None) -> bool:
+# patient_id/now를 주면 직전 값 대비 급변까지 검사한다.
+def _is_resp_rate_trustworthy(
+    heart_rate: int,
+    resp_rate: int | None,
+    patient_id: int | None = None,
+    now: float | None = None,
+) -> bool:
 
     if resp_rate is None:
         return False
@@ -118,7 +152,17 @@ def _is_resp_rate_trustworthy(heart_rate: int, resp_rate: int | None) -> bool:
     if not (settings.PLAUSIBLE_RR_MIN <= resp_rate <= settings.PLAUSIBLE_RR_MAX):
         return False
 
-    return not _is_resp_suspicious(heart_rate=heart_rate, resp_rate=resp_rate)
+    if _is_resp_suspicious(heart_rate=heart_rate, resp_rate=resp_rate):
+        return False
+
+    if patient_id is not None and now is not None:
+        return not _is_resp_jump(
+            patient_id=patient_id,
+            resp_rate=resp_rate,
+            now=now,
+        )
+
+    return True
 
 
 # 1초값을 모아 1분마다 평균을 vital_logs에 append
@@ -229,10 +273,16 @@ def _apply(
 
     # 호흡은 심박과 따로 판단한다. 레이더가 흉곽 움직임을 놓치는 일이 잦은데,
     # 그때마다 멀쩡한 심박까지 버리면 화면에 아무 값도 뜨지 않는다.
+    now = time.time()
     resp_trusted = _is_resp_rate_trustworthy(
         heart_rate=heart_rate,
         resp_rate=resp_rate,
+        patient_id=request.patient_id,
+        now=now,
     )
+
+    if resp_trusted:
+        _last_resp[request.patient_id] = (resp_rate, now)
 
     if not resp_trusted:
         previous = vital_crud.get_vital_check(db=db, patient_id=request.patient_id)
