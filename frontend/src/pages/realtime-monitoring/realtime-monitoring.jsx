@@ -1,9 +1,11 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Sidebar from "../../components/sidebar/sidebar.jsx";
 import Header from "../../components/header/header.jsx";
 import Icon from "../../components/icon/icon.jsx";
 import StatusBadge from "../../components/status-badge/status-badge.jsx";
+import { apiClient } from "../../api/client.js";
+import { useVitalStream, pollInterval } from "../../api/use-vital-stream.js";
 
 const LEGEND = [
   { label: "응급", color: "#E0442E" },
@@ -12,28 +14,35 @@ const LEGEND = [
   { label: "정상", color: "#2FA35C" },
 ];
 
-const WARDS = [
-  { name: "3병동", count: 12 },
-  { name: "4병동", count: 9 },
-  { name: "5병동", count: 15 },
-  { name: "6병동", count: 8 },
-  { name: "중환자실", count: 6 },
-];
+// 위험한 환자가 위로 오도록 정렬
+const SEVERITY_ORDER = { emergency: 0, warning: 1, caution: 2, normal: 3, offline: 4 };
 
-const PATIENTS = [
-  { name: "박정호", room: "201호 · B-3", severity: "emergency", heartRate: 128, respirationRate: 26, connected: true, battery: 72 },
-  { name: "최수민", room: "305호 · A-1", severity: "warning", heartRate: 119, respirationRate: 23, connected: true, battery: 40 },
-  { name: "이영희", room: "302호 · A-2", severity: "caution", heartRate: 104, respirationRate: 18, connected: true, battery: 88 },
-  { name: "김도현", room: "208호 · C-3", severity: "caution", heartRate: 99, respirationRate: 17, connected: true, battery: 61 },
-  { name: "정미경", room: "210호 · B-2", severity: "offline", connected: false, battery: null },
-  { name: "한지우", room: "301호 · A-3", severity: "normal", heartRate: 76, respirationRate: 15, connected: true, battery: 95 },
-  { name: "오세훈", room: "303호 · A-1", severity: "normal", heartRate: 72, respirationRate: 14, connected: true, battery: 80 },
-  { name: "윤서연", room: "206호 · C-1", severity: "normal", heartRate: 68, respirationRate: 13, connected: true, battery: 52 },
-  { name: "강민준", room: "209호 · B-4", severity: "normal", heartRate: 74, respirationRate: 16, connected: true, battery: 100 },
-  { name: "조은지", room: "305호 · A-4", severity: "normal", heartRate: 80, respirationRate: 15, connected: true, battery: 47 },
-  { name: "임재현", room: "204호 · C-2", severity: "normal", heartRate: 70, respirationRate: 14, connected: true, battery: 66 },
-  { name: "서예린", room: "207호 · B-3", severity: "normal", heartRate: 78, respirationRate: 16, connected: true, battery: 33 },
-];
+// 서버 등급(NEWS2 판정 결과) -> 화면 심각도
+const SEVERITY_BY_STATUS = {
+  NORMAL: "normal",
+  WARNING: "warning",
+  ALERT: "caution",
+  DANGER: "emergency",
+};
+
+function toMonitorCard(item) {
+  const connected = item.device_status === "ACTIVE";
+  const severity = SEVERITY_BY_STATUS[item.vital_status] ?? "normal";
+  return {
+    id: item.patient_id,
+    name: item.name,
+    ward: item.ward,
+    room: item.room,
+    // 센서가 끊기면 생체값 대신 '센서 확인 필요'를 보여준다
+    severity: connected ? severity : "offline",
+    onlineSeverity: severity,
+    heartRate: item.heart_rate,
+    respirationRate: item.resp_rate,
+    present: item.is_present,
+    connected,
+    battery: null, // 장치 배터리는 아직 서버가 내려주지 않는다
+  };
+}
 
 const CARD_STYLE = {
   emergency: { background: "#FDEDEA", borderColor: "#E0442E", borderWidth: 2 },
@@ -57,11 +66,11 @@ function MonitorCard({ patient }) {
       role="button"
       tabIndex={0}
       aria-label={`${patient.name} 상세 보기`}
-      onClick={() => navigate(`/patients/${encodeURIComponent(patient.name)}`)}
+      onClick={() => navigate(`/patients/${patient.id}`)}
       onKeyDown={(event) => {
         if (event.key === "Enter" || event.key === " ") {
           event.preventDefault();
-          navigate(`/patients/${encodeURIComponent(patient.name)}`);
+          navigate(`/patients/${patient.id}`);
         }
       }}
       className="flex cursor-pointer flex-col gap-[14px] rounded-xl p-4 shadow-[0_2px_3px_rgba(30,42,58,0.08)] transition-shadow hover:shadow-[0_4px_12px_rgba(30,42,58,0.16)]"
@@ -91,7 +100,7 @@ function MonitorCard({ patient }) {
             </div>
             <div className="flex items-end gap-[3px]">
               <span className="text-[30px] font-extrabold leading-none" style={{ color: valueColor }}>
-                {patient.heartRate}
+                {patient.heartRate ?? "--"}
               </span>
               <span className="pb-[2px] text-[11px] text-[#5A6B80]">bpm</span>
             </div>
@@ -103,7 +112,7 @@ function MonitorCard({ patient }) {
             </div>
             <div className="flex items-end gap-[3px]">
               <span className="text-[30px] font-extrabold leading-none" style={{ color: valueColor }}>
-                {patient.respirationRate}
+                {patient.respirationRate ?? "--"}
               </span>
               <span className="pb-[2px] text-[11px] text-[#5A6B80]">회/분</span>
             </div>
@@ -126,13 +135,73 @@ function MonitorCard({ patient }) {
 }
 
 function RealtimeMonitoring() {
-  const [activeWard, setActiveWard] = useState("3병동");
+  const [activeWard, setActiveWard] = useState(null);
+  const [wards, setWards] = useState([]);
+  const [patients, setPatients] = useState([]);
   const [now, setNow] = useState(() => new Date());
 
   useEffect(() => {
-    const interval = setInterval(() => setNow(new Date()), 1000 * 30);
+    const interval = setInterval(() => setNow(new Date()), 1000);
     return () => clearInterval(interval);
   }, []);
+
+  // 센서 값이 서버에 도착하는 즉시 해당 환자 카드만 갈아끼운다(새로고침 불필요)
+  const realtime = useVitalStream({
+    scope: "department",
+    onVitals: (payload) => {
+      setPatients((current) =>
+        current.map((patient) =>
+          patient.id !== payload.patient_id
+            ? patient
+            : {
+                ...patient,
+                // null이면 이번엔 갱신할 값이 없다는 뜻이라 직전 값을 유지한다
+                heartRate: payload.heart_rate ?? patient.heartRate,
+                respirationRate: payload.resp_rate ?? patient.respirationRate,
+                onlineSeverity: SEVERITY_BY_STATUS[payload.status] ?? patient.onlineSeverity,
+                severity: patient.connected
+                  ? (SEVERITY_BY_STATUS[payload.status] ?? patient.severity)
+                  : "offline",
+                present: payload.presence,
+              },
+        ),
+      );
+    },
+  });
+
+  // 환자 등록·센서 연결 상태처럼 스트림으로 오지 않는 값을 주기적으로 따라잡는다
+  useEffect(() => {
+    let cancelled = false;
+
+    function load() {
+      apiClient
+        .get("/monitoring")
+        .then(({ data }) => {
+          if (cancelled) return;
+          setWards(data.wards.map((item) => ({ name: item.ward, count: item.count })));
+          setPatients(data.patients.map(toMonitorCard));
+        })
+        .catch(() => {});
+    }
+
+    load();
+    const timer = setInterval(load, pollInterval(realtime));
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+    };
+  }, [realtime]);
+
+  // 아직 병동을 고르지 않았으면 첫 병동을 보여준다
+  const currentWard = activeWard ?? wards[0]?.name ?? null;
+
+  const visiblePatients = useMemo(
+    () =>
+      patients
+        .filter((patient) => currentWard == null || patient.ward === currentWard)
+        .sort((a, b) => SEVERITY_ORDER[a.severity] - SEVERITY_ORDER[b.severity]),
+    [patients, currentWard],
+  );
 
   return (
     <div className="realtime-monitoring flex min-h-screen bg-[#F5F7FA]">
@@ -144,8 +213,18 @@ function RealtimeMonitoring() {
         <div className="flex flex-col gap-5 p-6">
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div className="flex flex-col gap-1">
-              <h1 className="text-2xl font-bold text-[#1E2A3A]">실시간 모니터링 · 3병동</h1>
-              <p className="text-[13px] text-[#5A6B80]">위험 환자 우선 정렬 · 자동 갱신</p>
+              <h1 className="text-2xl font-bold text-[#1E2A3A]">
+                실시간 모니터링{currentWard ? ` · ${currentWard}` : ""}
+              </h1>
+              <div className="flex items-center gap-2">
+                <span
+                  className={`h-2 w-2 rounded-full ${realtime ? "bg-[#2FA35C]" : "bg-[#E8A13B]"}`}
+                  aria-hidden="true"
+                />
+                <p className="text-[13px] text-[#5A6B80]">
+                  위험 환자 우선 정렬 · {realtime ? "실시간 연결됨" : "재연결 중"}
+                </p>
+              </div>
             </div>
 
             <div className="flex flex-wrap items-center gap-5">
@@ -166,8 +245,8 @@ function RealtimeMonitoring() {
           </div>
 
           <div className="flex flex-wrap items-center gap-[10px]">
-            {WARDS.map((ward) => {
-              const isActive = ward.name === activeWard;
+            {wards.map((ward) => {
+              const isActive = ward.name === currentWard;
               return (
                 <button
                   key={ward.name}
@@ -190,11 +269,17 @@ function RealtimeMonitoring() {
             })}
           </div>
 
-          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-4">
-            {PATIENTS.map((patient) => (
-              <MonitorCard key={patient.name} patient={patient} />
-            ))}
-          </div>
+          {visiblePatients.length > 0 ? (
+            <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-4">
+              {visiblePatients.map((patient) => (
+                <MonitorCard key={patient.id} patient={patient} />
+              ))}
+            </div>
+          ) : (
+            <div className="flex flex-col items-center justify-center gap-2 rounded-xl border border-[#DCE3EC] bg-white p-10 text-center shadow-[0_2px_3px_rgba(30,42,58,0.08)]">
+              <p className="text-sm font-semibold text-[#5A6B80]">모니터링 중인 환자가 없습니다.</p>
+            </div>
+          )}
         </div>
       </div>
     </div>

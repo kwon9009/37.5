@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react"
 import { apiClient } from "@/api/client.js"
 import { openVitalStream } from "@/api/vital-stream.js"
+import { pollInterval } from "@/api/use-vital-stream.js"
 import type { NotiType } from "./schema-view"
 
 export type Noti = {
@@ -53,12 +54,17 @@ export type GuardianData = {
 const HR_NORMAL = { min: 60, max: 100 }
 const RR_NORMAL = { min: 12, max: 20 }
 
-// 심박·호흡은 실시간 스트림(SSE)으로 즉시 받는다.
-// 아래 간격은 알림·기록처럼 스트림으로 오지 않는 나머지 데이터를 다시 불러오는 주기다.
-//  - 스트림이 살아있으면 느리게(서버 부담 줄이기)
-//  - 스트림이 끊기면 빠르게(폴링만으로 버티기 = 폴백)
-const POLL_SLOW_MS = 30000
-const POLL_FAST_MS = 5000
+type Range = { min: number; max: number }
+
+function isAbnormal(value: number, range: Range): boolean {
+  return value < range.min || value > range.max
+}
+
+function levelLabel(value: number, range: Range): string {
+  if (value > range.max) return "높음"
+  if (value < range.min) return "낮음"
+  return "정상"
+}
 
 function relativeTime(sentAt: string): string {
   const diffMs = Date.now() - new Date(sentAt).getTime()
@@ -150,8 +156,8 @@ export function useGuardianData(): GuardianData {
         const latestEmergency = [...emergencyLogs].sort((a, b) => (a.created_at < b.created_at ? 1 : -1))[0]
         const evHeart = latestEmergency?.heart_rate ?? detail.current_vital?.heart_rate ?? 0
         const evResp = latestEmergency?.resp_rate ?? detail.current_vital?.resp_rate ?? 0
-        const heartAbnormal = evHeart < HR_NORMAL.min || evHeart > HR_NORMAL.max
-        const respAbnormal = evResp < RR_NORMAL.min || evResp > RR_NORMAL.max
+        const heartAbnormal = isAbnormal(evHeart, HR_NORMAL)
+        const respAbnormal = isAbnormal(evResp, RR_NORMAL)
 
         const notifications: Noti[] = [...alerts]
           .sort((a, b) => (a.sent_at < b.sent_at ? 1 : -1))
@@ -201,8 +207,8 @@ export function useGuardianData(): GuardianData {
             eventType: latestEmergency?.event_type ?? "cardiac",
             heartAbnormal,
             respAbnormal,
-            heartStatus: evHeart > HR_NORMAL.max ? "높음" : evHeart < HR_NORMAL.min ? "낮음" : "정상",
-            respStatus: evResp > RR_NORMAL.max ? "높음" : evResp < RR_NORMAL.min ? "낮음" : "정상",
+            heartStatus: levelLabel(evHeart, HR_NORMAL),
+            respStatus: levelLabel(evResp, RR_NORMAL),
           },
           notifications,
           specialNote: detail.patient.special_notes ?? "",
@@ -216,8 +222,8 @@ export function useGuardianData(): GuardianData {
     }
 
     load()
-    // 스트림이 살아있으면 느리게, 끊겼으면 빠르게 다시 불러온다
-    const timer = setInterval(load, realtime ? POLL_SLOW_MS : POLL_FAST_MS)
+    // 알림·기록처럼 스트림으로 오지 않는 값만 주기적으로 따라잡는다
+    const timer = setInterval(load, pollInterval(realtime))
     return () => {
       cancelled = true
       clearInterval(timer)
@@ -247,9 +253,24 @@ export function useGuardianData(): GuardianData {
     })
   }, [patientId])
 
+  // 응급 화면은 "지금" 상태를 봐야 하므로, 실시간 값이 있으면 그걸로 덮어쓴다.
+  // (덮어쓰지 않으면 응급이 발생한 순간의 과거 기록이 그대로 멈춰 보인다)
+  const emergencyEvent = liveVitals
+    ? {
+        ...data.emergencyEvent,
+        heartRate: liveVitals.heartRate,
+        respiration: liveVitals.respiration,
+        heartAbnormal: isAbnormal(liveVitals.heartRate, HR_NORMAL),
+        respAbnormal: isAbnormal(liveVitals.respiration, RR_NORMAL),
+        heartStatus: levelLabel(liveVitals.heartRate, HR_NORMAL),
+        respStatus: levelLabel(liveVitals.respiration, RR_NORMAL),
+      }
+    : data.emergencyEvent
+
   return {
     ...data,
     realtime,
     vitals: liveVitals ?? data.vitals,
+    emergencyEvent,
   }
 }

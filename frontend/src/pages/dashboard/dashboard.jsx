@@ -6,7 +6,7 @@ import PatientCard from "../../components/patient-card/patient-card.jsx";
 import Icon from "../../components/icon/icon.jsx";
 import EmergencyScreeningOverlay from "../../components/emergency-screening-overlay/emergency-screening-overlay.jsx";
 import { apiClient } from "../../api/client.js";
-import { openVitalStream } from "../../api/vital-stream.js";
+import { useVitalStream, pollInterval } from "../../api/use-vital-stream.js";
 
 const SEVERITY_ORDER = { emergency: 0, warning: 1, caution: 2, normal: 3 };
 
@@ -17,13 +17,6 @@ const SEVERITY_BY_STATUS = {
   ALERT: "caution",
   DANGER: "emergency",
 };
-
-// 심박·호흡은 실시간 스트림(SSE)으로 즉시 받는다.
-// 아래 간격은 알림 목록처럼 스트림으로 오지 않는 나머지 데이터를 다시 불러오는 주기다.
-//  - 스트림이 살아있으면 느리게(서버 부담 줄이기)
-//  - 스트림이 끊기면 빠르게(폴링만으로 버티기 = 폴백)
-const POLL_SLOW_MS = 30000;
-const POLL_FAST_MS = 5000;
 
 function sortBySeverity(list) {
   return [...list].sort((a, b) => SEVERITY_ORDER[a.severity] - SEVERITY_ORDER[b.severity]);
@@ -95,12 +88,36 @@ function Dashboard() {
   const [patients, setPatients] = useState([]);
   const [alerts, setAlerts] = useState([]);
   const [error, setError] = useState("");
-  const [realtime, setRealtime] = useState(false);
 
   useEffect(() => {
     const interval = setInterval(() => setNow(new Date()), 1000);
     return () => clearInterval(interval);
   }, []);
+
+  // 우리 부서 환자들의 심박·호흡을 서버가 값을 받는 즉시 받아본다(폴링 간격을 기다리지 않음)
+  const realtime = useVitalStream({
+    scope: "department",
+    onVitals: (payload) => {
+      setPatients((current) =>
+        sortBySeverity(
+          current.map((patient) =>
+            patient.id !== payload.patient_id
+              ? patient
+              : {
+                  ...patient,
+                  // null이면 "이번엔 갱신할 값이 없음"(부재중·안정화중·측정오류)이라
+                  // 직전 값을 그대로 유지한다
+                  heartRate: payload.heart_rate ?? patient.heartRate,
+                  respirationRate: payload.resp_rate ?? patient.respirationRate,
+                  severity: SEVERITY_BY_STATUS[payload.status] ?? patient.severity,
+                  presenceLabel: payload.presence ? "재실중" : "부재중",
+                  timestamp: toClockString(payload.measured_at),
+                },
+          ),
+        ),
+      );
+    },
+  });
 
   useEffect(() => {
     let cancelled = false;
@@ -149,41 +166,13 @@ function Dashboard() {
     }
 
     loadDashboard();
-    // 스트림이 살아있으면 느리게, 끊겼으면 빠르게 다시 불러온다
-    const timer = setInterval(loadDashboard, realtime ? POLL_SLOW_MS : POLL_FAST_MS);
+    // 알림 목록처럼 스트림으로 오지 않는 값만 주기적으로 따라잡는다
+    const timer = setInterval(loadDashboard, pollInterval(realtime));
     return () => {
       cancelled = true;
       clearInterval(timer);
     };
   }, [realtime]);
-
-  // 우리 부서 환자들의 심박·호흡을 서버가 값을 받는 즉시 받아본다(폴링 간격을 기다리지 않음)
-  useEffect(() => {
-    return openVitalStream({
-      scope: "department",
-      onVitals: (payload) => {
-        setPatients((prev) =>
-          sortBySeverity(
-            prev.map((patient) =>
-              patient.id !== payload.patient_id
-                ? patient
-                : {
-                    ...patient,
-                    // null이면 "이번엔 갱신할 값이 없음"(부재중·안정화중·측정오류)이라
-                    // 직전 값을 그대로 유지한다
-                    heartRate: payload.heart_rate ?? patient.heartRate,
-                    respirationRate: payload.resp_rate ?? patient.respirationRate,
-                    severity: SEVERITY_BY_STATUS[payload.status] ?? patient.severity,
-                    presenceLabel: payload.presence ? "재실중" : "부재중",
-                    timestamp: toClockString(payload.measured_at),
-                  },
-            ),
-          ),
-        );
-      },
-      onConnectionChange: setRealtime,
-    });
-  }, []);
 
   useEffect(() => {
     // 실시간 감지 이벤트를 흉내내기 위한 지연 (실제로는 SSE로 응급 이벤트 수신 시 즉시 트리거)
