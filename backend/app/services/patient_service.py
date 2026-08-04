@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 
 from app.crud import patient_crud
 
-from app.models.enums import VitalStatus
+from app.models.enums import UserRole, VitalStatus
 from app.models.user import User
 from app.services import permission_service
 
@@ -14,6 +14,9 @@ from app.schemas.patient.common import (
 )
 from app.schemas.patient.patient_detail_response import (
     PatientDetailResponse,
+)
+from app.schemas.patient.patient_special_notes_update import (
+    PatientSpecialNotesUpdateResponse,
 )
 from app.schemas.patient.patient_vital_logs_response import (
     PatientVitalLogsResponse,
@@ -97,6 +100,44 @@ def get_patient_detail(
         guardian=guardian_response,
         device_serial=device.serial_num if device else None,
         current_vital=current_vital,
+    )
+
+
+# 환자 특이사항 수정 (고혈압·협심증 병력, 항혈전제·심장약 복용, 흉통 호소 여부 등 관리)
+def update_patient_special_notes(
+    db: Session,
+    patient_id: int,
+    special_notes: str,
+    current_user: User,
+) -> PatientSpecialNotesUpdateResponse:
+
+    if current_user.role == UserRole.GUARDIAN:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="보호자 계정은 특이사항을 수정할 수 없습니다.",
+        )
+
+    permission_service.ensure_can_access_patient(
+        db=db,
+        current_user=current_user,
+        patient_id=patient_id,
+    )
+
+    patient = patient_crud.update_special_notes(
+        db=db,
+        patient_id=patient_id,
+        special_notes=special_notes,
+    )
+
+    if patient is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="환자를 찾을 수 없습니다.",
+        )
+
+    return PatientSpecialNotesUpdateResponse(
+        patient_id=patient.patient_id,
+        special_notes=patient.special_notes,
     )
 
 

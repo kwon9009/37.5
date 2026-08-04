@@ -1,15 +1,9 @@
 import { useEffect, useState } from "react";
 import Icon from "../../icon/icon.jsx";
+import SpecialNoteChips from "../../special-note-chips/special-note-chips.jsx";
+import { composeSpecialNotes } from "../../../lib/special-notes.js";
 
 const WARD_OPTIONS = ["3병동", "4병동", "5병동", "6병동", "중환자실"];
-
-const NOTE_CHIPS = [
-  { key: "pressure", icon: "bed", label: "욕창위험" },
-  { key: "allergy", icon: "shield-alert", label: "알레르기" },
-  { key: "mobility", icon: "accessibility", label: "거동불편" },
-  { key: "swallowing", icon: "utensils-crossed", label: "연하곤란" },
-  { key: "other", icon: "info", label: "기타" },
-];
 
 const INITIAL_FORM = {
   name: "",
@@ -48,7 +42,11 @@ function PatientRegisterModal({ isOpen, onClose, onSubmit }) {
       setError("환자 이름을 입력해 주세요");
       return;
     }
-    onSubmit?.({ ...form, notes: selectedNotes });
+    onSubmit?.({
+      ...form,
+      notes: selectedNotes,
+      special_notes: composeSpecialNotes(selectedNotes, form.otherNotes),
+    });
     onClose();
   };
 
@@ -200,24 +198,7 @@ function PatientRegisterModal({ isOpen, onClose, onSubmit }) {
 
         <div className="flex flex-col gap-2">
           <span className="text-xs font-bold tracking-wide text-[#5A6B80]">특이사항</span>
-          <div className="flex flex-wrap gap-2">
-            {NOTE_CHIPS.map((chip) => {
-              const isActive = selectedNotes.includes(chip.key);
-              return (
-                <button
-                  key={chip.key}
-                  type="button"
-                  onClick={() => toggleNote(chip.key)}
-                  className={`flex items-center gap-[6px] rounded-full border px-3 py-[6px] text-xs font-bold ${
-                    isActive ? "border-[#2B6FE3] bg-[#2B6FE3] text-white" : "border-[#DCE3EC] bg-[#EDF1F6] text-[#1E2A3A]"
-                  }`}
-                >
-                  <Icon name={chip.icon} size={14} className={isActive ? "text-white" : "text-[#5A6B80]"} />
-                  {chip.label}
-                </button>
-              );
-            })}
-          </div>
+          <SpecialNoteChips selectedKeys={selectedNotes} onToggle={toggleNote} />
           <input
             type="text"
             value={form.otherNotes}

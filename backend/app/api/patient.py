@@ -20,6 +20,10 @@ from app.schemas.patient.patient_emergency_logs_response import (
 from app.schemas.patient.patient_list_respoonse import (
     PatientListResponse,
 )
+from app.schemas.patient.patient_special_notes_update import (
+    PatientSpecialNotesUpdateRequest,
+    PatientSpecialNotesUpdateResponse,
+)
 from app.services import patient_service
 
 router = APIRouter(
@@ -41,6 +45,25 @@ def get_patient_detail(
     return patient_service.get_patient_detail(
         db=db,
         patient_id=patient_id,
+        current_user=current_user,
+    )
+
+
+# 환자 특이사항 수정
+@router.patch(
+    "/{patient_id}/special-notes",
+    response_model=PatientSpecialNotesUpdateResponse,
+)
+def update_patient_special_notes(
+    patient_id: int,
+    body: PatientSpecialNotesUpdateRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    return patient_service.update_patient_special_notes(
+        db=db,
+        patient_id=patient_id,
+        special_notes=body.special_notes,
         current_user=current_user,
     )
 
