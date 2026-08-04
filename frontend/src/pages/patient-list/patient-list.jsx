@@ -82,6 +82,7 @@ function PatientList() {
         respirationRate: "--",
         nurse: "-",
         lastUpdate: new Date().toLocaleTimeString("ko-KR", { hour12: false }),
+        specialNotes: form.special_notes || "",
       },
       ...current,
     ]);
