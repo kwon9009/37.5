@@ -22,4 +22,6 @@ class GuardianMeResponse(BaseModel):
     guardian_id: int
     name: str
     phone: str
+    # 가입 때부터 받는 값이지만, 이전에 가입한 계정은 비어 있을 수 있어 nullable
+    email: str | None
     patients: list[MyPatientResponse]

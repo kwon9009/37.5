@@ -28,6 +28,7 @@ from app.schemas.auth.department_register_request import (
 from app.schemas.auth.guardian_register_request import (
     GuardianRegisterRequest,
 )
+from app.schemas.auth.login_id_check_response import LoginIdCheckResponse
 from app.schemas.auth.login_request import LoginRequest
 from app.schemas.auth.login_response import LoginResponse
 from app.schemas.auth.register_response import RegisterResponse
@@ -74,6 +75,28 @@ def _validate_email(
         )
 
 
+# 아이디 중복 확인 (회원가입 화면의 '중복확인' 버튼)
+# 가입 버튼을 누른 뒤에야 중복을 알려주면 입력한 내용을 다시 채워야 해서,
+# 아이디를 적는 시점에 미리 알려준다. 실제 중복 차단은 가입 시 한 번 더 한다.
+def check_login_id(
+    db: Session,
+    login_id: str,
+) -> LoginIdCheckResponse:
+    if exists_by_login_id(
+        db=db,
+        login_id=login_id,
+    ):
+        return LoginIdCheckResponse(
+            available=False,
+            message="이미 사용 중인 아이디입니다.",
+        )
+
+    return LoginIdCheckResponse(
+        available=True,
+        message="사용할 수 있는 아이디입니다.",
+    )
+
+
 # 로그인
 def login_user(
     db: Session,
@@ -114,9 +137,15 @@ def register_guardian(
         login_id=request.login_id,
     )
 
+    _validate_email(
+        db=db,
+        email=request.email,
+    )
+
     try:
         user = User(
             login_id=request.login_id,
+            email=request.email,
             password=hash_password(request.password),
             role=UserRole.GUARDIAN,
         )
