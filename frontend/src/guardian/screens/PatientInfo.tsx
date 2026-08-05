@@ -4,7 +4,12 @@ import { MapPin, Phone, Building2, CheckCircle2 } from "lucide-react"
 import { Screen, TopBar, StickyAction } from "@/guardian/components/Screen"
 import { Button, Field } from "@/guardian/components/ui"
 import { cn } from "@/guardian/lib/utils"
-import { findHospitalByCode, type HospitalInfo } from "@/guardian/lib/hospitals"
+import {
+  findHospitalByCode,
+  getInviteCode,
+  saveRegisteredHospital,
+  type HospitalInfo,
+} from "@/guardian/lib/hospitals"
 
 const ITEM_H = 40 // 다이얼 각 항목 높이(px)
 
@@ -96,11 +101,23 @@ export default function PatientInfo() {
   const [pnameWarning, setPnameWarning] = useState("")
   const [pnameShake, setPnameShake] = useState(false)
 
-  // 병원 코드 등록
-  const [code, setCode] = useState("")
-  const [hospital, setHospital] = useState<HospitalInfo | null>(null)
+  // 병원 코드 등록.
+  // 초대 링크(...?code=DJ1003)로 들어왔으면 코드가 미리 채워지고 병원도 바로 확인된다.
+  const inviteCode = getInviteCode()
+  const [code, setCode] = useState(inviteCode ?? "")
+  const [hospital, setHospital] = useState<HospitalInfo | null>(() =>
+    inviteCode ? findHospitalByCode(inviteCode) : null,
+  )
   const [codeWarning, setCodeWarning] = useState("")
   const [codeShake, setCodeShake] = useState(false)
+
+  // [일시 비활성 - 개발용] 링크로 받은 병원 코드를 수정하지 못하게 잠그는 기능.
+  // 개발 중에는 여러 병원 코드를 바꿔가며 테스트해야 해서 꺼둔다.
+  // 시연/실제 배포 때는 아래 두 줄의 주석을 풀고, 그 아래 codeLocked = false 줄을 지우면 된다.
+  // (잠기면 입력칸이 회색 읽기전용이 되고 "확인" 버튼도 비활성화된다)
+  // const LOCK_INVITE_CODE = true
+  // const codeLocked = LOCK_INVITE_CODE && !!hospital && !!inviteCode
+  const codeLocked = false
 
   // 최종 확인 다이얼로그
   const [confirmOpen, setConfirmOpen] = useState(false)
@@ -274,16 +291,20 @@ export default function PatientInfo() {
                   setCodeWarning("")
                 }}
                 onAnimationEnd={() => setCodeShake(false)}
+                readOnly={codeLocked}
+                aria-readonly={codeLocked}
                 className={cn(
                   "h-13 min-w-0 flex-1 rounded-2xl border border-input bg-card px-4 text-base tracking-wide text-foreground outline-none placeholder:tracking-normal placeholder:text-muted-foreground/60 focus:border-ring focus:ring-2 focus:ring-ring/20",
                   codeShake && "verify-shake",
                   codeWarning && "verify-error-border",
+                  codeLocked && "cursor-not-allowed bg-muted/60 text-muted-foreground",
                 )}
               />
               <Button
                 type="button"
                 variant={hospital ? "muted" : "primary"}
                 className="h-13 w-28 shrink-0 whitespace-nowrap px-0 text-sm"
+                disabled={codeLocked}
                 onClick={handleCodeCheck}
               >
                 {hospital ? "등록됨" : "확인"}
@@ -379,7 +400,11 @@ export default function PatientInfo() {
               </button>
               <button
                 type="button"
-                onClick={() => navigate("/guardian/waiting")}
+                onClick={() => {
+                  // 홈 화면의 "병원 연락" 버튼이 이 병원 번호로 걸리도록 저장해 둔다
+                  if (hospital) saveRegisteredHospital(hospital.code)
+                  navigate("/guardian/waiting")
+                }}
                 className="h-12 flex-1 rounded-2xl bg-primary text-sm font-semibold text-primary-foreground"
               >
                 맞습니다
