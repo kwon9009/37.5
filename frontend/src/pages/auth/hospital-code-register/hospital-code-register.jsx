@@ -5,6 +5,7 @@ import { apiClient, getErrorMessage } from "../../../api/client.js";
 
 function HospitalCodeRegister() {
   const [hospitalName, setHospitalName] = useState("");
+  const [area, setArea] = useState("");
   const [address, setAddress] = useState("");
   const [bedCount, setBedCount] = useState("");
   const [error, setError] = useState("");
@@ -15,8 +16,8 @@ function HospitalCodeRegister() {
     event.preventDefault();
     setError("");
 
-    if (!hospitalName.trim() || !address.trim() || !bedCount.trim()) {
-      setError("병원명, 주소, 병상 수를 모두 입력해 주세요.");
+    if (!hospitalName.trim() || !area.trim() || !address.trim() || !bedCount.trim()) {
+      setError("병원명, 지역, 주소, 병상 수를 모두 입력해 주세요.");
       return;
     }
 
@@ -24,6 +25,7 @@ function HospitalCodeRegister() {
     try {
       await apiClient.post("/hospital-requests", {
         hospital_name: hospitalName.trim(),
+        area: area.trim(),
         address: address.trim(),
         bed_count: Number(bedCount),
       });
@@ -86,6 +88,41 @@ function HospitalCodeRegister() {
                   placeholder="예: 서울중앙병원"
                   value={hospitalName}
                   onChange={(event) => setHospitalName(event.target.value)}
+                  className="w-full border-0 bg-transparent text-[15px] text-[#1E2A3A] placeholder:text-[#5A6B80] focus:outline-none"
+                />
+              </div>
+            </div>
+
+            <div className="hospital-code-register__field flex flex-col gap-[7px]">
+              <label htmlFor="area" className="text-xs font-bold tracking-wide text-[#5A6B80]">
+                지역 (시·도)
+              </label>
+              <div className="hospital-code-register__input flex h-12 items-center gap-[10px] rounded-lg border border-[#DCE3EC] px-[14px]">
+                <svg
+                  aria-hidden="true"
+                  focusable="false"
+                  width="18"
+                  height="18"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="shrink-0 text-[#5A6B80]"
+                >
+                  <circle cx="12" cy="12" r="10" />
+                  <path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20" />
+                  <path d="M2 12h20" />
+                </svg>
+                <input
+                  id="area"
+                  name="area"
+                  type="text"
+                  maxLength={20}
+                  placeholder="예: 대전광역시"
+                  value={area}
+                  onChange={(event) => setArea(event.target.value)}
                   className="w-full border-0 bg-transparent text-[15px] text-[#1E2A3A] placeholder:text-[#5A6B80] focus:outline-none"
                 />
               </div>
