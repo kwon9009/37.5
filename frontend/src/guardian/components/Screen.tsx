@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react"
 import { useNavigate } from "react-router-dom"
 import { ChevronLeft, Bell } from "lucide-react"
 import { cn } from "@/guardian/lib/utils"
+import { captureInviteCode } from "@/guardian/lib/hospitals"
 
 type ScreenProps = {
   children: ReactNode
@@ -10,6 +11,12 @@ type ScreenProps = {
 
 /** Centered mobile frame wrapper used by every screen. */
 export function Screen({ children, className }: ScreenProps) {
+  // 초대 링크(...?code=DJ1003)로 들어왔다면 병원 코드를 저장해 둔다.
+  // 모든 보호자 화면이 Screen 을 쓰므로, 어느 주소로 처음 들어와도 한 번은 잡힌다.
+  useEffect(() => {
+    captureInviteCode(window.location.search)
+  }, [])
+
   return (
     <div className="flex h-dvh justify-center overflow-hidden bg-muted/40">
       {/* h-dvh + overflow-hidden: 바깥 스크롤을 없애 스크롤바가 상단 제목 칸(TopBar) 위로 겹치지 않게 함.
