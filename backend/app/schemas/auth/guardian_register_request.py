@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, EmailStr, Field
 
 
 class GuardianRegisterRequest(BaseModel):
@@ -8,6 +8,12 @@ class GuardianRegisterRequest(BaseModel):
         max_length=30,
         description="로그인 아이디",
         examples=["guardian01"],
+    )
+
+    email: EmailStr = Field(
+        ...,
+        description="비밀번호 찾기, 응급 알림 대체 수단으로 사용할 이메일",
+        examples=["guardian01@example.com"],
     )
 
     password: str = Field(

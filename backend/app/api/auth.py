@@ -1,11 +1,13 @@
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.orm import Session
 from fastapi.security import OAuth2PasswordRequestForm
 
 from app.core.database import get_db
+from app.schemas.auth.login_id_check_response import LoginIdCheckResponse
 from app.schemas.auth.login_request import LoginRequest
 from app.schemas.auth.login_response import LoginResponse
 from app.services.auth_service import (
+    check_login_id,
     login_user,
     register_department,
     register_guardian,
@@ -36,6 +38,22 @@ def login(
     return login_user(
         db=db,
         request=request,
+    )
+
+
+# 아이디 중복 확인 (회원가입 화면, 로그인 불필요)
+# 길이 제한은 회원가입 요청과 똑같이 맞춰야, 여기서 통과한 아이디가 가입에서 거부되지 않는다.
+@router.get(
+    "/check-login-id",
+    response_model=LoginIdCheckResponse,
+)
+def check_login_id_api(
+    login_id: str = Query(..., min_length=4, max_length=30),
+    db: Session = Depends(get_db),
+) -> LoginIdCheckResponse:
+    return check_login_id(
+        db=db,
+        login_id=login_id,
     )
 
 

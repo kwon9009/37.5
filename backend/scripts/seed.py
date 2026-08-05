@@ -93,11 +93,13 @@ def create_users(db: Session):
     # Guardian Users
     # ------------------------
 
+    # 보호자도 가입 시 이메일이 필수다(비밀번호 찾기·응급 알림 대체 수단).
+    # 시드만 비워두면 실제로는 만들 수 없는 계정이 되므로 똑같이 채운다.
     for i in range(1, 6):
         users.append(
             User(
                 login_id=f"guardian{i:02}",
-                email=None,
+                email=f"guardian{i}@example.com",
                 password=pw(),
                 role=UserRole.GUARDIAN,
                 is_active=True,
