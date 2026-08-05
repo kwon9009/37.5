@@ -1,9 +1,10 @@
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { useNavigate } from "react-router-dom"
 import { Heart, Wind, UserCheck, UserX, Phone, FileText, X, AlertTriangle, Bell, Trash2 } from "lucide-react"
 import { Screen, TopBar } from "@/guardian/components/Screen"
 import { BottomNav } from "@/guardian/components/BottomNav"
 import { useGuardianData } from "@/guardian/lib/api"
+import { findHospitalByName, loadRegisteredHospital, telHref } from "@/guardian/lib/hospitals"
 
 // 백엔드 미연결 시에도 응급 상황(10초 타이머) 데모가 특이사항까지 보여주도록 하는 폴백
 const DEMO_SPECIAL_NOTE =
@@ -42,6 +43,13 @@ export default function Home() {
   const [notifItems, setNotifItems] = useState(notifications)
   useEffect(() => setNotifItems(notifications), [notifications])
   const urgentCount = notifItems.filter((n) => n.type === "urgent").length
+
+  // 병원 연락처: 서버가 준 병원명으로 먼저 찾고, 못 찾으면 회원가입 때 등록한 병원으로 대체.
+  // (백엔드 미연결 상태에서는 patient.hospital 이 "-" 라서 저장해 둔 값이 쓰인다)
+  const hospitalContact = useMemo(
+    () => findHospitalByName(patient.hospital) ?? loadRegisteredHospital(),
+    [patient.hospital],
+  )
 
   // [일시 비활성 - 개발용] 홈 화면에 상주한 지 10초가 지나면 응급 화면으로 자동 이동하는 데모 기능.
   // 개발 중에는 홈에 10초만 머물러도 긴급 화면으로 튕겨서 작업이 어려우므로 잠시 꺼둔다.
@@ -125,15 +133,32 @@ export default function Home() {
         <div>
           <h2 className="mb-2 text-sm font-semibold text-muted-foreground">빠른 실행</h2>
           <div className="grid grid-cols-2 gap-3">
-            <a
-              href="tel:0000000000"
-              className="flex flex-col items-center rounded-3xl border border-border bg-card p-4 text-center shadow-sm"
-            >
-              <span className="mb-3 grid h-10 w-10 place-items-center rounded-2xl bg-primary/10 text-primary">
-                <Phone size={20} aria-hidden />
-              </span>
-              <span className="font-semibold text-foreground">병원 연락</span>
-            </a>
+            {/* 회원가입 때 등록한 병원 번호로 전화 앱을 연다.
+                번호를 못 찾으면(등록 전이거나 목록에 없는 병원) 눌리지 않게 비활성 처리. */}
+            {hospitalContact ? (
+              <a
+                href={telHref(hospitalContact.phone)}
+                aria-label={`${hospitalContact.name} ${hospitalContact.phone} 로 전화 걸기`}
+                className="flex flex-col items-center rounded-3xl border border-border bg-card p-4 text-center shadow-sm"
+              >
+                <span className="mb-3 grid h-10 w-10 place-items-center rounded-2xl bg-primary/10 text-primary">
+                  <Phone size={20} aria-hidden />
+                </span>
+                <span className="font-semibold text-foreground">병원 연락</span>
+                <span className="mt-0.5 text-xs text-muted-foreground">{hospitalContact.phone}</span>
+              </a>
+            ) : (
+              <div
+                className="flex flex-col items-center rounded-3xl border border-border bg-card p-4 text-center opacity-60 shadow-sm"
+                role="note"
+              >
+                <span className="mb-3 grid h-10 w-10 place-items-center rounded-2xl bg-muted text-muted-foreground">
+                  <Phone size={20} aria-hidden />
+                </span>
+                <span className="font-semibold text-foreground">병원 연락</span>
+                <span className="mt-0.5 text-xs text-muted-foreground">번호 확인 중</span>
+              </div>
+            )}
 
             {/* Special note */}
             <button
