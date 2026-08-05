@@ -24,7 +24,10 @@ class Hospital(Base):
 
     name: Mapped[str] = mapped_column(String(50), nullable=False)
 
-    address: Mapped[str] = mapped_column(String(50), nullable=False)
+    # 병원이 속한 시·도(예: "대전광역시"). 보호자가 병원을 지역으로 골라 찾는 데 쓴다.
+    area: Mapped[str] = mapped_column(String(20), nullable=False)
+
+    address: Mapped[str] = mapped_column(String(255), nullable=False)
 
     hospital_code: Mapped[str] = mapped_column(String(10), unique=True, nullable=False)
 

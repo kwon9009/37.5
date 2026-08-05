@@ -31,17 +31,30 @@ def get_by_id(
     return db.get(Hospital, hospital_id)
 
 
-# 병원명으로 검색 (회원가입 시 소속 병원 검색용)
+# 병원명/지역으로 검색 (회원가입 시 소속 병원 검색용)
+# 둘 다 선택 사항이다. 지역만 주면 그 지역 병원을 쭉 보여주고,
+# 이름만 주면 예전처럼 이름으로 찾고, 둘 다 주면 지역 안에서 이름으로 좁힌다.
 def search_by_name(
     db: Session,
-    query: str,
+    query: str | None = None,
+    area: str | None = None,
 ) -> list[Hospital]:
-    stmt = (
-        select(Hospital)
-        .where(Hospital.name.ilike(f"%{query}%"))
-        .order_by(Hospital.name)
-        .limit(20)
-    )
+    stmt = select(Hospital)
+
+    if query:
+        stmt = stmt.where(Hospital.name.ilike(f"%{query}%"))
+
+    if area:
+        stmt = stmt.where(Hospital.area == area)
+
+    stmt = stmt.order_by(Hospital.name).limit(20)
+
+    return list(db.scalars(stmt))
+
+
+# 등록된 병원이 있는 지역 목록 (회원가입 화면의 지역 선택 칸에 채운다)
+def list_areas(db: Session) -> list[str]:
+    stmt = select(Hospital.area).distinct().order_by(Hospital.area)
 
     return list(db.scalars(stmt))
 

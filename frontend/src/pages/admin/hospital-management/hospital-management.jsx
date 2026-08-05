@@ -126,7 +126,10 @@ function AdminHospitalManagement() {
                   >
                     <div className="flex flex-col gap-[3px]">
                       <p className="text-sm font-bold text-[#1E2A3A]">
-                        {request.hospital_name} <span className="font-normal text-[#5A6B80]">· {request.bed_count}병상</span>
+                        {request.hospital_name}{" "}
+                        <span className="font-normal text-[#5A6B80]">
+                          · {request.area} · {request.bed_count}병상
+                        </span>
                       </p>
                       <p className="text-xs text-[#5A6B80]">{request.address}</p>
                       <p className="text-[11px] text-[#5A6B80]">
