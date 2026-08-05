@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from "react"
 import { useNavigate } from "react-router-dom"
-import { ChevronLeft, Bell } from "lucide-react"
+import { ChevronLeft, Bell, WifiOff } from "lucide-react"
 import { cn } from "@/guardian/lib/utils"
 import { captureInviteCode } from "@/guardian/lib/hospitals"
 
@@ -9,9 +9,53 @@ type ScreenProps = {
   className?: string
 }
 
+/**
+ * 인터넷 연결이 끊기면 화면 위에 안내를 띄운다.
+ * 보호자 앱은 환자 상태를 실시간으로 받아야 해서, 연결이 끊긴 걸 모르고
+ * 옛날 값을 계속 보고 있으면 위험하다. 그래서 눈에 띄게 막아준다.
+ */
+function OfflineNotice() {
+  const [offline, setOffline] = useState(() => typeof navigator !== "undefined" && !navigator.onLine)
+
+  useEffect(() => {
+    const goOffline = () => setOffline(true)
+    const goOnline = () => setOffline(false)
+    window.addEventListener("offline", goOffline)
+    window.addEventListener("online", goOnline)
+    return () => {
+      window.removeEventListener("offline", goOffline)
+      window.removeEventListener("online", goOnline)
+    }
+  }, [])
+
+  if (!offline) return null
+
+  return (
+    <div
+      className="absolute inset-0 z-[60] flex items-center justify-center bg-foreground/50 px-8"
+      role="alertdialog"
+      aria-modal="true"
+      aria-labelledby="offline-title"
+    >
+      <div className="fade-up w-full rounded-3xl bg-card p-6 text-center shadow-xl">
+        <span className="mx-auto mb-4 grid h-14 w-14 place-items-center rounded-full bg-danger/10 text-danger">
+          <WifiOff size={28} aria-hidden />
+        </span>
+        <h2 id="offline-title" className="text-lg font-bold text-foreground">
+          인터넷에 연결되어 있지 않습니다
+        </h2>
+        <p className="mt-2 text-balance break-keep text-sm leading-relaxed text-muted-foreground">
+          환자분의 실시간 상태를 받아올 수 없습니다. Wi-Fi 또는 데이터 연결을 확인해 주세요.
+        </p>
+        <p className="mt-3 text-xs text-muted-foreground/80">연결되면 이 안내는 자동으로 사라집니다.</p>
+      </div>
+    </div>
+  )
+}
+
 /** Centered mobile frame wrapper used by every screen. */
 export function Screen({ children, className }: ScreenProps) {
-  // 초대 링크(...?code=DJ1003)로 들어왔다면 병원 코드를 저장해 둔다.
+  // 초대 링크(...?code=DJ001)로 들어왔다면 병원 코드를 저장해 둔다.
   // 모든 보호자 화면이 Screen 을 쓰므로, 어느 주소로 처음 들어와도 한 번은 잡힌다.
   useEffect(() => {
     captureInviteCode(window.location.search)
@@ -23,8 +67,14 @@ export function Screen({ children, className }: ScreenProps) {
           실제 스크롤은 각 화면 내부의 overflow-y-auto 영역에서만 발생. */}
       {/* text-foreground: 병원용 전역 글자색(:root)을 물려받지 않도록 앱 프레임에서 보호자 색으로 고정.
           화면별로 className 에 text-* 를 주면 그 색이 우선한다(Splash/Emergency). */}
-      <div className={cn("app-shell flex h-dvh flex-col overflow-hidden bg-background text-foreground", className)}>
+      <div
+        className={cn(
+          "app-shell relative flex h-dvh flex-col overflow-hidden bg-background text-foreground",
+          className,
+        )}
+      >
         {children}
+        <OfflineNotice />
       </div>
     </div>
   )
