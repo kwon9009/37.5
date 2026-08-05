@@ -5,7 +5,7 @@ import { Screen, TopBar, StickyAction } from "@/guardian/components/Screen"
 import { Button, Field } from "@/guardian/components/ui"
 import { cn } from "@/guardian/lib/utils"
 import {
-  findHospitalByCode,
+  fetchHospitalByCode,
   getInviteCode,
   saveRegisteredHospital,
   type HospitalInfo,
@@ -105,11 +105,27 @@ export default function PatientInfo() {
   // 초대 링크(...?code=DJ1003)로 들어왔으면 코드가 미리 채워지고 병원도 바로 확인된다.
   const inviteCode = getInviteCode()
   const [code, setCode] = useState(inviteCode ?? "")
-  const [hospital, setHospital] = useState<HospitalInfo | null>(() =>
-    inviteCode ? findHospitalByCode(inviteCode) : null,
-  )
+  const [hospital, setHospital] = useState<HospitalInfo | null>(null)
   const [codeWarning, setCodeWarning] = useState("")
   const [codeShake, setCodeShake] = useState(false)
+  const [codeChecking, setCodeChecking] = useState(false)
+
+  // 초대 링크로 들어왔으면 화면이 열릴 때 병원을 자동으로 조회한다.
+  useEffect(() => {
+    if (!inviteCode) return
+    let alive = true
+    setCodeChecking(true)
+    fetchHospitalByCode(inviteCode)
+      .then((found) => {
+        if (!alive) return
+        if (found) setHospital(found)
+        else setCodeWarning("링크의 병원 코드를 찾을 수 없습니다. 코드를 직접 입력해 주세요.")
+      })
+      .finally(() => alive && setCodeChecking(false))
+    return () => {
+      alive = false
+    }
+  }, [inviteCode])
 
   // [일시 비활성 - 개발용] 링크로 받은 병원 코드를 수정하지 못하게 잠그는 기능.
   // 개발 중에는 여러 병원 코드를 바꿔가며 테스트해야 해서 꺼둔다.
@@ -158,18 +174,24 @@ export default function PatientInfo() {
     validatePname()
   }
 
-  // 병원 코드 확인 → 병원명/주소/지도 확장 표시
-  function handleCodeCheck() {
-    const found = findHospitalByCode(code)
-    if (!found) {
-      setHospital(null)
-      setCodeWarning("등록되지 않은 병원 코드입니다. 다시 확인해 주세요.")
-      setCodeShake(true)
-      setCode("")
-      return
+  // 병원 코드 확인 → 서버 조회 후 병원명/주소/지도 확장 표시
+  async function handleCodeCheck() {
+    if (codeChecking) return
+    setCodeChecking(true)
+    try {
+      const found = await fetchHospitalByCode(code)
+      if (!found) {
+        setHospital(null)
+        setCodeWarning("등록되지 않은 병원 코드입니다. 다시 확인해 주세요.")
+        setCodeShake(true)
+        setCode("")
+        return
+      }
+      setHospital(found)
+      setCodeWarning("")
+    } finally {
+      setCodeChecking(false)
     }
-    setHospital(found)
-    setCodeWarning("")
   }
 
   function handleSubmit(e: React.FormEvent) {
@@ -304,10 +326,10 @@ export default function PatientInfo() {
                 type="button"
                 variant={hospital ? "muted" : "primary"}
                 className="h-13 w-28 shrink-0 whitespace-nowrap px-0 text-sm"
-                disabled={codeLocked}
+                disabled={codeLocked || codeChecking}
                 onClick={handleCodeCheck}
               >
-                {hospital ? "등록됨" : "확인"}
+                {codeChecking ? "조회 중" : hospital ? "등록됨" : "확인"}
               </Button>
             </div>
             {codeWarning && (
