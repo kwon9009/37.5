@@ -36,13 +36,27 @@ def exists_by_login_id(
     )
 
 
+# 이메일로 사용자 조회
+def get_by_email(
+    db: Session,
+    email: str,
+) -> User | None:
+    stmt = select(User).where(User.email == email)
+    return db.scalar(stmt)
+
+
 # 이메일 존재 여부 확인
 def exists_by_email(
     db: Session,
     email: str,
 ) -> bool:
-    stmt = select(User).where(User.email == email)
-    return db.scalar(stmt) is not None
+    return (
+        get_by_email(
+            db=db,
+            email=email,
+        )
+        is not None
+    )
 
 
 # 사용자 생성
