@@ -216,13 +216,25 @@ def request_password_reset(
     return same_answer
 
 
-# 메일 링크를 타고 들어와 새 비밀번호 설정
-def confirm_password_reset(
+# 재설정 링크가 아직 쓸 수 있는지만 확인한다 (아무것도 바꾸지 않음).
+# 화면이 열리자마자 부르는 용도다. 이게 없으면 사용자가 새 비밀번호를 다 입력하고
+# 저장을 누른 뒤에야 '이미 사용된 링크'라는 걸 알게 된다.
+def verify_password_reset_token(
     db: Session,
-    request: PasswordResetConfirm,
+    token: str,
 ) -> MessageResponse:
 
-    payload = decode_password_reset_token(request.token)
+    _load_user_for_reset(db=db, token=token)
+
+    return MessageResponse(message="사용할 수 있는 링크입니다.")
+
+
+# 재설정 토큰에서 사용자를 찾는다. 쓸 수 없는 토큰이면 이유를 담아 예외를 던진다.
+def _load_user_for_reset(
+    db: Session,
+    token: str,
+):
+    payload = decode_password_reset_token(token)
 
     user = get_by_user_id(db=db, user_id=int(payload["sub"]))
 
@@ -232,6 +244,26 @@ def confirm_password_reset(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="이미 사용된 링크입니다. 비밀번호 재설정을 다시 요청해 주세요.",
+        )
+
+    return user
+
+
+# 메일 링크를 타고 들어와 새 비밀번호 설정
+def confirm_password_reset(
+    db: Session,
+    request: PasswordResetConfirm,
+) -> MessageResponse:
+
+    user = _load_user_for_reset(db=db, token=request.token)
+
+    # 지금 쓰는 비밀번호를 그대로 넣으면 바뀐 게 없다.
+    # "변경되었습니다"라고 알려주지만 실제로는 아무 일도 일어나지 않아 혼란스럽고,
+    # 계정이 털려서 재설정하는 상황이라면 유출된 비밀번호로 되돌리는 셈이 된다.
+    if verify_password(request.new_password, user.password):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="현재 사용 중인 비밀번호와 다른 비밀번호를 입력해 주세요.",
         )
 
     user.password = hash_password(request.new_password)

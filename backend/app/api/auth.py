@@ -21,6 +21,7 @@ from app.services.auth_service import (
     register_department,
     register_guardian,
     request_password_reset,
+    verify_password_reset_token,
 )
 from app.schemas.auth.department_register_request import (
     DepartmentRegisterRequest,
@@ -126,6 +127,21 @@ def request_password_reset_api(
     return request_password_reset(
         db=db,
         request=request,
+    )
+
+
+# 재설정 링크가 아직 유효한지 확인 (화면이 열릴 때 부른다, 아무것도 바꾸지 않음)
+@router.get(
+    "/password-reset/verify",
+    response_model=MessageResponse,
+)
+def verify_password_reset_api(
+    token: str = Query(..., min_length=10),
+    db: Session = Depends(get_db),
+) -> MessageResponse:
+    return verify_password_reset_token(
+        db=db,
+        token=token,
     )
 
 
