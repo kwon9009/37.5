@@ -14,6 +14,22 @@ class Settings(BaseSettings):
     # SMS
     ALIGO_API_KEY: str = ""
 
+    # 비밀번호 재설정 메일 (Gmail SMTP)
+    # 비워두면 메일을 보내지 않고 서버 로그에만 링크를 남긴다.
+    # 팀원이 메일 계정 없이도 나머지 기능을 개발할 수 있게 하기 위함.
+    MAIL_HOST: str = "smtp.gmail.com"
+    MAIL_PORT: int = 587
+    MAIL_USERNAME: str = ""
+    MAIL_PASSWORD: str = ""
+    MAIL_FROM_NAME: str = "37.5 SmartCare"
+
+    # 재설정 링크를 만들 때 앞에 붙일 주소. 배포하면 실제 도메인으로 바꾼다.
+    FRONTEND_BASE_URL: str = "http://localhost:5173"
+
+    # 재설정 링크 유효시간(분). 짧을수록 안전하고,
+    # 메일을 확인하고 새 비밀번호를 정하는 데 걸리는 시간보다는 길어야 한다.
+    PASSWORD_RESET_EXPIRE_MINUTES: int = 30
+
     # 센서 오류 판별용 생리학적 한계값.
     # 사람이 의식이 있는 상태로 유지할 수 없는 값은 측정 실패로 보고 버린다.
     # (등급 판정 기준인 NEWS2와는 별개로, 순수하게 '오측정 거르기'용)

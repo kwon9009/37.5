@@ -3,14 +3,24 @@ from sqlalchemy.orm import Session
 from fastapi.security import OAuth2PasswordRequestForm
 
 from app.core.database import get_db
+from app.schemas.auth.find_id_request import FindIdRequest
+from app.schemas.auth.find_id_response import FindIdResponse
 from app.schemas.auth.login_id_check_response import LoginIdCheckResponse
 from app.schemas.auth.login_request import LoginRequest
 from app.schemas.auth.login_response import LoginResponse
+from app.schemas.auth.message_response import MessageResponse
+from app.schemas.auth.password_reset_request import (
+    PasswordResetConfirm,
+    PasswordResetRequest,
+)
 from app.services.auth_service import (
     check_login_id,
+    confirm_password_reset,
+    find_login_id,
     login_user,
     register_department,
     register_guardian,
+    request_password_reset,
 )
 from app.schemas.auth.department_register_request import (
     DepartmentRegisterRequest,
@@ -84,6 +94,51 @@ def register_department_api(
     db: Session = Depends(get_db),
 ) -> RegisterResponse:
     return register_department(
+        db=db,
+        request=request,
+    )
+
+
+# 아이디 찾기 (이름 + 이메일, 로그인 불필요)
+@router.post(
+    "/find-id",
+    response_model=FindIdResponse,
+)
+def find_id_api(
+    request: FindIdRequest,
+    db: Session = Depends(get_db),
+) -> FindIdResponse:
+    return find_login_id(
+        db=db,
+        request=request,
+    )
+
+
+# 비밀번호 재설정 메일 요청 (로그인 불필요)
+@router.post(
+    "/password-reset/request",
+    response_model=MessageResponse,
+)
+def request_password_reset_api(
+    request: PasswordResetRequest,
+    db: Session = Depends(get_db),
+) -> MessageResponse:
+    return request_password_reset(
+        db=db,
+        request=request,
+    )
+
+
+# 메일 링크로 새 비밀번호 설정 (로그인 불필요, 링크의 토큰으로 본인 확인)
+@router.post(
+    "/password-reset/confirm",
+    response_model=MessageResponse,
+)
+def confirm_password_reset_api(
+    request: PasswordResetConfirm,
+    db: Session = Depends(get_db),
+) -> MessageResponse:
+    return confirm_password_reset(
         db=db,
         request=request,
     )

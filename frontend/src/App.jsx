@@ -28,6 +28,7 @@ import GuardianTerms from "./guardian/screens/Terms.tsx";
 import GuardianSignup from "./guardian/screens/Signup.tsx";
 import GuardianFindId from "./guardian/screens/FindId.tsx";
 import GuardianFindPassword from "./guardian/screens/FindPassword.tsx";
+import GuardianResetPassword from "./guardian/screens/ResetPassword.tsx";
 import GuardianPatientInfo from "./guardian/screens/PatientInfo.tsx";
 import GuardianWaiting from "./guardian/screens/Waiting.tsx";
 import GuardianHome from "./guardian/screens/Home.tsx";
@@ -76,6 +77,8 @@ function App() {
       <Route path="/guardian/signup" element={<GuardianSignup />} />
       <Route path="/guardian/find-id" element={<GuardianFindId />} />
       <Route path="/guardian/find-password" element={<GuardianFindPassword />} />
+      {/* 메일로 받은 재설정 링크가 여는 화면. 링크의 token이 본인 확인을 대신하므로 로그인 불필요 */}
+      <Route path="/guardian/reset-password" element={<GuardianResetPassword />} />
       <Route path="/guardian/patient-info" element={<GuardianPatientInfo />} />
       <Route path="/guardian/waiting" element={<GuardianWaiting />} />
 
