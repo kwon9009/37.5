@@ -1,9 +1,11 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Sidebar from "../../components/sidebar/sidebar.jsx";
 import Header from "../../components/header/header.jsx";
 import Icon from "../../components/icon/icon.jsx";
 import StatusBadge from "../../components/status-badge/status-badge.jsx";
+import { apiClient } from "../../api/client.js";
+import { openVitalStream } from "../../api/vital-stream.js";
 
 const LEGEND = [
   { label: "응급", color: "#E0442E" },
@@ -12,33 +14,42 @@ const LEGEND = [
   { label: "정상", color: "#2FA35C" },
 ];
 
-const WARDS = [
-  { name: "3병동", count: 12 },
-  { name: "4병동", count: 9 },
-  { name: "5병동", count: 15 },
-  { name: "6병동", count: 8 },
-  { name: "중환자실", count: 6 },
-];
+// 서버 등급(NEWS2 판정 결과) -> 화면 심각도. SSE 스트림은 대문자 enum 값을 그대로 보낸다.
+const SEVERITY_BY_STATUS = {
+  NORMAL: "normal",
+  WARNING: "warning",
+  ALERT: "caution",
+  DANGER: "emergency",
+};
 
-const PATIENTS = [
-  { name: "박정호", room: "201호 · B-3", severity: "emergency", heartRate: 128, respirationRate: 26, connected: true, battery: 72 },
-  { name: "최수민", room: "305호 · A-1", severity: "warning", heartRate: 119, respirationRate: 23, connected: true, battery: 40 },
-  { name: "이영희", room: "302호 · A-2", severity: "caution", heartRate: 104, respirationRate: 18, connected: true, battery: 88 },
-  { name: "김도현", room: "208호 · C-3", severity: "caution", heartRate: 99, respirationRate: 17, connected: true, battery: 61 },
-  { name: "정미경", room: "210호 · B-2", severity: "offline", connected: false, battery: null },
-  { name: "한지우", room: "301호 · A-3", severity: "normal", heartRate: 76, respirationRate: 15, connected: true, battery: 95 },
-  { name: "오세훈", room: "303호 · A-1", severity: "normal", heartRate: 72, respirationRate: 14, connected: true, battery: 80 },
-  { name: "윤서연", room: "206호 · C-1", severity: "normal", heartRate: 68, respirationRate: 13, connected: true, battery: 52 },
-  { name: "강민준", room: "209호 · B-4", severity: "normal", heartRate: 74, respirationRate: 16, connected: true, battery: 100 },
-  { name: "조은지", room: "305호 · A-4", severity: "normal", heartRate: 80, respirationRate: 15, connected: true, battery: 47 },
-  { name: "임재현", room: "204호 · C-2", severity: "normal", heartRate: 70, respirationRate: 14, connected: true, battery: 66 },
-  { name: "서예린", room: "207호 · B-3", severity: "normal", heartRate: 78, respirationRate: 16, connected: true, battery: 33 },
-];
+// 스트림이 살아있으면 느리게, 끊겼으면 빠르게 다시 불러온다(폴백)
+const POLL_SLOW_MS = 30000;
+const POLL_FAST_MS = 5000;
 
 const CARD_STYLE = {
   emergency: { background: "#FDEDEA", borderColor: "#E0442E", borderWidth: 2 },
   offline: { background: "#EDF1F6", borderColor: "#DCE3EC", borderWidth: 1 },
 };
+
+// GET /dashboard/patients의 room은 "3층 A병동 · 305호 · 2번" 형태라 앞부분이 병동명이다.
+function wardOf(room) {
+  return room?.split(" · ")[0] ?? "미배정";
+}
+
+function toMonitorPatient(item) {
+  const isOffline = item.sensor_status !== "연결됨";
+  return {
+    id: item.patient_id,
+    name: item.name,
+    room: item.room,
+    ward: wardOf(item.room),
+    severity: isOffline ? "offline" : item.severity,
+    heartRate: item.heart_rate,
+    respirationRate: item.respiration_rate,
+    connected: !isOffline,
+    sensorStatus: item.sensor_status,
+  };
+}
 
 function formatWardClock(date) {
   const datePart = new Intl.DateTimeFormat("ko-KR", { year: "numeric", month: "long", day: "numeric", weekday: "short" }).format(date);
@@ -50,18 +61,17 @@ function MonitorCard({ patient }) {
   const navigate = useNavigate();
   const style = CARD_STYLE[patient.severity] ?? { background: "#FFFFFF", borderColor: "#DCE3EC", borderWidth: 1 };
   const valueColor = patient.severity === "emergency" ? "#E0442E" : "#1E2A3A";
-  const batteryColor = patient.battery != null && patient.battery <= 40 ? "#E8A13B" : "#5A6B80";
 
   return (
     <div
       role="button"
       tabIndex={0}
       aria-label={`${patient.name} 상세 보기`}
-      onClick={() => navigate(`/patients/${encodeURIComponent(patient.name)}`)}
+      onClick={() => navigate(`/patients/${patient.id}`)}
       onKeyDown={(event) => {
         if (event.key === "Enter" || event.key === " ") {
           event.preventDefault();
-          navigate(`/patients/${encodeURIComponent(patient.name)}`);
+          navigate(`/patients/${patient.id}`);
         }
       }}
       className="flex cursor-pointer flex-col gap-[14px] rounded-xl p-4 shadow-[0_2px_3px_rgba(30,42,58,0.08)] transition-shadow hover:shadow-[0_4px_12px_rgba(30,42,58,0.16)]"
@@ -114,11 +124,7 @@ function MonitorCard({ patient }) {
       <div className="flex items-center gap-[10px] border-t border-[#DCE3EC] pt-[10px]">
         <div className="flex items-center gap-[5px]">
           <Icon name={patient.connected ? "wifi" : "wifi-off"} size={13} className={patient.connected ? "text-[#2FA35C]" : "text-[#5A6B80]"} />
-          <span className="text-[11px] text-[#5A6B80]">{patient.connected ? "연결됨" : "연결 끊김"}</span>
-        </div>
-        <div className="flex items-center gap-[5px]">
-          <Icon name={patient.battery == null ? "battery-warning" : "battery"} size={14} style={{ color: batteryColor }} />
-          <span className="text-[11px] text-[#5A6B80]">{patient.battery != null ? `${patient.battery}%` : "—"}</span>
+          <span className="text-[11px] text-[#5A6B80]">{patient.sensorStatus ?? (patient.connected ? "연결됨" : "연결 끊김")}</span>
         </div>
       </div>
     </div>
@@ -126,13 +132,77 @@ function MonitorCard({ patient }) {
 }
 
 function RealtimeMonitoring() {
-  const [activeWard, setActiveWard] = useState("3병동");
+  const [activeWard, setActiveWard] = useState("전체");
   const [now, setNow] = useState(() => new Date());
+  const [patients, setPatients] = useState([]);
+  const [error, setError] = useState("");
+  const [realtime, setRealtime] = useState(false);
 
   useEffect(() => {
     const interval = setInterval(() => setNow(new Date()), 1000 * 30);
     return () => clearInterval(interval);
   }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadPatients() {
+      try {
+        const { data } = await apiClient.get("/dashboard/patients");
+        if (cancelled) return;
+        setError("");
+        setPatients(data.map(toMonitorPatient));
+      } catch {
+        if (!cancelled) setError("환자 목록을 불러오지 못했습니다.");
+      }
+    }
+
+    loadPatients();
+    const timer = setInterval(loadPatients, realtime ? POLL_SLOW_MS : POLL_FAST_MS);
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+    };
+  }, [realtime]);
+
+  // 심박·호흡은 서버가 값을 받는 즉시 밀어준다(폴링 간격을 기다리지 않음)
+  useEffect(() => {
+    return openVitalStream({
+      scope: "department",
+      onVitals: (payload) => {
+        setPatients((prev) =>
+          prev.map((patient) =>
+            patient.id !== payload.patient_id
+              ? patient
+              : {
+                  ...patient,
+                  heartRate: payload.heart_rate ?? patient.heartRate,
+                  respirationRate: payload.resp_rate ?? patient.respirationRate,
+                  severity: patient.connected ? (SEVERITY_BY_STATUS[payload.status] ?? patient.severity) : patient.severity,
+                },
+          ),
+        );
+      },
+      onConnectionChange: setRealtime,
+    });
+  }, []);
+
+  const wardTabs = useMemo(() => {
+    const counts = patients.reduce((acc, patient) => {
+      acc[patient.ward] = (acc[patient.ward] ?? 0) + 1;
+      return acc;
+    }, {});
+    return [
+      { name: "전체", count: patients.length },
+      ...Object.entries(counts).map(([name, count]) => ({ name, count })),
+    ];
+  }, [patients]);
+
+  const wardPatients = useMemo(() => {
+    const filtered = activeWard === "전체" ? patients : patients.filter((patient) => patient.ward === activeWard);
+    const order = { emergency: 0, warning: 1, caution: 2, normal: 3, offline: 4 };
+    return [...filtered].sort((a, b) => order[a.severity] - order[b.severity]);
+  }, [patients, activeWard]);
 
   return (
     <div className="realtime-monitoring flex min-h-screen bg-[#F5F7FA]">
@@ -144,11 +214,18 @@ function RealtimeMonitoring() {
         <div className="flex flex-col gap-5 p-6">
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div className="flex flex-col gap-1">
-              <h1 className="text-2xl font-bold text-[#1E2A3A]">실시간 모니터링 · 3병동</h1>
+              <h1 className="text-2xl font-bold text-[#1E2A3A]">실시간 모니터링{activeWard !== "전체" ? ` · ${activeWard}` : ""}</h1>
               <p className="text-[13px] text-[#5A6B80]">위험 환자 우선 정렬 · 자동 갱신</p>
             </div>
 
             <div className="flex flex-wrap items-center gap-5">
+              <div className="flex items-center gap-2">
+                <span className={`h-2 w-2 rounded-full ${realtime ? "bg-[#2FA35C]" : "bg-[#E8A13B]"}`} aria-hidden="true" />
+                <span className="text-xs font-bold tracking-wide text-[#5A6B80]">
+                  {realtime ? "실시간 연결됨" : "재연결 중"}
+                </span>
+              </div>
+
               <div className="flex items-center gap-2 rounded-lg border border-[#DCE3EC] bg-white px-[14px] py-2">
                 <Icon name="clock-3" size={15} className="text-[#5A6B80]" />
                 <span className="text-[13px] font-semibold text-[#1E2A3A]">{formatWardClock(now)}</span>
@@ -165,8 +242,12 @@ function RealtimeMonitoring() {
             </div>
           </div>
 
+          {error && (
+            <p className="rounded-lg bg-[#FDEDEA] px-3 py-2 text-xs font-semibold text-[#E0442E]">{error}</p>
+          )}
+
           <div className="flex flex-wrap items-center gap-[10px]">
-            {WARDS.map((ward) => {
+            {wardTabs.map((ward) => {
               const isActive = ward.name === activeWard;
               return (
                 <button
@@ -190,11 +271,17 @@ function RealtimeMonitoring() {
             })}
           </div>
 
-          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-4">
-            {PATIENTS.map((patient) => (
-              <MonitorCard key={patient.name} patient={patient} />
-            ))}
-          </div>
+          {wardPatients.length > 0 ? (
+            <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-4">
+              {wardPatients.map((patient) => (
+                <MonitorCard key={patient.id} patient={patient} />
+              ))}
+            </div>
+          ) : (
+            <div className="flex flex-col items-center justify-center gap-2 rounded-xl border border-[#DCE3EC] bg-white p-10 text-center shadow-[0_2px_3px_rgba(30,42,58,0.08)]">
+              <p className="text-sm font-semibold text-[#5A6B80]">해당 병동에 모니터링 중인 환자가 없습니다.</p>
+            </div>
+          )}
         </div>
       </div>
     </div>
