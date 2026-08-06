@@ -50,21 +50,48 @@ function formatRelative(iso) {
   return date.toLocaleDateString("ko-KR");
 }
 
+// 범위(1h/6h/24h)를 20등분한 구간별 평균으로 재집계한다.
+// vital_logs는 1분 평균이라 24시간 범위면 최대 1440개 점이 나오는데,
+// 그대로 찍으면 차트가 너무 빽빽해져서 구간 길이와 무관하게 20개 점으로 고정한다.
+const CHART_BUCKET_COUNT = 20;
+
+function bucketize(filtered, valueKey, windowMs, now) {
+  const bucketMs = windowMs / CHART_BUCKET_COUNT;
+  const windowStart = now - windowMs;
+  const buckets = Array.from({ length: CHART_BUCKET_COUNT }, () => []);
+
+  for (const log of filtered) {
+    const time = new Date(log.recorded_at).getTime();
+    const index = Math.min(CHART_BUCKET_COUNT - 1, Math.floor((time - windowStart) / bucketMs));
+    if (index >= 0) buckets[index].push(log);
+  }
+
+  const points = [];
+  buckets.forEach((bucketLogs, index) => {
+    if (bucketLogs.length === 0) return;
+    const avg = bucketLogs.reduce((sum, log) => sum + log[valueKey], 0) / bucketLogs.length;
+    const lastLog = bucketLogs[bucketLogs.length - 1];
+    points.push({ value: Math.round(avg * 10) / 10, label: formatClock(lastLog.recorded_at), bucketIndex: index });
+  });
+  return points;
+}
+
 function buildRanges(logs, valueKey, defaultMin, defaultMax) {
   const now = Date.now();
   const ranges = {};
   for (const label of RANGE_OPTIONS) {
     const windowMs = RANGE_WINDOW_MS[label];
     const filtered = logs.filter((log) => now - new Date(log.recorded_at).getTime() <= windowMs);
-    const values = filtered.length > 0 ? filtered.map((log) => log[valueKey]) : [defaultMin, defaultMax];
+    const points = bucketize(filtered, valueKey, windowMs, now);
+    const values = points.length > 0 ? points.map((point) => point.value) : [defaultMin, defaultMax];
     const min = Math.min(defaultMin, ...values);
     const max = Math.max(defaultMax, ...values);
     ranges[label] = {
-      xAxisLabels: filtered.length > 0 ? filtered.map((log) => formatClock(log.recorded_at)) : ["-"],
+      xAxisLabels: points.length > 0 ? points.map((point) => point.label) : ["-"],
       data: values,
       min,
       max,
-      markerIndex: filtered.length > 0 ? filtered.length - 1 : null,
+      markerIndex: points.length > 0 ? points.length - 1 : null,
     };
   }
   return ranges;
