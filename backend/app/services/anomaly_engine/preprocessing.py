@@ -29,6 +29,13 @@ class SensorPreprocessor:
         frame["timestamp"] = pd.to_datetime(frame["timestamp"], errors="coerce")
         if frame["timestamp"].isna().any():
             raise ValueError("timestamp contains invalid values")
+        # 실시간 수집값은 정확히 1.000000초 간격이 아니라 datetime.now() 호출 시점의
+        # 미세한 잔차(1.000117초, 1.000408초...)가 섞여 있다. 아래 _process_subject가
+        # 1초 격자에 정확히 일치하는 timestamp만 남기고 나머지를 결측으로 처리하므로,
+        # 반올림 없이 넘기면 거의 모든 행이 결측 처리되어 presence_ratio가 0에
+        # 수렴하고 예측 모델이 상시 "데이터 부족"으로 빠진다. 초 단위로 반올림해
+        # 실제 1초 간격 수집과 격자를 맞춘다.
+        frame["timestamp"] = frame["timestamp"].dt.round("1s")
         for column in MEASURE_COLUMNS + ["presence"]:
             frame[column] = pd.to_numeric(frame[column], errors="coerce")
         frame = frame.sort_values(["subject_id", "timestamp"])
