@@ -47,9 +47,7 @@ function Notifications() {
   };
 
   const handleMarkAllRead = () => {
-    Promise.all(
-      notifications.filter((item) => !item.is_read).map((item) => apiClient.patch(`/alerts/${item.alert_id}/read`)),
-    ).then(loadNotifications);
+    apiClient.patch("/alerts/read-all").then(loadNotifications);
   };
 
   return (
