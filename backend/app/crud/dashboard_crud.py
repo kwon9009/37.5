@@ -135,7 +135,7 @@ def get_recent_alerts(
             {
                 "alert_id": alert.alert_id,
                 "patient_name": patient.name,
-                "room": f"{patient.room_num}호 · B-{patient.bed_num}",
+                "room": f"{patient.room_num}호 · {patient.bed_num}번",
                 "message": alert.message,
                 "is_read": alert.is_read,
                 "sent_at": alert.sent_at,

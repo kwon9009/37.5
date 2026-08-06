@@ -5,7 +5,7 @@ import Header from "../../components/header/header.jsx";
 import Icon from "../../components/icon/icon.jsx";
 import StatusBadge from "../../components/status-badge/status-badge.jsx";
 import { apiClient } from "../../api/client.js";
-import { openVitalStream } from "../../api/vital-stream.js";
+import { useVitalStream, pollInterval } from "../../api/use-vital-stream.js";
 
 const LEGEND = [
   { label: "응급", color: "#E0442E" },
@@ -13,6 +13,9 @@ const LEGEND = [
   { label: "주의", color: "#E8A13B" },
   { label: "정상", color: "#2FA35C" },
 ];
+
+// 위험한 환자가 위로 오도록 정렬
+const SEVERITY_ORDER = { emergency: 0, warning: 1, caution: 2, normal: 3, offline: 4 };
 
 // 서버 등급(NEWS2 판정 결과) -> 화면 심각도. SSE 스트림은 대문자 enum 값을 그대로 보낸다.
 const SEVERITY_BY_STATUS = {
@@ -22,34 +25,29 @@ const SEVERITY_BY_STATUS = {
   DANGER: "emergency",
 };
 
-// 스트림이 살아있으면 느리게, 끊겼으면 빠르게 다시 불러온다(폴백)
-const POLL_SLOW_MS = 30000;
-const POLL_FAST_MS = 5000;
+function toMonitorCard(item) {
+  const connected = item.device_status === "ACTIVE";
+  const severity = SEVERITY_BY_STATUS[item.vital_status] ?? "normal";
+  return {
+    id: item.patient_id,
+    name: item.name,
+    ward: item.ward,
+    room: item.room,
+    // 센서가 끊기면 생체값 대신 '센서 확인 필요'를 보여준다
+    severity: connected ? severity : "offline",
+    onlineSeverity: severity,
+    heartRate: item.heart_rate,
+    respirationRate: item.resp_rate,
+    present: item.is_present,
+    connected,
+    battery: null, // 장치 배터리는 아직 서버가 내려주지 않는다
+  };
+}
 
 const CARD_STYLE = {
   emergency: { background: "#FDEDEA", borderColor: "#E0442E", borderWidth: 2 },
   offline: { background: "#EDF1F6", borderColor: "#DCE3EC", borderWidth: 1 },
 };
-
-// GET /dashboard/patients의 room은 "3층 A병동 · 305호 · 2번" 형태라 앞부분이 병동명이다.
-function wardOf(room) {
-  return room?.split(" · ")[0] ?? "미배정";
-}
-
-function toMonitorPatient(item) {
-  const isOffline = item.sensor_status !== "연결됨";
-  return {
-    id: item.patient_id,
-    name: item.name,
-    room: item.room,
-    ward: wardOf(item.room),
-    severity: isOffline ? "offline" : item.severity,
-    heartRate: item.heart_rate,
-    respirationRate: item.respiration_rate,
-    connected: !isOffline,
-    sensorStatus: item.sensor_status,
-  };
-}
 
 function formatWardClock(date) {
   const datePart = new Intl.DateTimeFormat("ko-KR", { year: "numeric", month: "long", day: "numeric", weekday: "short" }).format(date);
@@ -101,7 +99,7 @@ function MonitorCard({ patient }) {
             </div>
             <div className="flex items-end gap-[3px]">
               <span className="text-[30px] font-extrabold leading-none" style={{ color: valueColor }}>
-                {patient.heartRate}
+                {patient.heartRate ?? "--"}
               </span>
               <span className="pb-[2px] text-[11px] text-[#5A6B80]">bpm</span>
             </div>
@@ -113,7 +111,7 @@ function MonitorCard({ patient }) {
             </div>
             <div className="flex items-end gap-[3px]">
               <span className="text-[30px] font-extrabold leading-none" style={{ color: valueColor }}>
-                {patient.respirationRate}
+                {patient.respirationRate ?? "--"}
               </span>
               <span className="pb-[2px] text-[11px] text-[#5A6B80]">회/분</span>
             </div>
@@ -133,76 +131,75 @@ function MonitorCard({ patient }) {
 
 function RealtimeMonitoring() {
   const [activeWard, setActiveWard] = useState("전체");
-  const [now, setNow] = useState(() => new Date());
+  const [wards, setWards] = useState([]);
   const [patients, setPatients] = useState([]);
+  const [now, setNow] = useState(() => new Date());
   const [error, setError] = useState("");
-  const [realtime, setRealtime] = useState(false);
 
   useEffect(() => {
-    const interval = setInterval(() => setNow(new Date()), 1000 * 30);
+    const interval = setInterval(() => setNow(new Date()), 1000);
     return () => clearInterval(interval);
   }, []);
 
+  // 센서 값이 서버에 도착하는 즉시 해당 환자 카드만 갈아끼운다(새로고침 불필요)
+  const realtime = useVitalStream({
+    scope: "department",
+    onVitals: (payload) => {
+      setPatients((current) =>
+        current.map((patient) =>
+          patient.id !== payload.patient_id
+            ? patient
+            : {
+                ...patient,
+                // null이면 이번엔 갱신할 값이 없다는 뜻이라 직전 값을 유지한다
+                heartRate: payload.heart_rate ?? patient.heartRate,
+                respirationRate: payload.resp_rate ?? patient.respirationRate,
+                onlineSeverity: SEVERITY_BY_STATUS[payload.status] ?? patient.onlineSeverity,
+                severity: patient.connected
+                  ? (SEVERITY_BY_STATUS[payload.status] ?? patient.severity)
+                  : "offline",
+                present: payload.presence,
+              },
+        ),
+      );
+    },
+  });
+
+  // 환자 등록·센서 연결 상태처럼 스트림으로 오지 않는 값을 주기적으로 따라잡는다
   useEffect(() => {
     let cancelled = false;
 
-    async function loadPatients() {
-      try {
-        const { data } = await apiClient.get("/dashboard/patients");
-        if (cancelled) return;
-        setError("");
-        setPatients(data.map(toMonitorPatient));
-      } catch {
-        if (!cancelled) setError("환자 목록을 불러오지 못했습니다.");
-      }
+    function load() {
+      apiClient
+        .get("/monitoring")
+        .then(({ data }) => {
+          if (cancelled) return;
+          setError("");
+          setWards(data.wards.map((item) => ({ name: item.ward, count: item.count })));
+          setPatients(data.patients.map(toMonitorCard));
+        })
+        .catch(() => {
+          if (!cancelled) setError("환자 목록을 불러오지 못했습니다.");
+        });
     }
 
-    loadPatients();
-    const timer = setInterval(loadPatients, realtime ? POLL_SLOW_MS : POLL_FAST_MS);
+    load();
+    const timer = setInterval(load, pollInterval(realtime));
     return () => {
       cancelled = true;
       clearInterval(timer);
     };
   }, [realtime]);
 
-  // 심박·호흡은 서버가 값을 받는 즉시 밀어준다(폴링 간격을 기다리지 않음)
-  useEffect(() => {
-    return openVitalStream({
-      scope: "department",
-      onVitals: (payload) => {
-        setPatients((prev) =>
-          prev.map((patient) =>
-            patient.id !== payload.patient_id
-              ? patient
-              : {
-                  ...patient,
-                  heartRate: payload.heart_rate ?? patient.heartRate,
-                  respirationRate: payload.resp_rate ?? patient.respirationRate,
-                  severity: patient.connected ? (SEVERITY_BY_STATUS[payload.status] ?? patient.severity) : patient.severity,
-                },
-          ),
-        );
-      },
-      onConnectionChange: setRealtime,
-    });
-  }, []);
+  const wardTabs = useMemo(() => [{ name: "전체", count: patients.length }, ...wards], [patients, wards]);
 
-  const wardTabs = useMemo(() => {
-    const counts = patients.reduce((acc, patient) => {
-      acc[patient.ward] = (acc[patient.ward] ?? 0) + 1;
-      return acc;
-    }, {});
-    return [
-      { name: "전체", count: patients.length },
-      ...Object.entries(counts).map(([name, count]) => ({ name, count })),
-    ];
-  }, [patients]);
-
-  const wardPatients = useMemo(() => {
-    const filtered = activeWard === "전체" ? patients : patients.filter((patient) => patient.ward === activeWard);
-    const order = { emergency: 0, warning: 1, caution: 2, normal: 3, offline: 4 };
-    return [...filtered].sort((a, b) => order[a.severity] - order[b.severity]);
-  }, [patients, activeWard]);
+  const visiblePatients = useMemo(
+    () =>
+      patients
+        .filter((patient) => activeWard === "전체" || patient.ward === activeWard)
+        .sort((a, b) => SEVERITY_ORDER[a.severity] - SEVERITY_ORDER[b.severity]),
+    [patients, activeWard],
+  );
 
   return (
     <div className="realtime-monitoring flex min-h-screen bg-[#F5F7FA]">
@@ -271,15 +268,15 @@ function RealtimeMonitoring() {
             })}
           </div>
 
-          {wardPatients.length > 0 ? (
+          {visiblePatients.length > 0 ? (
             <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-4">
-              {wardPatients.map((patient) => (
+              {visiblePatients.map((patient) => (
                 <MonitorCard key={patient.id} patient={patient} />
               ))}
             </div>
           ) : (
             <div className="flex flex-col items-center justify-center gap-2 rounded-xl border border-[#DCE3EC] bg-white p-10 text-center shadow-[0_2px_3px_rgba(30,42,58,0.08)]">
-              <p className="text-sm font-semibold text-[#5A6B80]">해당 병동에 모니터링 중인 환자가 없습니다.</p>
+              <p className="text-sm font-semibold text-[#5A6B80]">모니터링 중인 환자가 없습니다.</p>
             </div>
           )}
         </div>

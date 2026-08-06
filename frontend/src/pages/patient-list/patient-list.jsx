@@ -7,6 +7,7 @@ import PresenceBadge from "../../components/presence-badge/presence-badge.jsx";
 import StatusBadge from "../../components/status-badge/status-badge.jsx";
 import PatientRegisterModal from "../../components/modals/patient-register-modal/patient-register-modal.jsx";
 import { apiClient } from "../../api/client.js";
+import { useVitalStream, pollInterval } from "../../api/use-vital-stream.js";
 
 const SEVERITY_CHIPS = [
   { key: "normal", label: "정상", color: "#2FA35C" },
@@ -24,6 +25,15 @@ const VITAL_STATUS_TO_SEVERITY = {
 
 const GENDER_LABEL = { MALE: "남", FEMALE: "여" };
 
+const PRESENT = { label: "재실중", color: "#2FA35C" };
+const ABSENT = { label: "부재중", color: "#5A6B80" };
+const DISCHARGED = { label: "퇴원", color: "#5A6B80" };
+
+function toClock(value) {
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? "-" : date.toLocaleTimeString("ko-KR", { hour12: false });
+}
+
 function toPatientRow(item) {
   const room = `${item.room_num}호`;
   return {
@@ -32,15 +42,13 @@ function toPatientRow(item) {
     gender: GENDER_LABEL[item.gender] ?? item.gender,
     birthDate: item.birthdate,
     room,
-    presence:
-      item.patient_status === "DISCHARGED"
-        ? { label: "퇴원", color: "#5A6B80" }
-        : { label: "재실중", color: "#2FA35C" },
+    discharged: item.patient_status === "DISCHARGED",
+    presence: item.patient_status === "DISCHARGED" ? DISCHARGED : PRESENT,
     severity: VITAL_STATUS_TO_SEVERITY[item.vital_status] ?? "normal",
     heartRate: item.heart_rate ?? "--",
     respirationRate: item.resp_rate ?? "--",
     nurse: item.department_name,
-    lastUpdate: item.updated_at ? new Date(item.updated_at).toLocaleTimeString("ko-KR", { hour12: false }) : "-",
+    lastUpdate: item.updated_at ? toClock(item.updated_at) : "-",
   };
 }
 
@@ -52,12 +60,49 @@ function PatientList() {
   const [roomTab, setRoomTab] = useState("전체");
   const [isRegisterOpen, setIsRegisterOpen] = useState(false);
 
+  // 센서 값이 서버에 도착하는 즉시 해당 환자 줄만 갈아끼운다(새로고침 불필요)
+  const realtime = useVitalStream({
+    scope: "department",
+    onVitals: (payload) => {
+      setPatients((current) =>
+        current.map((patient) =>
+          patient.id !== payload.patient_id
+            ? patient
+            : {
+                ...patient,
+                // null이면 이번엔 갱신할 값이 없다는 뜻이라 직전 값을 유지한다
+                heartRate: payload.heart_rate ?? patient.heartRate,
+                respirationRate: payload.resp_rate ?? patient.respirationRate,
+                severity: VITAL_STATUS_TO_SEVERITY[payload.status] ?? patient.severity,
+                presence: patient.discharged ? DISCHARGED : payload.presence ? PRESENT : ABSENT,
+                lastUpdate: toClock(payload.measured_at),
+              },
+        ),
+      );
+    },
+  });
+
+  // 스트림으로 오지 않는 것(환자 등록/퇴원 등)을 따라잡기 위한 주기 갱신.
+  // 스트림이 끊기면 이 주기가 빨라져 폴링만으로도 화면이 돈다.
   useEffect(() => {
-    apiClient
-      .get("/patients")
-      .then(({ data }) => setPatients(data.patients.map(toPatientRow)))
-      .catch(() => {});
-  }, []);
+    let cancelled = false;
+
+    function load() {
+      apiClient
+        .get("/patients")
+        .then(({ data }) => {
+          if (!cancelled) setPatients(data.patients.map(toPatientRow));
+        })
+        .catch(() => {});
+    }
+
+    load();
+    const timer = setInterval(load, pollInterval(realtime));
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+    };
+  }, [realtime]);
 
   const roomTabs = useMemo(() => ["전체", ...Array.from(new Set(patients.map((patient) => patient.room)))], [patients]);
 
@@ -76,12 +121,13 @@ function PatientList() {
         gender: form.gender,
         birthDate: form.birthDate || "-",
         room,
-        presence: { label: "재실중", color: "#2FA35C" },
+        discharged: false,
+        presence: PRESENT,
         severity: "normal",
         heartRate: "--",
         respirationRate: "--",
         nurse: "-",
-        lastUpdate: new Date().toLocaleTimeString("ko-KR", { hour12: false }),
+        lastUpdate: toClock(new Date()),
         specialNotes: form.special_notes || "",
       },
       ...current,
@@ -109,7 +155,15 @@ function PatientList() {
         <div className="flex flex-col gap-6 p-6">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <h1 className="text-2xl font-bold text-[#1E2A3A]">환자 목록</h1>
-            <p className="text-sm text-[#5A6B80]">총 {patients.length}명 모니터링 중</p>
+            <div className="flex items-center gap-2">
+              <span
+                className={`h-2 w-2 rounded-full ${realtime ? "bg-[#2FA35C]" : "bg-[#E8A13B]"}`}
+                aria-hidden="true"
+              />
+              <p className="text-sm text-[#5A6B80]">
+                총 {patients.length}명 모니터링 중 · {realtime ? "실시간 연결됨" : "재연결 중"}
+              </p>
+            </div>
           </div>
 
           <div className="flex flex-wrap items-center justify-between gap-4">

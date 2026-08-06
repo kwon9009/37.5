@@ -8,6 +8,7 @@ from app.models.enums import HospitalRequestStatus
 class HospitalRequestResponse(BaseModel):
     hospital_request_id: int
     hospital_name: str
+    area: str
     address: str
     bed_count: int
     status: HospitalRequestStatus

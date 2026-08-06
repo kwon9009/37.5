@@ -18,6 +18,9 @@ class HospitalRequest(BaseModel):
 
     hospital_name: Mapped[str] = mapped_column(String(50), nullable=False)
 
+    # 승인되면 hospitals.area로 그대로 복사된다.
+    area: Mapped[str] = mapped_column(String(20), nullable=False)
+
     address: Mapped[str] = mapped_column(String(255), nullable=False)
 
     bed_count: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("0"))

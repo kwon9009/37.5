@@ -8,6 +8,7 @@ import PresenceBadge from "../../components/presence-badge/presence-badge.jsx";
 import SpecialNoteTag from "../../components/special-note-tag/special-note-tag.jsx";
 import SpecialNoteChips from "../../components/special-note-chips/special-note-chips.jsx";
 import { apiClient } from "../../api/client.js";
+import { useVitalStream, pollInterval } from "../../api/use-vital-stream.js";
 import { composeSpecialNotes, parseSpecialNotes, splitForEditing } from "../../lib/special-notes.js";
 
 const RANGE_OPTIONS = ["1시간", "6시간", "24시간"];
@@ -150,22 +151,58 @@ function PatientDetail() {
   const [noteOtherText, setNoteOtherText] = useState("");
   const [noteSaveError, setNoteSaveError] = useState("");
   const [isSavingNotes, setIsSavingNotes] = useState(false);
+  // 스트림으로 들어온 현재 생체값. 주기 조회 결과가 덮어쓰지 않도록 따로 들고 있는다.
+  const [liveVital, setLiveVital] = useState(null);
+
+  // 이 환자의 값이 서버에 도착하는 즉시 화면에 반영한다(새로고침 불필요)
+  const realtime = useVitalStream({
+    scope: "patient",
+    patientId,
+    onVitals: (payload) => {
+      setLiveVital((previous) => ({
+        // null이면 이번엔 갱신할 값이 없다는 뜻이라 직전 값을 유지한다
+        heart_rate: payload.heart_rate ?? previous?.heart_rate ?? null,
+        resp_rate: payload.resp_rate ?? previous?.resp_rate ?? null,
+        status: payload.status ?? previous?.status ?? null,
+        presence: payload.presence,
+        measured_at: payload.measured_at,
+      }));
+    },
+  });
 
   useEffect(() => {
     if (!patientId) return;
-    Promise.all([
-      apiClient.get(`/patients/${patientId}`),
-      apiClient.get(`/patients/${patientId}/vital-logs`),
-      apiClient.get(`/patients/${patientId}/alerts`),
-      apiClient.get(`/patients/${patientId}/emergency-logs`),
-    ])
-      .then(([detailRes, vitalLogsRes, alertsRes, emergencyLogsRes]) => {
-        setDetail(detailRes.data);
-        setVitalLogs(vitalLogsRes.data.vital_logs);
-        setAlerts(alertsRes.data.alerts);
-        setEmergencyLogs(emergencyLogsRes.data.emergency_logs);
-      })
-      .catch(() => {});
+    let cancelled = false;
+
+    function load() {
+      Promise.all([
+        apiClient.get(`/patients/${patientId}`),
+        apiClient.get(`/patients/${patientId}/vital-logs`),
+        apiClient.get(`/patients/${patientId}/alerts`),
+        apiClient.get(`/patients/${patientId}/emergency-logs`),
+      ])
+        .then(([detailRes, vitalLogsRes, alertsRes, emergencyLogsRes]) => {
+          if (cancelled) return;
+          setDetail(detailRes.data);
+          setVitalLogs(vitalLogsRes.data.vital_logs);
+          setAlerts(alertsRes.data.alerts);
+          setEmergencyLogs(emergencyLogsRes.data.emergency_logs);
+        })
+        .catch(() => {});
+    }
+
+    load();
+    // 이력·알림처럼 스트림으로 오지 않는 값만 주기적으로 따라잡는다
+    const timer = setInterval(load, pollInterval(realtime));
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+    };
+  }, [patientId, realtime]);
+
+  // 화면이 바뀌면 이전 환자의 값이 잠깐 남지 않도록 비운다
+  useEffect(() => {
+    setLiveVital(null);
   }, [patientId]);
 
   if (!detail) {
@@ -180,9 +217,16 @@ function PatientDetail() {
     );
   }
 
-  const { patient, guardian, device_serial: deviceSerial, current_vital: currentVital } = detail;
+  const { patient, guardian, device_serial: deviceSerial, current_vital: storedVital } = detail;
   const age = calcAge(patient.birth_date);
-  const severity = VITAL_STATUS_TO_SEVERITY[alerts[0]?.status] ?? "normal";
+
+  // 실시간으로 들어온 값이 있으면 그걸 우선 보여준다(주기 조회보다 항상 최신)
+  const currentVital = liveVital ?? storedVital;
+
+  // 상태 배지도 실시간 판정 결과를 따라간다.
+  // 스트림이 없을 때만 기존처럼 최근 알림 기준으로 보여준다.
+  const severity =
+    VITAL_STATUS_TO_SEVERITY[liveVital?.status ?? storedVital?.status ?? alerts[0]?.status] ?? "normal";
   const specialNoteTags = parseSpecialNotes(patient.special_notes);
 
   const openNotesEditor = () => {
@@ -252,10 +296,21 @@ function PatientDetail() {
         <Header />
 
         <div className="flex flex-col gap-6 p-6">
-          <Link to="/patients" className="flex w-fit items-center gap-[6px] text-[#2B6FE3]">
-            <Icon name="chevron-left" size={16} />
-            <span className="text-sm font-semibold">환자 목록으로</span>
-          </Link>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <Link to="/patients" className="flex w-fit items-center gap-[6px] text-[#2B6FE3]">
+              <Icon name="chevron-left" size={16} />
+              <span className="text-sm font-semibold">환자 목록으로</span>
+            </Link>
+            <div className="flex items-center gap-2">
+              <span
+                className={`h-2 w-2 rounded-full ${realtime ? "bg-[#2FA35C]" : "bg-[#E8A13B]"}`}
+                aria-hidden="true"
+              />
+              <span className="text-xs font-bold tracking-wide text-[#5A6B80]">
+                {realtime ? "실시간 연결됨" : "재연결 중"}
+              </span>
+            </div>
+          </div>
 
           <div className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-[#DCE3EC] bg-white p-5 shadow-[0_2px_3px_rgba(30,42,58,0.08)]">
             <div className="flex items-center gap-4">

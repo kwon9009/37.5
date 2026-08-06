@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { useNavigate } from "react-router-dom"
 import { User, FileText, LogOut, ChevronRight, VolumeX, Volume1, Volume2, X } from "lucide-react"
 import { Screen, TopBar } from "@/guardian/components/Screen"
@@ -14,12 +14,35 @@ const soundLevels = [
   { key: "high", label: "크게", Icon: Volume2 },
 ]
 
+// 알림 소리는 기기별 설정이라 서버가 아니라 이 폰에만 저장한다.
+// (병원에서는 무음, 집에서는 크게처럼 기기마다 다르게 두는 게 자연스럽다)
+const SOUND_KEY = "guardian.alertSound"
+const DEFAULT_SOUND = "mid"
+
+function readSavedSound(): string {
+  try {
+    const saved = localStorage.getItem(SOUND_KEY)
+    return soundLevels.some((l) => l.key === saved) ? (saved as string) : DEFAULT_SOUND
+  } catch {
+    // 사생활 보호 모드 등으로 localStorage를 못 쓰면 기본값으로 동작한다
+    return DEFAULT_SOUND
+  }
+}
+
 export default function Settings() {
   const navigate = useNavigate()
   const logout = useAuthStore((state) => state.logout)
   const { patient } = useGuardianData()
-  const [sound, setSound] = useState("mid")
+  const [sound, setSound] = useState(readSavedSound)
   const current = soundLevels.find((l) => l.key === sound) ?? soundLevels[2]
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(SOUND_KEY, sound)
+    } catch {
+      // 저장에 실패해도 이번 실행 동안은 선택한 소리로 동작한다
+    }
+  }, [sound])
 
   // 이용약관 및 정책 - 회원가입 동의 화면과 별개로, 전문을 팝업으로 보여주기만 함
   const [termsOpen, setTermsOpen] = useState(false)

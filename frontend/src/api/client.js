@@ -35,6 +35,7 @@ const FIELD_LABEL = {
   password: "비밀번호",
   name: "이름",
   phone: "휴대전화 번호",
+  area: "지역",
   address: "주소",
   bed_count: "병상 수",
 };

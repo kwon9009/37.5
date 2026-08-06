@@ -4,13 +4,12 @@ import { AlertCircle, CheckCircle2, Check, ChevronDown } from "lucide-react"
 import { Screen, TopBar, StickyAction } from "@/guardian/components/Screen"
 import { Button, Field } from "@/guardian/components/ui"
 import { cn } from "@/guardian/lib/utils"
+import { apiClient, getErrorMessage } from "@/api/client.js"
+import { useAuthStore } from "@/store/auth-store.js"
 import "@/guardian/verify.css"
 
-// 데모용 정답 인증번호
+// 데모용 정답 인증번호 (실제 문자 발송 수단이 없어 화면 흐름만 재현한다)
 const DEMO_CODE = "123456"
-
-// 데모용 이미 사용 중인 아이디
-const TAKEN_IDS = ["admin", "test", "user123", "hong", "guardian"]
 
 // 본인인증용 통신사 목록
 const CARRIERS = ["SKT", "KT", "LG U+", "알뜰폰(SKT)", "알뜰폰(KT)", "알뜰폰(LG U+)"]
@@ -23,6 +22,7 @@ const pwRules = [
 
 export default function Signup() {
   const navigate = useNavigate()
+  const login = useAuthStore((s) => s.login)
 
   // 인증 상태
   const [phoneSent, setPhoneSent] = useState(false)
@@ -46,10 +46,16 @@ export default function Signup() {
   const [phoneWarning, setPhoneWarning] = useState("")
   const [phoneShake, setPhoneShake] = useState(false)
 
+  // 이메일 상태 (비밀번호 찾기·응급 알림 대체 수단)
+  const [email, setEmail] = useState("")
+  const [emailWarning, setEmailWarning] = useState("")
+  const [emailShake, setEmailShake] = useState(false)
+
   // 아이디 상태 (중복검사)
   const [userid, setUserid] = useState("")
-  const [useridStatus, setUseridStatus] = useState<"idle" | "ok" | "taken" | "invalid">("idle")
+  const [useridStatus, setUseridStatus] = useState<"idle" | "ok" | "taken" | "invalid" | "empty">("idle")
   const [useridShake, setUseridShake] = useState(false)
+  const [useridChecking, setUseridChecking] = useState(false)
 
   // 비밀번호 상태
   const [pw, setPw] = useState("")
@@ -57,12 +63,18 @@ export default function Signup() {
   const [pwShake, setPwShake] = useState(false)
   const [pwWarning, setPwWarning] = useState("")
 
+  // 가입 요청 상태
+  const [submitting, setSubmitting] = useState(false)
+  const [submitError, setSubmitError] = useState("")
+
   const pwValid = pwRules.every((r) => r.test(pw))
 
   // 성명: 미입력 시 안내, 완성된 한글(가-힣)만 허용. 자모/영문/숫자 포함 시 진동 + 삭제
   function handleNameBlur() {
     if (!name) {
       setNameWarning("성명을 입력해주세요.")
+      // 다른 오류(형식 오류·연락처·아이디)와 동일하게 흔들림 모션으로 알림
+      setNameShake(true)
       return
     }
     if (!/^[가-힣]{2,}$/.test(name)) {
@@ -98,21 +110,33 @@ export default function Signup() {
     }
   }
 
-  // 아이디: 중복검사 (형식 검사 + 사용 여부 확인)
+  // 아이디: 중복검사 (형식 검사 + 서버에 사용 여부 확인)
   // 규칙: 영문과 숫자를 모두 포함, 최소 6자 이상
-  function handleUseridCheck() {
+  async function handleUseridCheck() {
     if (!/^(?=.*[a-zA-Z])(?=.*[0-9])[a-zA-Z0-9]{6,20}$/.test(userid)) {
       setUseridStatus("invalid")
       setUseridShake(true)
       return
     }
-    if (TAKEN_IDS.includes(userid.toLowerCase())) {
-      setUseridStatus("taken")
-      setUseridShake(true)
-      setUserid("")
-      return
+
+    setUseridChecking(true)
+    try {
+      const { data } = await apiClient.get("/auth/check-login-id", { params: { login_id: userid } })
+      if (data.available) {
+        setUseridStatus("ok")
+      } else {
+        setUseridStatus("taken")
+        setUseridShake(true)
+        setUserid("")
+      }
+    } catch {
+      // 서버에 못 물어봤으면 '사용 가능'으로 넘기면 안 된다.
+      // 가입 단계에서 어차피 한 번 더 막히므로 여기서는 확인만 실패로 둔다.
+      setUseridStatus("idle")
+      setSubmitError("아이디 중복 확인에 실패했습니다. 잠시 후 다시 시도해 주세요.")
+    } finally {
+      setUseridChecking(false)
     }
-    setUseridStatus("ok")
   }
 
   // 인증번호: 숫자만 입력, 숫자 외 입력 시 경고
@@ -146,12 +170,45 @@ export default function Signup() {
     setCodeWarning("")
   }
 
-  function handleSubmit(e: React.FormEvent) {
+  // 미입력 검사는 브라우저 기본 말풍선("이 입력란을 작성하세요") 대신
+  // 화면 위에서 아래 순서대로 앱 경고 문구를 띄운다. 그래서 input 에 required 를 쓰지 않는다.
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
+    setSubmitError("")
     // 성명 미입력 시 안내 문구 표시
     if (!name) {
       setNameWarning("성명을 입력해주세요.")
       setNameShake(true)
+      return
+    }
+    if (!carrier) {
+      setCarrierWarning("통신사를 선택해 주세요.")
+      setCarrierOpen(true)
+      return
+    }
+    if (!phone) {
+      setPhoneWarning("연락처를 입력해주세요.")
+      setPhoneShake(true)
+      return
+    }
+    if (!email) {
+      setEmailWarning("이메일을 입력해주세요.")
+      setEmailShake(true)
+      return
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      setEmailWarning("이메일 형식이 올바르지 않습니다.")
+      setEmailShake(true)
+      return
+    }
+    if (!userid) {
+      setUseridStatus("empty")
+      setUseridShake(true)
+      return
+    }
+    if (!pw || !pw2) {
+      setPwWarning("비밀번호를 입력해주세요.")
+      setPwShake(true)
       return
     }
     // 비밀번호 요구사항 미충족 시 진동 + 입력값 삭제
@@ -169,14 +226,54 @@ export default function Signup() {
       return
     }
     setPwWarning("")
-    navigate("/guardian/patient-info")
+
+    // 여기서부터 실제 가입. 성공하면 바로 로그인까지 해서
+    // 환자 등록 화면에서 다시 로그인하라고 하지 않는다.
+    setSubmitting(true)
+    try {
+      await apiClient.post("/auth/register/guardian", {
+        login_id: userid,
+        email,
+        password: pw,
+        name,
+        phone,
+      })
+
+      const { data } = await apiClient.post("/auth/login", {
+        login_id: userid,
+        password: pw,
+      })
+
+      login(
+        {
+          accessToken: data.access_token,
+          userId: data.user_id,
+          role: data.role,
+          loginId: userid,
+        },
+        false,
+      )
+
+      navigate("/guardian/patient-info", { replace: true })
+    } catch (err) {
+      setSubmitError(getErrorMessage(err, "회원가입 중 오류가 발생했습니다."))
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   return (
     <Screen>
       <TopBar title="회원가입" back />
       <form className="flex flex-1 flex-col overflow-hidden" onSubmit={handleSubmit}>
-        <StickyAction className="space-y-5 px-5 py-6" action={<Button type="submit">다음</Button>}>
+        <StickyAction
+          className="space-y-5 px-5 py-6"
+          action={
+            <Button type="submit" disabled={submitting}>
+              {submitting ? "가입 중..." : "다음"}
+            </Button>
+          }
+        >
           <div>
             <h2 className="text-lg font-bold text-foreground">계정 정보를 입력해 주세요</h2>
             <p className="mt-1 text-sm text-muted-foreground">보호자 본인 인증 후 계정을 생성합니다.</p>
@@ -292,7 +389,6 @@ export default function Signup() {
                 onChange={handlePhoneChange}
                 onBlur={handlePhoneBlur}
                 onAnimationEnd={() => setPhoneShake(false)}
-                required
               />
               <Button
                 type="button"
@@ -379,6 +475,33 @@ export default function Signup() {
 
           <div className="h-px bg-border" />
 
+          {/* 이메일 (비밀번호 찾기·응급 알림 대체 수단) */}
+          <div>
+            <Field
+              id="email"
+              label="이메일"
+              type="email"
+              placeholder="example@email.com"
+              value={email}
+              onChange={(e) => {
+                setEmail(e.target.value)
+                setEmailWarning("")
+              }}
+              onAnimationEnd={() => setEmailShake(false)}
+              className={cn(emailShake && "verify-shake", emailWarning && "verify-error-border")}
+            />
+            {emailWarning ? (
+              <p className="verify-warning" role="alert">
+                <AlertCircle size={14} aria-hidden />
+                {emailWarning}
+              </p>
+            ) : (
+              <p className="mt-1.5 text-xs text-muted-foreground">
+                비밀번호를 잊었을 때와 긴급 알림 전달에 사용됩니다.
+              </p>
+            )}
+          </div>
+
           {/* 아이디 + 중복검사 */}
           <div>
             <span className="mb-1.5 block text-sm font-medium text-muted-foreground">아이디</span>
@@ -398,18 +521,23 @@ export default function Signup() {
                   setUseridStatus("idle")
                 }}
                 onAnimationEnd={() => setUseridShake(false)}
-                required
               />
               <Button
                 type="button"
                 variant={useridStatus === "ok" ? "muted" : "primary"}
                 className="h-13 w-28 shrink-0 whitespace-nowrap px-0 text-sm"
-                disabled={useridStatus === "ok"}
+                disabled={useridStatus === "ok" || useridChecking}
                 onClick={handleUseridCheck}
               >
-                {useridStatus === "ok" ? "확인됨" : "중복검사"}
+                {useridStatus === "ok" ? "확인됨" : useridChecking ? "확인 중" : "중복검사"}
               </Button>
             </div>
+            {useridStatus === "empty" && (
+              <p className="verify-warning" role="alert">
+                <AlertCircle size={14} aria-hidden />
+                아이디를 입력해주세요.
+              </p>
+            )}
             {useridStatus === "invalid" && (
               <p className="verify-warning" role="alert">
                 <AlertCircle size={14} aria-hidden />
@@ -444,7 +572,6 @@ export default function Signup() {
               }}
               onAnimationEnd={() => setPwShake(false)}
               className={cn(pwShake && "verify-shake", pwWarning && "verify-error-border")}
-              required
             />
             <ul className="mt-2 flex items-center gap-3">
               {pwRules.map((r) => {
@@ -485,7 +612,6 @@ export default function Signup() {
               }}
               onAnimationEnd={() => setPwShake(false)}
               className={cn(pwShake && "verify-shake", pwWarning && "verify-error-border")}
-              required
             />
             {pwWarning && (
               <p className="verify-warning" role="alert">
@@ -494,6 +620,14 @@ export default function Signup() {
               </p>
             )}
           </div>
+
+          {/* 서버가 거부한 경우(아이디·이메일 중복 등) */}
+          {submitError && (
+            <p className="verify-warning" role="alert">
+              <AlertCircle size={14} aria-hidden />
+              {submitError}
+            </p>
+          )}
         </StickyAction>
       </form>
     </Screen>

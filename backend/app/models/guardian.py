@@ -11,6 +11,7 @@ if TYPE_CHECKING:
     from app.models.patient_guardian import PatientGuardian
     from app.models.alert import Alert
     from app.models.user import User
+    from app.models.patient_link_request import PatientLinkRequest
 
 
 class Guardian(BaseModel):
@@ -47,11 +48,17 @@ class Guardian(BaseModel):
         back_populates="guardian",
     )
 
+    patient_link_requests: Mapped[list["PatientLinkRequest"]] = relationship(
+        "PatientLinkRequest",
+        back_populates="guardian",
+    )
+
     patient_guardians: Mapped[list["PatientGuardian"]] = relationship(
         "PatientGuardian",
         back_populates="guardian",
         passive_deletes=True,
     )
+
     alerts: Mapped[list["Alert"]] = relationship(
         back_populates="guardian",
     )

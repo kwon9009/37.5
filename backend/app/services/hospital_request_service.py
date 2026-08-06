@@ -17,6 +17,7 @@ def _to_response(request: HospitalRequest) -> HospitalRequestResponse:
     return HospitalRequestResponse(
         hospital_request_id=request.hospital_request_id,
         hospital_name=request.hospital_name,
+        area=request.area,
         address=request.address,
         bed_count=request.bed_count,
         status=request.status,
@@ -30,6 +31,7 @@ def submit_hospital_request(
 ) -> HospitalRequestResponse:
     hospital_request = HospitalRequest(
         hospital_name=request.hospital_name,
+        area=request.area,
         address=request.address,
         bed_count=request.bed_count,
         status=HospitalRequestStatus.PENDING,
@@ -85,6 +87,7 @@ def approve_hospital_request(
 
     hospital = Hospital(
         name=hospital_request.hospital_name,
+        area=hospital_request.area,
         address=hospital_request.address,
         bed_count=hospital_request.bed_count,
         hospital_code=f"REQ{hospital_request.hospital_request_id:06d}",

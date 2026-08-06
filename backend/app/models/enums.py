@@ -34,3 +34,9 @@ class HospitalRequestStatus(str, Enum):
     PENDING = "PENDING"
     APPROVED = "APPROVED"
     REJECTED = "REJECTED"
+
+
+class PatientLinkRequestStatus(str, Enum):
+    PENDING = "PENDING"
+    APPROVED = "APPROVED"
+    REJECTED = "REJECTED"

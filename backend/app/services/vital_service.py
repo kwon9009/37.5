@@ -8,6 +8,11 @@
 따른다. 환자 상태 악화를 조기에 발견하기 위한 국제 표준 척도로, 심박·호흡 모두
 '너무 높을 때'와 '너무 낮을 때'를 같은 위험도로 본다.
 주의: NEWS2는 성인(16세 이상) 기준이며 소아·임신부에게는 적용하지 않는다.
+
+센서 오류는 심박과 호흡을 '따로' 판단한다. mmWave 레이더는 심장 박동을 잡으면서도
+흉곽 움직임(호흡)은 자주 놓치는데, 그때마다 멀쩡한 심박까지 버리면 화면에
+아무것도 뜨지 않기 때문이다. 실제로 호흡이 1이나 빈 값으로 오는 동안에도
+심박은 74~77로 안정적으로 측정됐다.
 """
 
 import time
@@ -70,31 +75,94 @@ def _resp_rate_score(resp_rate: int) -> int:
 
 # 심박·호흡 중 더 위험한 쪽을 최종 등급으로 삼는다
 # (NEWS2도 한 항목만 3점이어도 즉시 의료진 확인 대상으로 본다)
+#
+# resp_rate가 None이면 이번엔 호흡을 믿을 수 없다는 뜻이라 심박만으로 판정한다.
+# 못 믿는 호흡값으로 위험 판정을 내리면 가짜 응급이 만들어지기 때문이다.
 def judge_status(
     heart_rate: int,
-    resp_rate: int,
+    resp_rate: int | None = None,
 ) -> VitalStatus:
 
-    score = max(_heart_rate_score(heart_rate), _resp_rate_score(resp_rate))
+    score = _heart_rate_score(heart_rate)
+
+    if resp_rate is not None:
+        score = max(score, _resp_rate_score(resp_rate))
 
     return _SCORE_TO_STATUS[score]
 
 
-# 1단계 필터: 사람이 유지할 수 없는 값이면 센서 오류로 본다
-def _is_plausible(heart_rate: int, resp_rate: int) -> bool:
+# 심박을 믿을 수 있는가.
+# 심박은 등급 판정의 기준 신호라, 이걸 못 믿으면 이번 측정은 쓸 수 없다.
+def _is_heart_rate_trustworthy(heart_rate: int | None) -> bool:
 
-    return (
-        settings.PLAUSIBLE_HR_MIN <= heart_rate <= settings.PLAUSIBLE_HR_MAX
-        and settings.PLAUSIBLE_RR_MIN <= resp_rate <= settings.PLAUSIBLE_RR_MAX
-    )
+    if heart_rate is None:
+        return False
+
+    return settings.PLAUSIBLE_HR_MIN <= heart_rate <= settings.PLAUSIBLE_HR_MAX
 
 
-# 2단계 필터: 호흡만 위험 구간인데 심박이 멀쩡하면 센서 오류를 의심한다.
+# 호흡만 위험 구간인데 심박이 멀쩡하면 센서 오류를 의심한다.
 # 실제로 환자 상태가 나빠지면 심박·호흡이 함께 무너지므로,
 # 호흡만 튀는 경우는 레이더가 흉곽 움직임을 놓친 것으로 보는 편이 안전하다.
 def _is_resp_suspicious(heart_rate: int, resp_rate: int) -> bool:
 
     return _resp_rate_score(resp_rate) == 3 and _heart_rate_score(heart_rate) == 0
+
+
+# 직전에 '믿은' 호흡값과 그 시각 (환자별). 급변 판정에만 쓴다.
+_last_resp: dict[int, tuple[int, float]] = {}
+
+
+# 직전에 믿었던 호흡값에서 1초 만에 크게 튀었는가.
+# 사람의 호흡수는 그렇게 빨리 변하지 않는다. 레이더가 흉곽 대신 다른 움직임을
+# 잡으면 18 -> 6 처럼 튀는데, 그대로 받으면 멀쩡한 사람이 갑자기
+# '호흡 위험'으로 판정되어 가짜 응급이 발송된다.
+def _is_resp_jump(
+    patient_id: int,
+    resp_rate: int,
+    now: float,
+) -> bool:
+
+    previous = _last_resp.get(patient_id)
+
+    if previous is None:
+        return False
+
+    value, measured_at = previous
+
+    # 신호가 한참 끊겼다 다시 잡힌 경우는 급변이 아니라 재측정으로 본다
+    if now - measured_at > settings.RESP_JUMP_WINDOW_SEC:
+        return False
+
+    return abs(resp_rate - value) >= settings.RESP_MAX_JUMP
+
+
+# 호흡을 믿을 수 있는가. 심박과 별개로 판단한다.
+# patient_id/now를 주면 직전 값 대비 급변까지 검사한다.
+def _is_resp_rate_trustworthy(
+    heart_rate: int,
+    resp_rate: int | None,
+    patient_id: int | None = None,
+    now: float | None = None,
+) -> bool:
+
+    if resp_rate is None:
+        return False
+
+    if not (settings.PLAUSIBLE_RR_MIN <= resp_rate <= settings.PLAUSIBLE_RR_MAX):
+        return False
+
+    if _is_resp_suspicious(heart_rate=heart_rate, resp_rate=resp_rate):
+        return False
+
+    if patient_id is not None and now is not None:
+        return not _is_resp_jump(
+            patient_id=patient_id,
+            resp_rate=resp_rate,
+            now=now,
+        )
+
+    return True
 
 
 # 1초값을 모아 1분마다 평균을 vital_logs에 append
@@ -156,6 +224,7 @@ def ingest_vitals(
     # 화면이 다시 물어보기(폴링)를 기다리지 않도록 값이 들어온 즉시 밀어준다.
     # heart_rate/resp_rate가 None이면 "이번엔 갱신할 값이 없음"이라는 뜻이라
     # 화면은 직전 값을 그대로 유지하고 재실/등급만 반영한다.
+    # resp_replaced=True면 호흡은 이번에 잰 값이 아니라 직전 값을 이어 쓴 것이다.
     stream_service.publish(
         {
             "patient_id": patient.patient_id,
@@ -166,6 +235,7 @@ def ingest_vitals(
             "presence": result["presence"],
             "stabilizing": request.stabilizing,
             "saved": result["saved"],
+            "resp_replaced": result["resp_replaced"],
             "measured_at": (request.measured_at or datetime.now()).isoformat(),
         }
     )
@@ -187,64 +257,49 @@ def _apply(
         is_present=request.presence,
     )
 
-    # 아래 경우엔 생체값을 갱신하지 않고 마지막 정상값을 남겨둔다.
-    #  - 사람이 없거나 신호가 끊김
-    #  - 센서가 아직 안정화 중(lock을 잡는 동안 값이 무의미하게 나옴)
-    # (vital_checks의 심박/호흡은 NOT NULL이라 빈 값을 넣을 수 없고,
-    #  마지막 정상값을 남겨두는 편이 화면에서도 자연스럽다)
-    if (
-        not request.presence
-        or request.stabilizing
-        or request.heart_rate is None
-        or request.breath_rate is None
-    ):
+    # 사람이 없거나, 센서가 아직 안정화 중(lock을 잡는 동안 값이 무의미)이면
+    # 생체값을 건드리지 않고 마지막 정상값을 남겨둔다.
+    if not request.presence or request.stabilizing:
         _buffers.pop(request.patient_id, None)
-        return {
-            "saved": False,
-            "presence": request.presence,
-            "status": None,
-            "heart_rate": None,
-            "resp_rate": None,
-        }
+        return _not_saved(presence=request.presence)
 
     heart_rate = request.heart_rate
     resp_rate = request.breath_rate  # 하드웨어 breath_rate -> DB resp_rate
 
-    # 1단계: 사람이 유지할 수 없는 값이면 통째로 버린다
-    if not _is_plausible(heart_rate, resp_rate):
+    # 심박은 등급 판정의 기준 신호다. 이걸 못 믿으면 이번 측정은 쓸 수 없다.
+    if not _is_heart_rate_trustworthy(heart_rate):
         _buffers.pop(request.patient_id, None)
-        return {
-            "saved": False,
-            "presence": True,
-            "status": None,
-            "heart_rate": None,
-            "resp_rate": None,
-            "rejected": "implausible",
-        }
+        return _not_saved(presence=True, rejected="no_heart_rate")
 
-    # 2단계: 호흡만 위험 구간이고 심박은 정상이면 호흡을 신뢰하지 않는다.
-    # 심박은 살아있으므로 직전 호흡값을 이어 쓰고 심박만 갱신한다.
-    resp_replaced = False
-    if _is_resp_suspicious(heart_rate, resp_rate):
+    # 호흡은 심박과 따로 판단한다. 레이더가 흉곽 움직임을 놓치는 일이 잦은데,
+    # 그때마다 멀쩡한 심박까지 버리면 화면에 아무 값도 뜨지 않는다.
+    now = time.time()
+    resp_trusted = _is_resp_rate_trustworthy(
+        heart_rate=heart_rate,
+        resp_rate=resp_rate,
+        patient_id=request.patient_id,
+        now=now,
+    )
+
+    if resp_trusted:
+        _last_resp[request.patient_id] = (resp_rate, now)
+
+    if not resp_trusted:
         previous = vital_crud.get_vital_check(db=db, patient_id=request.patient_id)
 
         if previous is None:
-            # 비교할 직전 값이 없으면 이번 측정은 넘긴다
-            return {
-                "saved": False,
-                "presence": True,
-                "status": None,
-                "heart_rate": None,
-                "resp_rate": None,
-                "rejected": "resp_suspicious",
-            }
+            # 이어 쓸 직전 호흡값조차 없으면 저장할 수가 없다
+            # (vital_checks.resp_rate가 NOT NULL이라 빈 값을 넣을 수 없음)
+            _buffers.pop(request.patient_id, None)
+            return _not_saved(presence=True, rejected="no_resp_baseline")
 
         resp_rate = previous.resp_rate
-        resp_replaced = True
 
+    # 호흡을 못 믿을 때는 심박만으로 등급을 낸다.
+    # 이어 쓴 옛날 호흡값으로 위험 판정을 내리면 가짜 응급이 만들어진다.
     vital_status = judge_status(
         heart_rate=heart_rate,
-        resp_rate=resp_rate,
+        resp_rate=resp_rate if resp_trusted else None,
     )
 
     vital_crud.upsert_vital_check(
@@ -255,8 +310,8 @@ def _apply(
         status=vital_status,
     )
 
-    # 대체한 호흡값은 이번에 측정된 값이 아니므로 평균에 넣지 않는다
-    if not resp_replaced:
+    # 이어 쓴 호흡값은 이번에 측정된 값이 아니므로 1분 평균에 넣지 않는다
+    if resp_trusted:
         _accumulate(
             db=db,
             patient_id=request.patient_id,
@@ -270,5 +325,27 @@ def _apply(
         "status": vital_status.value,
         "heart_rate": heart_rate,
         "resp_rate": resp_rate,
-        "resp_replaced": resp_replaced,
+        "resp_replaced": not resp_trusted,
     }
+
+
+# 이번 측정을 저장하지 않을 때의 공통 응답.
+# 심박/호흡을 None으로 돌려주면 화면은 직전 값을 그대로 유지한다.
+def _not_saved(
+    presence: bool,
+    rejected: str | None = None,
+) -> dict:
+
+    result = {
+        "saved": False,
+        "presence": presence,
+        "status": None,
+        "heart_rate": None,
+        "resp_rate": None,
+        "resp_replaced": False,
+    }
+
+    if rejected is not None:
+        result["rejected"] = rejected
+
+    return result
