@@ -17,7 +17,7 @@ const LEGEND = [
 // 위험한 환자가 위로 오도록 정렬
 const SEVERITY_ORDER = { emergency: 0, warning: 1, caution: 2, normal: 3, offline: 4 };
 
-// 서버 등급(NEWS2 판정 결과) -> 화면 심각도
+// 서버 등급(NEWS2 판정 결과) -> 화면 심각도. SSE 스트림은 대문자 enum 값을 그대로 보낸다.
 const SEVERITY_BY_STATUS = {
   NORMAL: "normal",
   WARNING: "warning",
@@ -59,7 +59,6 @@ function MonitorCard({ patient }) {
   const navigate = useNavigate();
   const style = CARD_STYLE[patient.severity] ?? { background: "#FFFFFF", borderColor: "#DCE3EC", borderWidth: 1 };
   const valueColor = patient.severity === "emergency" ? "#E0442E" : "#1E2A3A";
-  const batteryColor = patient.battery != null && patient.battery <= 40 ? "#E8A13B" : "#5A6B80";
 
   return (
     <div
@@ -123,11 +122,7 @@ function MonitorCard({ patient }) {
       <div className="flex items-center gap-[10px] border-t border-[#DCE3EC] pt-[10px]">
         <div className="flex items-center gap-[5px]">
           <Icon name={patient.connected ? "wifi" : "wifi-off"} size={13} className={patient.connected ? "text-[#2FA35C]" : "text-[#5A6B80]"} />
-          <span className="text-[11px] text-[#5A6B80]">{patient.connected ? "연결됨" : "연결 끊김"}</span>
-        </div>
-        <div className="flex items-center gap-[5px]">
-          <Icon name={patient.battery == null ? "battery-warning" : "battery"} size={14} style={{ color: batteryColor }} />
-          <span className="text-[11px] text-[#5A6B80]">{patient.battery != null ? `${patient.battery}%` : "—"}</span>
+          <span className="text-[11px] text-[#5A6B80]">{patient.sensorStatus ?? (patient.connected ? "연결됨" : "연결 끊김")}</span>
         </div>
       </div>
     </div>
@@ -135,10 +130,11 @@ function MonitorCard({ patient }) {
 }
 
 function RealtimeMonitoring() {
-  const [activeWard, setActiveWard] = useState(null);
+  const [activeWard, setActiveWard] = useState("전체");
   const [wards, setWards] = useState([]);
   const [patients, setPatients] = useState([]);
   const [now, setNow] = useState(() => new Date());
+  const [error, setError] = useState("");
 
   useEffect(() => {
     const interval = setInterval(() => setNow(new Date()), 1000);
@@ -178,10 +174,13 @@ function RealtimeMonitoring() {
         .get("/monitoring")
         .then(({ data }) => {
           if (cancelled) return;
+          setError("");
           setWards(data.wards.map((item) => ({ name: item.ward, count: item.count })));
           setPatients(data.patients.map(toMonitorCard));
         })
-        .catch(() => {});
+        .catch(() => {
+          if (!cancelled) setError("환자 목록을 불러오지 못했습니다.");
+        });
     }
 
     load();
@@ -192,15 +191,14 @@ function RealtimeMonitoring() {
     };
   }, [realtime]);
 
-  // 아직 병동을 고르지 않았으면 첫 병동을 보여준다
-  const currentWard = activeWard ?? wards[0]?.name ?? null;
+  const wardTabs = useMemo(() => [{ name: "전체", count: patients.length }, ...wards], [patients, wards]);
 
   const visiblePatients = useMemo(
     () =>
       patients
-        .filter((patient) => currentWard == null || patient.ward === currentWard)
+        .filter((patient) => activeWard === "전체" || patient.ward === activeWard)
         .sort((a, b) => SEVERITY_ORDER[a.severity] - SEVERITY_ORDER[b.severity]),
-    [patients, currentWard],
+    [patients, activeWard],
   );
 
   return (
@@ -213,21 +211,18 @@ function RealtimeMonitoring() {
         <div className="flex flex-col gap-5 p-6">
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div className="flex flex-col gap-1">
-              <h1 className="text-2xl font-bold text-[#1E2A3A]">
-                실시간 모니터링{currentWard ? ` · ${currentWard}` : ""}
-              </h1>
-              <div className="flex items-center gap-2">
-                <span
-                  className={`h-2 w-2 rounded-full ${realtime ? "bg-[#2FA35C]" : "bg-[#E8A13B]"}`}
-                  aria-hidden="true"
-                />
-                <p className="text-[13px] text-[#5A6B80]">
-                  위험 환자 우선 정렬 · {realtime ? "실시간 연결됨" : "재연결 중"}
-                </p>
-              </div>
+              <h1 className="text-2xl font-bold text-[#1E2A3A]">실시간 모니터링{activeWard !== "전체" ? ` · ${activeWard}` : ""}</h1>
+              <p className="text-[13px] text-[#5A6B80]">위험 환자 우선 정렬 · 자동 갱신</p>
             </div>
 
             <div className="flex flex-wrap items-center gap-5">
+              <div className="flex items-center gap-2">
+                <span className={`h-2 w-2 rounded-full ${realtime ? "bg-[#2FA35C]" : "bg-[#E8A13B]"}`} aria-hidden="true" />
+                <span className="text-xs font-bold tracking-wide text-[#5A6B80]">
+                  {realtime ? "실시간 연결됨" : "재연결 중"}
+                </span>
+              </div>
+
               <div className="flex items-center gap-2 rounded-lg border border-[#DCE3EC] bg-white px-[14px] py-2">
                 <Icon name="clock-3" size={15} className="text-[#5A6B80]" />
                 <span className="text-[13px] font-semibold text-[#1E2A3A]">{formatWardClock(now)}</span>
@@ -244,9 +239,13 @@ function RealtimeMonitoring() {
             </div>
           </div>
 
+          {error && (
+            <p className="rounded-lg bg-[#FDEDEA] px-3 py-2 text-xs font-semibold text-[#E0442E]">{error}</p>
+          )}
+
           <div className="flex flex-wrap items-center gap-[10px]">
-            {wards.map((ward) => {
-              const isActive = ward.name === currentWard;
+            {wardTabs.map((ward) => {
+              const isActive = ward.name === activeWard;
               return (
                 <button
                   key={ward.name}

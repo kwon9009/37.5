@@ -93,17 +93,6 @@ function EmergencyScreeningOverlay({ patient, onAcknowledge, onRespond }) {
           <p className="font-mono text-sm text-[#5A6B80]">{patient.room}</p>
         </div>
 
-        {criticalNotes.length > 0 && (
-          <div className="flex w-full flex-col gap-[6px] rounded-xl border border-[#F5C6BE] bg-[#FDEDEA] p-3 text-left">
-            {criticalNotes.map((note, index) => (
-              <div key={`${note.label}-${index}`} className="flex items-center gap-2">
-                <Icon name={note.icon} size={16} className="shrink-0 text-[#E0442E]" />
-                <span className="text-[13px] font-bold text-[#E0442E]">{note.label}</span>
-              </div>
-            ))}
-          </div>
-        )}
-
         <div className="flex w-full gap-3">
           <div className="flex w-full flex-col items-center gap-1 rounded-xl bg-[#FDEDEA] py-4">
             <span className="flex items-center gap-1 text-xs font-bold tracking-wide text-[#E0442E]">
@@ -122,6 +111,21 @@ function EmergencyScreeningOverlay({ patient, onAcknowledge, onRespond }) {
             <span className="text-xs text-[#5A6B80]">회/분</span>
           </div>
         </div>
+
+        {criticalNotes.length > 0 && (
+          <div className="flex w-full flex-col gap-[6px] rounded-xl border border-[#F5C6BE] bg-[#FDEDEA] p-3 text-left">
+            <span className="flex items-center gap-1 text-[11px] font-bold tracking-wide text-[#E0442E]">
+              <Icon name="circle-alert" size={13} className="text-[#E0442E]" />
+              대응 전 확인
+            </span>
+            {criticalNotes.map((note, index) => (
+              <div key={`${note.label}-${index}`} className="flex items-center gap-2">
+                <Icon name={note.icon} size={16} className="shrink-0 text-[#E0442E]" />
+                <span className="text-[13px] font-bold text-[#E0442E]">{note.label}</span>
+              </div>
+            ))}
+          </div>
+        )}
 
         <div className="flex w-full flex-col gap-[10px]">
           <button

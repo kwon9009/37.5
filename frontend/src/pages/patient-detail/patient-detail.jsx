@@ -241,6 +241,14 @@ function PatientDetail() {
     setNoteKeys((current) => (current.includes(key) ? current.filter((item) => item !== key) : [...current, key]));
   };
 
+  const markAlertRead = (alertId) => {
+    apiClient.patch(`/alerts/${alertId}/read`).then(() => {
+      setAlerts((current) =>
+        current.map((alert) => (alert.alert_id === alertId ? { ...alert, is_read: true } : alert)),
+      );
+    });
+  };
+
   const saveNotes = async () => {
     const composed = composeSpecialNotes(noteKeys, noteOtherText);
     setIsSavingNotes(true);
@@ -270,6 +278,7 @@ function PatientDetail() {
     message: alert.message,
     time: formatRelative(alert.sent_at),
     severity: VITAL_STATUS_TO_SEVERITY[alert.status] ?? "normal",
+    isRead: alert.is_read,
   }));
 
   const emergencyEvents = emergencyLogs.map((log, index) => ({
@@ -532,6 +541,16 @@ function PatientDetail() {
                         <p className="text-[11px] text-[#5A6B80]">{item.time}</p>
                       </div>
                       <StatusBadge severity={item.severity} />
+                      {!item.isRead && (
+                        <button
+                          type="button"
+                          onClick={() => markAlertRead(item.key)}
+                          className="flex h-7 shrink-0 items-center gap-1 rounded-full bg-[#2B6FE3] px-[10px] text-[11px] font-bold text-white"
+                        >
+                          <Icon name="check" size={12} className="text-white" />
+                          읽음
+                        </button>
+                      )}
                     </div>
                   ))}
                 </div>
