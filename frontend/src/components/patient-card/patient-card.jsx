@@ -1,6 +1,7 @@
 import PresenceBadge from "../presence-badge/presence-badge.jsx";
 import StatusBadge from "../status-badge/status-badge.jsx";
 import SpecialNoteTag from "../special-note-tag/special-note-tag.jsx";
+import Icon from "../icon/icon.jsx";
 
 const SEVERITY_COLOR = {
   normal: "#2FA35C",
@@ -25,6 +26,7 @@ function PatientCard({
   timestamp,
   presenceLabel = "재실중",
   notes = [],
+  earlyWarning,
   onClick,
 }) {
   const severityColor = SEVERITY_COLOR[severity] ?? SEVERITY_COLOR.normal;
@@ -70,6 +72,13 @@ function PatientCard({
             <StatusBadge severity={severity} />
           </div>
         </div>
+
+        {earlyWarning && (
+          <div className="flex items-center gap-[5px] rounded-md bg-[#F1EEFC] px-[9px] py-1 text-[11px] font-bold text-[#6C4FD1]">
+            <Icon name="activity" size={12} className="text-[#6C4FD1]" />
+            이상 패턴 조기 감지 · 확인 권장
+          </div>
+        )}
 
         <div className="patient-card__vitals flex gap-3">
           <div className="flex w-full flex-col gap-1">

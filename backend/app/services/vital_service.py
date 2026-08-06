@@ -22,15 +22,34 @@ from fastapi import HTTPException, status as http_status
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
-from app.crud import vital_crud
+from app.crud import alert_crud, vital_crud
 from app.models.enums import VitalStatus
 from app.models.patient import Patient
 from app.schemas.vitals.vitals_ingest_request import VitalsIngestRequest
 from app.services import stream_service
+from app.services.anomaly_engine import engine as anomaly_engine
 
 # 1분 평균을 만들기 위한 환자별 임시 버퍼 (서버 메모리)
 _LOG_INTERVAL_SEC = 60
 _buffers: dict[int, dict] = {}
+
+# 등급별 알림 문구 (NORMAL은 알림을 만들지 않는다)
+_ALERT_MESSAGES = {
+    VitalStatus.WARNING: "활력징후 주의가 감지되었습니다.",
+    VitalStatus.ALERT: "의료진 확인이 필요합니다.",
+    VitalStatus.DANGER: "응급상황이 감지되었습니다.",
+}
+
+# 등급 비교용 (숫자가 클수록 위험) - NEWS2와 예측 모델 중 더 위험한 쪽을 채택할 때 씀
+_SEVERITY = {
+    VitalStatus.NORMAL: 0,
+    VitalStatus.WARNING: 1,
+    VitalStatus.ALERT: 2,
+    VitalStatus.DANGER: 3,
+}
+
+# 직전에 통보한 등급 (환자별). 등급이 "새로 바뀔 때"만 알림을 만들기 위한 기록.
+_last_status: dict[int, VitalStatus] = {}
 
 # NEWS2 점수 -> 우리 등급
 _SCORE_TO_STATUS = {
@@ -89,6 +108,80 @@ def judge_status(
         score = max(score, _resp_rate_score(resp_rate))
 
     return _SCORE_TO_STATUS[score]
+
+
+# 예측 모델은 확정된 규칙 판정이 아니라 "평소와 다르다"는 조짐일 뿐이라, 모델
+# 단독으로는 최대 ALERT(화면 "주의") 단계까지만 올린다 - 곧바로 DANGER(응급)로
+# 표시하지 않는다. NEWS2가 자체적으로 낸 DANGER 판정은 이 상한선과 무관하게
+# 그대로 유지된다(모델은 등급을 더하기만 하지, NEWS2 판정을 깎거나 막지 않는다).
+_EARLY_WARNING_CEILING = VitalStatus.ALERT
+
+
+# NEWS2는 "지금 값이 고정 기준선을 넘었는가"만 본다. 여기서는 개인 평소 패턴(최근
+# 180초) 대비 이상탐지 모델(anomaly_engine) 점수를 추가로 받아, NEWS2보다 더
+# 위험하다고 나오면 그 등급으로 올려 쓴다. 반대로 모델이 더 낮게 보더라도 NEWS2
+# 등급을 낮추지는 않는다(조기경보는 더하기만 하지, 기존 안전판을 약화하지 않는다).
+def _apply_early_warning(
+    news2_status: VitalStatus,
+    patient_id: int,
+    heart_rate: int,
+    resp_rate: int,
+) -> tuple[VitalStatus, str | None]:
+
+    prediction = anomaly_engine.evaluate(
+        patient_id=patient_id,
+        heart_rate=heart_rate,
+        respiration_rate=resp_rate,
+    )
+
+    predicted_status = VitalStatus(prediction.status)
+
+    if _SEVERITY[predicted_status] > _SEVERITY[_EARLY_WARNING_CEILING]:
+        predicted_status = _EARLY_WARNING_CEILING
+
+    if _SEVERITY[predicted_status] <= _SEVERITY[news2_status]:
+        return news2_status, None
+
+    reason = prediction.reasons[0] if prediction.reasons else None
+
+    return predicted_status, reason
+
+
+# 등급이 이전과 달라졌을 때만 알림을 만든다(매초 중복 생성 방지).
+# DANGER로 "새로 진입"할 때는 응급 로그도 함께 남긴다.
+def _raise_alert_if_changed(
+    db: Session,
+    patient: Patient,
+    status: VitalStatus,
+    heart_rate: int,
+    resp_rate: int,
+    reason: str | None,
+) -> None:
+
+    previous_status = _last_status.get(patient.patient_id)
+    _last_status[patient.patient_id] = status
+
+    if status == VitalStatus.NORMAL or status == previous_status:
+        return
+
+    alert_crud.create_alert(
+        db=db,
+        patient_id=patient.patient_id,
+        department_id=patient.department_id,
+        message=_ALERT_MESSAGES[status],
+        status=status,
+    )
+
+    if status == VitalStatus.DANGER:
+        vital_crud.create_emergency_log(
+            db=db,
+            patient_id=patient.patient_id,
+            heart_rate=heart_rate,
+            resp_rate=resp_rate,
+            # 예측 모델이 올린 등급이면 그 사유를, 아니면 NEWS2(규칙) 판정임을 남긴다
+            event_type=(reason or "NEWS2 규칙 기반 응급 감지")[:50],
+        )
+        # TODO: Aligo SMS로 보호자에게 알림 발송 (CLAUDE.md 확정 아키텍처, 미연동)
 
 
 # 심박을 믿을 수 있는가.
@@ -237,6 +330,7 @@ def ingest_vitals(
             "saved": result["saved"],
             "resp_replaced": result["resp_replaced"],
             "measured_at": (request.measured_at or datetime.now()).isoformat(),
+            "early_warning": result.get("reason"),
         }
     )
 
@@ -302,12 +396,33 @@ def _apply(
         resp_rate=resp_rate if resp_trusted else None,
     )
 
+    # 예측 모델(anomaly_engine)은 개인 평소 패턴 대비 이상 정도를 본다. 호흡을
+    # 못 믿는 이번 측정에 옛날 호흡값을 넣어 모델에 태우면 잘못된 학습/판정이
+    # 나오므로, 심박·호흡이 둘 다 이번에 실제로 믿을 수 있을 때만 돌린다.
+    reason = None
+    if resp_trusted:
+        vital_status, reason = _apply_early_warning(
+            news2_status=vital_status,
+            patient_id=request.patient_id,
+            heart_rate=heart_rate,
+            resp_rate=resp_rate,
+        )
+
     vital_crud.upsert_vital_check(
         db=db,
         patient_id=request.patient_id,
         heart_rate=heart_rate,
         resp_rate=resp_rate,
         status=vital_status,
+    )
+
+    _raise_alert_if_changed(
+        db=db,
+        patient=patient,
+        status=vital_status,
+        heart_rate=heart_rate,
+        resp_rate=resp_rate,
+        reason=reason,
     )
 
     # 이어 쓴 호흡값은 이번에 측정된 값이 아니므로 1분 평균에 넣지 않는다
@@ -326,6 +441,7 @@ def _apply(
         "heart_rate": heart_rate,
         "resp_rate": resp_rate,
         "resp_replaced": not resp_trusted,
+        "reason": reason,
     }
 
 

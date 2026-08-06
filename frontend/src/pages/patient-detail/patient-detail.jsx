@@ -166,6 +166,7 @@ function PatientDetail() {
         status: payload.status ?? previous?.status ?? null,
         presence: payload.presence,
         measured_at: payload.measured_at,
+        early_warning: Boolean(payload.early_warning),
       }));
     },
   });
@@ -343,6 +344,13 @@ function PatientDetail() {
             </div>
             <StatusBadge severity={severity} size="lg" />
           </div>
+
+          {liveVital?.early_warning && (
+            <div className="flex items-center gap-[6px] rounded-lg bg-[#F1EEFC] px-4 py-[10px] text-[13px] font-bold text-[#6C4FD1]">
+              <Icon name="activity" size={15} className="text-[#6C4FD1]" />
+              이상 패턴 조기 감지 · 평소 패턴과 다른 변화가 감지되었습니다. 확인을 권장합니다.
+            </div>
+          )}
 
           <div className="flex flex-col gap-6 xl:flex-row">
             <div className="flex w-full flex-col gap-6">

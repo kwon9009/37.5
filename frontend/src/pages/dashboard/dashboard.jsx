@@ -112,6 +112,7 @@ function Dashboard() {
                   severity: SEVERITY_BY_STATUS[payload.status] ?? patient.severity,
                   presenceLabel: payload.presence ? "재실중" : "부재중",
                   timestamp: toClockString(payload.measured_at),
+                  earlyWarning: Boolean(payload.early_warning),
                 },
           ),
         ),
@@ -148,6 +149,7 @@ function Dashboard() {
               sensorStatus: patient.sensor_status,
               timestamp: toClockString(patient.timestamp),
               specialNotes: patient.notes,
+              earlyWarning: false,
             })),
           ),
         );

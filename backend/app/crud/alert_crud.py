@@ -2,7 +2,30 @@ from sqlalchemy import update, func
 from sqlalchemy.orm import Session
 
 from app.models.alert import Alert
+from app.models.enums import VitalStatus
 from app.models.patient import Patient
+
+
+# 알림 생성 (등급이 새로 악화됐을 때 1건)
+def create_alert(
+    db: Session,
+    patient_id: int,
+    department_id: int | None,
+    message: str,
+    status: VitalStatus,
+) -> Alert:
+
+    alert = Alert(
+        patient_id=patient_id,
+        department_id=department_id,
+        message=message,
+        status=status,
+    )
+
+    db.add(alert)
+    db.commit()
+
+    return alert
 
 
 # 알림 읽음 처리

@@ -61,9 +61,9 @@ def receive_vitals(
 ):
     """라즈베리파이가 1초마다 보내는 생체 데이터 수신.
 
-    등급 판정 -> DB 반영 -> 접속 중인 화면에 즉시 방송(SSE)까지 여기서 끝난다.
+    등급 판정(NEWS2 + 예측 모델) -> DB 반영 -> 접속 중인 화면에 즉시 방송(SSE)
+    -> 등급 악화 시 알림/응급 로그 저장까지 여기서(vital_service) 끝난다.
     """
     result = vital_service.ingest_vitals(db=db, request=request)
 
-    # TODO: DANGER 지속 시 -> alerts/emergency_logs 저장 -> SMS 발송
     return {"ok": True, **result}
