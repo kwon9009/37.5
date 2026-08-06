@@ -1,5 +1,6 @@
 from sqlalchemy.orm import Session
 
+from app.models.emergency_log import EmergencyLog
 from app.models.enums import VitalStatus
 from app.models.patient import Patient
 from app.models.vital_check import VitalCheck
@@ -70,6 +71,28 @@ def update_presence(
 
     patient.is_present = is_present
     db.commit()
+
+
+# 응급 로그 추가 (DANGER로 새로 진입하는 순간에만 1건)
+def create_emergency_log(
+    db: Session,
+    patient_id: int,
+    heart_rate: int,
+    resp_rate: int,
+    event_type: str,
+) -> EmergencyLog:
+
+    emergency_log = EmergencyLog(
+        patient_id=patient_id,
+        heart_rate=heart_rate,
+        resp_rate=resp_rate,
+        event_type=event_type,
+    )
+
+    db.add(emergency_log)
+    db.commit()
+
+    return emergency_log
 
 
 # 1분 평균 이력 추가 (recorded_at은 DB가 현재시각으로 채운다)

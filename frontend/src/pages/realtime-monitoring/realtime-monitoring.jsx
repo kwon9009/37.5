@@ -41,6 +41,7 @@ function toMonitorCard(item) {
     present: item.is_present,
     connected,
     battery: null, // 장치 배터리는 아직 서버가 내려주지 않는다
+    earlyWarning: false,
   };
 }
 
@@ -84,6 +85,13 @@ function MonitorCard({ patient }) {
         </div>
         <StatusBadge severity={patient.severity} />
       </div>
+
+      {patient.earlyWarning && patient.severity !== "offline" && (
+        <div className="flex items-center gap-[5px] rounded-md bg-[#F1EEFC] px-[9px] py-1 text-[11px] font-bold text-[#6C4FD1]">
+          <Icon name="activity" size={12} className="text-[#6C4FD1]" />
+          이상 패턴 조기 감지 · 확인 권장
+        </div>
+      )}
 
       {patient.severity === "offline" ? (
         <div className="flex items-center justify-center gap-2 py-[18px]">
@@ -159,6 +167,7 @@ function RealtimeMonitoring() {
                   ? (SEVERITY_BY_STATUS[payload.status] ?? patient.severity)
                   : "offline",
                 present: payload.presence,
+                earlyWarning: Boolean(payload.early_warning),
               },
         ),
       );
