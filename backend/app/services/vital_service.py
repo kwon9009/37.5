@@ -396,17 +396,18 @@ def _apply(
         resp_rate=resp_rate if resp_trusted else None,
     )
 
-    # 예측 모델(anomaly_engine)은 개인 평소 패턴 대비 이상 정도를 본다. 호흡을
-    # 못 믿는 이번 측정에 옛날 호흡값을 넣어 모델에 태우면 잘못된 학습/판정이
-    # 나오므로, 심박·호흡이 둘 다 이번에 실제로 믿을 수 있을 때만 돌린다.
-    reason = None
-    if resp_trusted:
-        vital_status, reason = _apply_early_warning(
-            news2_status=vital_status,
-            patient_id=request.patient_id,
-            heart_rate=heart_rate,
-            resp_rate=resp_rate,
-        )
+    # 예측 모델(anomaly_engine)은 DB 저장과 같은 호흡값(이번에 못 믿으면 직전 값을
+    # 이어 씀)을 그대로 받는다. NEWS2와 달리 여기선 안전하다: 예측 모델은 최대
+    # ALERT(주의)까지만 올리도록 상한을 걸어뒀기 때문에, 오래된 호흡값 때문에
+    # 잘못 튀어도 최악이 "주의 배지"지 가짜 응급(DANGER)이 만들어지지 않는다.
+    # mmWave 레이더는 호흡을 자주 놓치므로, 여기서도 NEWS2처럼 매번 건너뛰면
+    # 조기경보가 사실상 거의 동작하지 않게 된다.
+    vital_status, reason = _apply_early_warning(
+        news2_status=vital_status,
+        patient_id=request.patient_id,
+        heart_rate=heart_rate,
+        resp_rate=resp_rate,
+    )
 
     vital_crud.upsert_vital_check(
         db=db,
