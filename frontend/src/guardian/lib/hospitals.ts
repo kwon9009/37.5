@@ -11,9 +11,6 @@ export type HospitalInfo = {
   address: string
   /** 백엔드에 phone 컬럼 추가 전까지는 없을 수 있음 → "병원 연락" 버튼이 비활성됨 */
   phone?: string
-  /** 목업 지도용 상대 좌표(%). 구글맵/카카오맵 연동 시 위경도로 교체 예정 */
-  x?: number
-  y?: number
 }
 
 /**
@@ -24,11 +21,11 @@ export type HospitalInfo = {
  * 전화번호는 DB 에 아직 없어서 여기 값도 전부 임시다.
  * ────────────────────────────────────────────────────────────── */
 export const hospitalDirectory: HospitalInfo[] = [
-  { code: "DJ001", name: "둔산엔젤요양병원", address: "대전 서구 둔산로 100", phone: "042-000-0001", x: 34, y: 48 },
-  { code: "DJ002", name: "중부요양병원", address: "대전 중구 문화로 282", phone: "042-000-0002", x: 46, y: 58 },
-  { code: "DJ003", name: "유성온천요양병원", address: "대전 유성구 온천북로 55", phone: "042-000-0003", x: 24, y: 34 },
-  { code: "DJ004", name: "대덕행복요양병원", address: "대전 대덕구 계족로 210", phone: "042-000-0004", x: 62, y: 30 },
-  { code: "DJ005", name: "동구사랑요양병원", address: "대전 동구 동서대로 1720", phone: "042-000-0005", x: 70, y: 62 },
+  { code: "DJ001", name: "둔산엔젤요양병원", address: "대전 서구 둔산로 100", phone: "042-000-0001" },
+  { code: "DJ002", name: "중부요양병원", address: "대전 중구 문화로 282", phone: "042-000-0002" },
+  { code: "DJ003", name: "유성온천요양병원", address: "대전 유성구 온천북로 55", phone: "042-000-0003" },
+  { code: "DJ004", name: "대덕행복요양병원", address: "대전 대덕구 계족로 210", phone: "042-000-0004" },
+  { code: "DJ005", name: "동구사랑요양병원", address: "대전 동구 동서대로 1720", phone: "042-000-0005" },
 ]
 
 /** 개발용 목록에서 코드로 찾기 (서버 조회 실패 시 폴백) */

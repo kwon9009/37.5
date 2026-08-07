@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react"
 import { useNavigate } from "react-router-dom"
 import { MapPin, Phone, Building2, CheckCircle2 } from "lucide-react"
 import { Screen, TopBar, StickyAction } from "@/guardian/components/Screen"
+import { KakaoMap } from "@/guardian/components/KakaoMap"
 import { Button, Field } from "@/guardian/components/ui"
 import { cn } from "@/guardian/lib/utils"
 import {
@@ -354,10 +355,13 @@ export default function PatientInfo() {
                       <MapPin size={12} aria-hidden />
                       {hospital.address}
                     </p>
-                    <p className="mt-0.5 flex items-center gap-1 text-xs text-muted-foreground">
-                      <Phone size={12} aria-hidden />
-                      {hospital.phone}
-                    </p>
+                    {/* DB에 전화번호가 아직 없어 내려오지 않을 수 있다 */}
+                    {hospital.phone && (
+                      <p className="mt-0.5 flex items-center gap-1 text-xs text-muted-foreground">
+                        <Phone size={12} aria-hidden />
+                        {hospital.phone}
+                      </p>
+                    )}
                   </div>
                   <span className="flex shrink-0 items-center gap-1 text-xs font-semibold text-success">
                     <CheckCircle2 size={14} aria-hidden />
@@ -365,29 +369,13 @@ export default function PatientInfo() {
                   </span>
                 </div>
 
-                {/* Google Maps API 연결 지점 (플레이스홀더)
-                    실제 연동 시: <GoogleMap center={{lat,lng}} /> 로 교체하고
-                    VITE_GOOGLE_MAPS_API_KEY 환경변수를 사용합니다. */}
-                <div className="relative h-40 border-t border-border bg-muted/50">
-                  <div
-                    className="absolute inset-0 opacity-60"
-                    style={{
-                      backgroundImage:
-                        "linear-gradient(to right, var(--color-border) 1px, transparent 1px), linear-gradient(to bottom, var(--color-border) 1px, transparent 1px)",
-                      backgroundSize: "28px 28px",
-                    }}
-                    aria-hidden
-                  />
-                  <span
-                    className="absolute -translate-x-1/2 -translate-y-full text-primary"
-                    style={{ left: `${hospital.x}%`, top: `${hospital.y}%` }}
-                  >
-                    <MapPin size={30} strokeWidth={2.5} aria-hidden />
-                  </span>
-                  <span className="absolute bottom-2 right-3 rounded-full bg-card/90 px-2 py-1 text-[10px] font-medium text-muted-foreground">
-                    Google Maps 연동 영역
-                  </span>
-                </div>
+                {/* 카카오맵. 병원 주소를 좌표로 바꿔 지도에 표시한다.
+                    키(VITE_KAKAO_MAP_KEY)가 없으면 주소만 보이는 화면으로 대체된다. */}
+                <KakaoMap
+                  address={hospital.address}
+                  name={hospital.name}
+                  className="h-40 border-t border-border"
+                />
               </div>
             )}
           </div>
