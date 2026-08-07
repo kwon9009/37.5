@@ -42,11 +42,13 @@ class PredictionService:
         self.detector = detector
         self.config = config
 
-    def predict(self, data: pd.DataFrame) -> list[dict[str, Any]]:
+    def predict(self, data: pd.DataFrame, latest_only: bool = False) -> list[dict[str, Any]]:
+        """latest_only=True면 가장 최근 윈도우 하나만 계산한다(실시간 판정용)."""
         processed = SensorPreprocessor(self.config).process(data)
         fallback = self.detector.metadata["global_baseline"]
         features = extract_features(
-            processed, self.detector.metadata.get("baselines", {}), fallback, self.config
+            processed, self.detector.metadata.get("baselines", {}), fallback, self.config,
+            latest_only=latest_only,
         )
         if features.empty:
             subject = str(data["subject_id"].iloc[0]) if len(data) else "unknown"

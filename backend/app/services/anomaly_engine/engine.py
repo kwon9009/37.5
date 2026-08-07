@@ -93,7 +93,9 @@ def evaluate(
     if detector is None or len(frame) < settings.window_seconds:
         return _fallback_status(heart_rate, respiration_rate)
 
-    outputs = PredictionService(detector).predict(frame)
+    # 매초 판정에서는 "지금 상태"만 필요하다. 전체 윈도우를 다 계산하면
+    # 24개를 만들어 버리게 되므로 마지막 하나만 계산한다.
+    outputs = PredictionService(detector).predict(frame, latest_only=True)
     latest = outputs[-1]
     status = latest["status"]
 
