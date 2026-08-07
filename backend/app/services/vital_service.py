@@ -51,6 +51,10 @@ _SEVERITY = {
 # 직전에 통보한 등급 (환자별). 등급이 "새로 바뀔 때"만 알림을 만들기 위한 기록.
 _last_status: dict[int, VitalStatus] = {}
 
+# 현재 진행 중인 DANGER 구간 (환자별). {"since": 시작시각, "notified": 통보했는지}
+# DANGER가 끊기거나 사람이 자리를 비우면 지운다 = 처음부터 다시 센다.
+_danger_episodes: dict[int, dict] = {}
+
 # NEWS2 점수 -> 우리 등급
 _SCORE_TO_STATUS = {
     0: VitalStatus.NORMAL,
@@ -148,7 +152,14 @@ def _apply_early_warning(
 
 
 # 등급이 이전과 달라졌을 때만 알림을 만든다(매초 중복 생성 방지).
-# DANGER로 "새로 진입"할 때는 응급 로그도 함께 남긴다.
+#
+# DANGER는 곧바로 통보하지 않고 DANGER_SUSTAIN_SEC(기본 10초) 이상 이어질 때만
+# 응급으로 본다. 센서가 한 번 튀어 1초만 DANGER가 나오는 일이 잦은데(실측상
+# 호흡값이 1초 사이 6 이상 변하는 경우가 9.6%), 그때마다 응급으로 기록하면
+# 나중에 웹푸시를 붙였을 때 보호자 폰이 헛되이 울린다.
+#
+# 지속 시간은 "몇 건 연속"이 아니라 "몇 초 지났나"로 잰다. 전송 주기가 흔들리거나
+# 중간에 못 믿을 측정이 섞여도 기준이 함께 흔들리지 않게 하기 위함이다.
 def _raise_alert_if_changed(
     db: Session,
     patient: Patient,
@@ -156,32 +167,64 @@ def _raise_alert_if_changed(
     heart_rate: int,
     resp_rate: int,
     reason: str | None,
+    now: float,
 ) -> None:
 
-    previous_status = _last_status.get(patient.patient_id)
-    _last_status[patient.patient_id] = status
+    patient_id = patient.patient_id
+    previous_status = _last_status.get(patient_id)
+    _last_status[patient_id] = status
 
-    if status == VitalStatus.NORMAL or status == previous_status:
+    # DANGER가 아니면 진행 중이던 DANGER 구간은 끝난 것으로 본다
+    if status != VitalStatus.DANGER:
+        _danger_episodes.pop(patient_id, None)
+
+        if status == VitalStatus.NORMAL or status == previous_status:
+            return
+
+        alert_crud.create_alert(
+            db=db,
+            patient_id=patient_id,
+            department_id=patient.department_id,
+            message=_ALERT_MESSAGES[status],
+            status=status,
+        )
         return
+
+    # 여기부터 DANGER
+    episode = _danger_episodes.get(patient_id)
+
+    if episode is None:
+        # 방금 시작했다. 아직 통보하지 않고 시각만 기록해둔다.
+        _danger_episodes[patient_id] = {"since": now, "notified": False}
+        return
+
+    if episode["notified"]:
+        # 이번 구간은 이미 통보했다. 이어지는 동안 중복으로 만들지 않는다.
+        return
+
+    if now - episode["since"] < settings.DANGER_SUSTAIN_SEC:
+        # 아직 기준 시간을 못 채웠다.
+        return
+
+    episode["notified"] = True
 
     alert_crud.create_alert(
         db=db,
-        patient_id=patient.patient_id,
+        patient_id=patient_id,
         department_id=patient.department_id,
         message=_ALERT_MESSAGES[status],
         status=status,
     )
 
-    if status == VitalStatus.DANGER:
-        vital_crud.create_emergency_log(
-            db=db,
-            patient_id=patient.patient_id,
-            heart_rate=heart_rate,
-            resp_rate=resp_rate,
-            # 예측 모델이 올린 등급이면 그 사유를, 아니면 NEWS2(규칙) 판정임을 남긴다
-            event_type=(reason or "NEWS2 규칙 기반 응급 감지")[:50],
-        )
-        # TODO: Aligo SMS로 보호자에게 알림 발송 (CLAUDE.md 확정 아키텍처, 미연동)
+    vital_crud.create_emergency_log(
+        db=db,
+        patient_id=patient_id,
+        heart_rate=heart_rate,
+        resp_rate=resp_rate,
+        # 예측 모델이 올린 등급이면 그 사유를, 아니면 NEWS2(규칙) 판정임을 남긴다
+        event_type=(reason or "NEWS2 규칙 기반 응급 감지")[:50],
+    )
+    # TODO: 웹푸시로 보호자에게 알림 발송 (3분 간격 최대 5회, 정상 복귀 시 중단)
 
 
 # 심박을 믿을 수 있는가.
@@ -355,6 +398,10 @@ def _apply(
     # 생체값을 건드리지 않고 마지막 정상값을 남겨둔다.
     if not request.presence or request.stabilizing:
         _buffers.pop(request.patient_id, None)
+        # 자리를 비웠거나 센서가 안정화 중이면 그동안은 지켜보지 못한 것이므로,
+        # 진행 중이던 DANGER 지속 시간도 무효로 하고 처음부터 다시 센다.
+        # ("재실 상태가 유지되면서 10초 이상"이 응급 판정 조건이다)
+        _danger_episodes.pop(request.patient_id, None)
         return _not_saved(presence=request.presence)
 
     heart_rate = request.heart_rate
@@ -400,7 +447,7 @@ def _apply(
     # 못 믿는 이번 측정에 옛날 호흡값을 넣어 모델에 태우면 잘못된 학습/판정이
     # 나오므로, 심박·호흡이 둘 다 이번에 실제로 믿을 수 있을 때만 돌린다.
     reason = None
-    if resp_trusted:
+    if settings.EARLY_WARNING_ENABLED and resp_trusted:
         vital_status, reason = _apply_early_warning(
             news2_status=vital_status,
             patient_id=request.patient_id,
@@ -423,6 +470,7 @@ def _apply(
         heart_rate=heart_rate,
         resp_rate=resp_rate,
         reason=reason,
+        now=now,
     )
 
     # 이어 쓴 호흡값은 이번에 측정된 값이 아니므로 1분 평균에 넣지 않는다

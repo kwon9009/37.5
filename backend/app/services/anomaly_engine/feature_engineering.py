@@ -23,12 +23,25 @@ def feature_names() -> list[str]:
     return names
 
 
-def iter_windows(data: pd.DataFrame, config: Settings = settings) -> Iterator[pd.DataFrame]:
-    """Yield fixed-duration windows by subject."""
+def iter_windows(
+    data: pd.DataFrame, config: Settings = settings, latest_only: bool = False,
+) -> Iterator[pd.DataFrame]:
+    """Yield fixed-duration windows by subject.
+
+    latest_only=True면 가장 최근 윈도우 하나만 낸다. 실시간 판정에서는 매초
+    "지금 상태"만 알면 되는데, 전부 계산하면 180초 버퍼 기준 25개 윈도우를
+    만들고 그중 24개를 버리게 된다(1건에 260ms -> 초당 3.5건밖에 처리 못 함).
+    학습할 때는 모든 윈도우가 필요하므로 기본값은 False로 둔다.
+    """
     for _, group in data.groupby("subject_id"):
         group = group.sort_values("timestamp").reset_index(drop=True)
         size = config.window_seconds
-        for start in range(0, len(group) - size + 1, config.window_step_seconds):
+        starts = range(0, len(group) - size + 1, config.window_step_seconds)
+
+        if latest_only:
+            starts = list(starts)[-1:]
+
+        for start in starts:
             yield group.iloc[start:start + size].copy()
 
 
@@ -82,9 +95,10 @@ def extract_features(
     baselines: dict[str, dict[str, float]],
     fallback: dict[str, float],
     config: Settings = settings,
+    latest_only: bool = False,
 ) -> pd.DataFrame:
     rows = []
-    for window in iter_windows(data, config):
+    for window in iter_windows(data, config, latest_only=latest_only):
         subject = str(window["subject_id"].iloc[0])
         rows.append(extract_window_features(window, baselines.get(subject, fallback)))
     return pd.DataFrame(rows)
