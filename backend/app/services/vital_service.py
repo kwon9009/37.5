@@ -26,7 +26,7 @@ from app.crud import alert_crud, vital_crud
 from app.models.enums import VitalStatus
 from app.models.patient import Patient
 from app.schemas.vitals.vitals_ingest_request import VitalsIngestRequest
-from app.services import stream_service
+from app.services import stream_service, vital_recorder
 from app.services.anomaly_engine import engine as anomaly_engine
 
 # 1분 평균을 만들기 위한 환자별 임시 버퍼 (서버 메모리)
@@ -121,6 +121,32 @@ def judge_status(
 _EARLY_WARNING_CEILING = VitalStatus.ALERT
 
 
+# 라즈베리파이가 보낸 측정 시각을 그대로 믿어도 되는지 본다.
+#
+# RPi는 RTC(시계 배터리)가 없어서 부팅 직후 NTP 동기화 전까지 시각이 크게
+# 틀어질 수 있다. 그 값을 그대로 모델 버퍼에 넣으면, 전처리가 버퍼의 처음~끝을
+# 1초 격자로 채우면서 그 간격만큼 행을 만든다. 하루만 틀어져도 86,400행이라
+# 서버가 멈춘다.
+#
+# 서버 시각과 너무 동떨어지면 못 믿는 것으로 보고 서버 시각을 쓴다(=예전 동작).
+_MAX_CLOCK_SKEW_SEC = 300
+
+
+def _usable_measured_at(measured_at: datetime | None) -> datetime | None:
+
+    if measured_at is None:
+        return None
+
+    # 타임존이 붙어 온 경우 서버 시각(naive)과 뺄 수 없으므로 떼어낸다
+    if measured_at.tzinfo is not None:
+        measured_at = measured_at.replace(tzinfo=None)
+
+    if abs((measured_at - datetime.now()).total_seconds()) > _MAX_CLOCK_SKEW_SEC:
+        return None
+
+    return measured_at
+
+
 # NEWS2는 "지금 값이 고정 기준선을 넘었는가"만 본다. 여기서는 개인 평소 패턴(최근
 # 180초) 대비 이상탐지 모델(anomaly_engine) 점수를 추가로 받아, NEWS2보다 더
 # 위험하다고 나오면 그 등급으로 올려 쓴다. 반대로 모델이 더 낮게 보더라도 NEWS2
@@ -130,12 +156,17 @@ def _apply_early_warning(
     patient_id: int,
     heart_rate: int,
     resp_rate: int,
-) -> tuple[VitalStatus, str | None]:
+    measured_at: datetime | None = None,
+) -> tuple[VitalStatus, str | None, anomaly_engine.EvaluationResult]:
 
+    # 측정 시각은 센서가 잰 시각(measured_at)을 쓴다. 안 넘기면 engine이 서버
+    # 도착 시각을 찍는데, 그러면 전송이 밀렸다가 몰려 들어올 때 60초 윈도우가
+    # 실제 측정 간격과 어긋난다.
     prediction = anomaly_engine.evaluate(
         patient_id=patient_id,
         heart_rate=heart_rate,
         respiration_rate=resp_rate,
+        timestamp=_usable_measured_at(measured_at),
     )
 
     predicted_status = VitalStatus(prediction.status)
@@ -143,12 +174,14 @@ def _apply_early_warning(
     if _SEVERITY[predicted_status] > _SEVERITY[_EARLY_WARNING_CEILING]:
         predicted_status = _EARLY_WARNING_CEILING
 
+    # prediction은 상한을 적용하기 전의 원판정이다. 실측 기록에는 이걸 남겨야
+    # "모델이 원래 얼마나 위험하다고 봤는지"를 나중에 되짚을 수 있다.
     if _SEVERITY[predicted_status] <= _SEVERITY[news2_status]:
-        return news2_status, None
+        return news2_status, None, prediction
 
     reason = prediction.reasons[0] if prediction.reasons else None
 
-    return predicted_status, reason
+    return predicted_status, reason, prediction
 
 
 # 등급이 이전과 달라졌을 때만 알림을 만든다(매초 중복 생성 방지).
@@ -357,6 +390,26 @@ def ingest_vitals(
 
     result = _apply(db=db, patient=patient, request=request)
 
+    # 실측 세션 기록 (VITAL_RECORD_PATH를 설정했을 때만).
+    # 1초 원시값은 DB에 남지 않으므로, 규칙 판정과 모델 판정을 나중에 비교하려면
+    # 여기서 남겨두는 수밖에 없다.
+    if vital_recorder.is_enabled():
+        vital_recorder.record(
+            vital_recorder.build_entry(
+                patient_id=request.patient_id,
+                request_heart_rate=request.heart_rate,
+                request_resp_rate=request.breath_rate,
+                presence=request.presence,
+                stabilizing=request.stabilizing,
+                measured_at=request.measured_at,
+                result=result,
+            )
+        )
+
+    # 판정 비교용 값은 기록에만 쓴다. 화면·하드웨어 응답에는 내보내지 않는다.
+    for key in ("news2", "model", "score", "reasons"):
+        result.pop(key, None)
+
     # 화면이 다시 물어보기(폴링)를 기다리지 않도록 값이 들어온 즉시 밀어준다.
     # heart_rate/resp_rate가 None이면 "이번엔 갱신할 값이 없음"이라는 뜻이라
     # 화면은 직전 값을 그대로 유지하고 재실/등급만 반영한다.
@@ -438,21 +491,24 @@ def _apply(
 
     # 호흡을 못 믿을 때는 심박만으로 등급을 낸다.
     # 이어 쓴 옛날 호흡값으로 위험 판정을 내리면 가짜 응급이 만들어진다.
-    vital_status = judge_status(
+    news2_status = judge_status(
         heart_rate=heart_rate,
         resp_rate=resp_rate if resp_trusted else None,
     )
+    vital_status = news2_status
 
     # 예측 모델(anomaly_engine)은 개인 평소 패턴 대비 이상 정도를 본다. 호흡을
     # 못 믿는 이번 측정에 옛날 호흡값을 넣어 모델에 태우면 잘못된 학습/판정이
     # 나오므로, 심박·호흡이 둘 다 이번에 실제로 믿을 수 있을 때만 돌린다.
     reason = None
+    prediction = None
     if settings.EARLY_WARNING_ENABLED and resp_trusted:
-        vital_status, reason = _apply_early_warning(
-            news2_status=vital_status,
+        vital_status, reason, prediction = _apply_early_warning(
+            news2_status=news2_status,
             patient_id=request.patient_id,
             heart_rate=heart_rate,
             resp_rate=resp_rate,
+            measured_at=request.measured_at,
         )
 
     vital_crud.upsert_vital_check(
@@ -490,6 +546,12 @@ def _apply(
         "resp_rate": resp_rate,
         "resp_replaced": not resp_trusted,
         "reason": reason,
+        # 아래 넷은 화면에는 안 나가고 실측 기록에만 쓴다.
+        # 규칙 판정과 모델 판정을 나란히 남겨야 나중에 둘을 비교할 수 있다.
+        "news2": news2_status.value,
+        "model": prediction.status if prediction else None,
+        "score": prediction.anomaly_score if prediction else None,
+        "reasons": prediction.reasons if prediction else None,
     }
 
 
