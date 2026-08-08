@@ -204,6 +204,14 @@ export default function PatientInfo() {
     }
   }
 
+  // 등록된 병원 코드를 다시 입력할 수 있도록 잠금 해제
+  // (초대 링크로 고정된 경우(codeLocked)는 이 버튼 자체가 노출되지 않는다)
+  function handleCodeReset() {
+    setHospital(null)
+    setCode("")
+    setCodeWarning("")
+  }
+
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!pname) {
@@ -378,30 +386,33 @@ export default function PatientInfo() {
               <input
                 id="hospital-code"
                 aria-label="병원 코드"
-                placeholder="예: DJ1001"
+                placeholder="예: DJ001"
                 value={code}
                 onChange={(e) => {
                   setCode(e.target.value.toUpperCase())
                   setCodeWarning("")
                 }}
                 onAnimationEnd={() => setCodeShake(false)}
-                readOnly={codeLocked}
-                aria-readonly={codeLocked}
+                readOnly={codeLocked || Boolean(hospital)}
+                aria-readonly={codeLocked || Boolean(hospital)}
                 className={cn(
                   "h-13 min-w-0 flex-1 rounded-2xl border border-input bg-card px-4 text-base tracking-wide text-foreground outline-none placeholder:tracking-normal placeholder:text-muted-foreground/60 focus:border-ring focus:ring-2 focus:ring-ring/20",
                   codeShake && "verify-shake",
                   codeWarning && "verify-error-border",
                   codeLocked && "cursor-not-allowed bg-muted/60 text-muted-foreground",
+                  !codeLocked && hospital && "bg-muted/50 text-muted-foreground",
                 )}
               />
+              {/* 등록 완료 후에는 "변경"으로 바꿔, 같은 버튼이 재조회처럼 동작하는 혼란을 없앤다.
+                  단, 초대 링크로 코드가 고정된 경우(codeLocked)는 변경 자체를 막는다. */}
               <Button
                 type="button"
-                variant={hospital ? "muted" : "primary"}
+                variant={hospital ? (codeLocked ? "muted" : "outline") : "primary"}
                 className="h-13 w-28 shrink-0 whitespace-nowrap px-0 text-sm"
                 disabled={codeLocked || codeChecking}
-                onClick={handleCodeCheck}
+                onClick={hospital && !codeLocked ? handleCodeReset : handleCodeCheck}
               >
-                {codeChecking ? "조회 중" : hospital ? "등록됨" : "확인"}
+                {codeChecking ? "조회 중" : hospital ? (codeLocked ? "등록됨" : "변경") : "확인"}
               </Button>
             </div>
             {codeWarning && (
@@ -436,7 +447,7 @@ export default function PatientInfo() {
                   </div>
                   <span className="flex shrink-0 items-center gap-1 text-xs font-semibold text-success">
                     <CheckCircle2 size={14} aria-hidden />
-                    확인
+                    등록됨
                   </span>
                 </div>
 

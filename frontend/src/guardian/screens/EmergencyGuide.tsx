@@ -32,7 +32,7 @@ export default function EmergencyGuide() {
 
   return (
     <Screen>
-      <TopBar title="의료 응급상황 대응 가이드" back />
+      <TopBar title="의료 응급상황 대응 가이드" back titleClassName="text-sm" />
       <div className="flex-1 overflow-y-auto px-5 py-5">
         {/* 1·2·3단계 대응을 픽토그램으로 요약 */}
         <div className="rounded-3xl bg-danger/10 p-5">
