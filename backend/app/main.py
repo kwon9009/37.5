@@ -26,6 +26,7 @@ from app.api.alert import router as alert_router
 from app.api.guardian import router as guardian_router
 from app.api.stream import router as stream_router
 from app.api.monitoring import router as monitoring_router
+from app.api.patient_link_request import router as patient_link_request_router
 
 app = FastAPI(title="37.5 SmartCare API")
 app.include_router(auth_router)
@@ -38,6 +39,7 @@ app.include_router(alert_router)
 app.include_router(guardian_router)
 app.include_router(stream_router)
 app.include_router(monitoring_router)
+app.include_router(patient_link_request_router)
 
 # 프론트(다른 포트)에서 접근 가능하게 CORS 허용 (개발용: 전체 허용)
 app.add_middleware(

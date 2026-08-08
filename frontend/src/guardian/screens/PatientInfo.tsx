@@ -11,6 +11,7 @@ import {
   saveRegisteredHospital,
   type HospitalInfo,
 } from "@/guardian/lib/hospitals"
+import { RELATIONS, submitLinkRequest } from "@/guardian/lib/patient-link"
 
 const ITEM_H = 40 // 다이얼 각 항목 높이(px)
 
@@ -136,8 +137,16 @@ export default function PatientInfo() {
   // const codeLocked = LOCK_INVITE_CODE && !!hospital && !!inviteCode
   const codeLocked = false
 
+  // 환자와의 관계. 병원이 승인할 때 이 값으로 보호자-환자가 연결된다.
+  const [relation, setRelation] = useState<string>("")
+  const [relationWarning, setRelationWarning] = useState("")
+
   // 최종 확인 다이얼로그
   const [confirmOpen, setConfirmOpen] = useState(false)
+
+  // 연동 신청 보내는 중 / 실패 사유
+  const [submitting, setSubmitting] = useState(false)
+  const [submitError, setSubmitError] = useState("")
 
   const now = new Date()
   const [year, setYear] = useState(1950)
@@ -204,12 +213,44 @@ export default function PatientInfo() {
     if (!validatePname()) {
       return
     }
+    if (!relation) {
+      setRelationWarning("환자와의 관계를 선택해 주세요.")
+      return
+    }
     if (!hospital) {
       setCodeWarning("병원 코드를 등록해 주세요.")
       setCodeShake(true)
       return
     }
+    setSubmitError("")
     setConfirmOpen(true)
+  }
+
+  // 확인 다이얼로그에서 "맞습니다"를 눌렀을 때: 병원에 연동을 신청한다.
+  // 신청이 성공해야 대기 화면으로 넘어간다. 실패했는데 넘어가면 보호자는
+  // 승인을 기다리는 줄 알지만 병원에는 아무것도 안 가 있는 상태가 된다.
+  async function handleConfirm() {
+    if (!hospital || submitting) return
+
+    setSubmitting(true)
+    setSubmitError("")
+
+    try {
+      await submitLinkRequest({
+        hospitalCode: hospital.code,
+        patientName: pname,
+        birthdate: `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`,
+        relation,
+      })
+
+      // 홈 화면의 "병원 연락" 버튼이 이 병원 번호로 걸리도록 저장해 둔다
+      saveRegisteredHospital(hospital.code)
+      navigate("/guardian/waiting", { replace: true })
+    } catch (error) {
+      setSubmitError((error as Error).message)
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   return (
@@ -265,6 +306,36 @@ export default function PatientInfo() {
                 </button>
               ))}
             </div>
+          </div>
+
+          {/* 환자와의 관계. 병원이 승인할 때 이 값으로 보호자-환자가 연결된다. */}
+          <div>
+            <span className="mb-1.5 block text-sm font-medium text-muted-foreground">환자와의 관계</span>
+            <div className="grid grid-cols-3 gap-2">
+              {RELATIONS.map((r) => (
+                <button
+                  key={r}
+                  type="button"
+                  onClick={() => {
+                    setRelation(r)
+                    setRelationWarning("")
+                  }}
+                  className={cn(
+                    "h-13 rounded-2xl border text-sm font-semibold transition",
+                    relation === r
+                      ? "border-primary bg-primary text-primary-foreground"
+                      : "border-border bg-card text-foreground",
+                  )}
+                >
+                  {r}
+                </button>
+              ))}
+            </div>
+            {relationWarning && (
+              <p className="mt-1.5 text-xs font-medium text-danger" role="alert">
+                {relationWarning}
+              </p>
+            )}
           </div>
 
           {/* 생년월일 - 토글로 다이얼 열기 */}
@@ -392,6 +463,7 @@ export default function PatientInfo() {
                 ["성명", pname],
                 ["성별", gender === "male" ? "남성" : gender === "female" ? "여성" : "미선택"],
                 ["생년월일", birthLabel],
+                ["관계", relation || "-"],
                 ["병원", hospital?.name ?? "-"],
               ].map(([k, v]) => (
                 <div key={k} className="flex items-center justify-between gap-3 text-sm">
@@ -400,24 +472,28 @@ export default function PatientInfo() {
                 </div>
               ))}
             </dl>
+            {submitError && (
+              <p className="mt-4 rounded-xl bg-danger/10 px-3 py-2 text-xs font-medium text-danger" role="alert">
+                {submitError}
+              </p>
+            )}
+
             <div className="mt-5 flex gap-2">
               <button
                 type="button"
                 onClick={() => setConfirmOpen(false)}
-                className="h-12 flex-1 rounded-2xl border border-border text-sm font-semibold text-foreground"
+                disabled={submitting}
+                className="h-12 flex-1 rounded-2xl border border-border text-sm font-semibold text-foreground disabled:opacity-50"
               >
                 다시 확인
               </button>
               <button
                 type="button"
-                onClick={() => {
-                  // 홈 화면의 "병원 연락" 버튼이 이 병원 번호로 걸리도록 저장해 둔다
-                  if (hospital) saveRegisteredHospital(hospital.code)
-                  navigate("/guardian/waiting")
-                }}
-                className="h-12 flex-1 rounded-2xl bg-primary text-sm font-semibold text-primary-foreground"
+                onClick={handleConfirm}
+                disabled={submitting}
+                className="h-12 flex-1 rounded-2xl bg-primary text-sm font-semibold text-primary-foreground disabled:opacity-50"
               >
-                맞습니다
+                {submitting ? "신청 중…" : "맞습니다"}
               </button>
             </div>
           </div>
