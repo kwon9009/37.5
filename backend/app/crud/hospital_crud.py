@@ -38,6 +38,7 @@ def search_by_name(
     db: Session,
     query: str | None = None,
     area: str | None = None,
+    limit: int = 20,
 ) -> list[Hospital]:
     stmt = select(Hospital)
 
@@ -47,9 +48,24 @@ def search_by_name(
     if area:
         stmt = stmt.where(Hospital.area == area)
 
-    stmt = stmt.order_by(Hospital.name).limit(20)
+    stmt = stmt.order_by(Hospital.name).limit(limit)
 
     return list(db.scalars(stmt))
+
+
+# 병원 코드로 조회 (보호자가 문자로 받은 코드를 입력했을 때)
+# 코드는 대소문자를 가리지 않는다. 문자로 받은 코드를 손으로 옮겨 적다가
+# 소문자로 입력하는 일이 잦은데, 그때마다 "없는 병원"이 되면 안 된다.
+def get_by_code(
+    db: Session,
+    hospital_code: str,
+) -> Hospital | None:
+
+    stmt = select(Hospital).where(
+        func.upper(Hospital.hospital_code) == hospital_code.strip().upper()
+    )
+
+    return db.scalar(stmt)
 
 
 # 등록된 병원이 있는 지역 목록 (회원가입 화면의 지역 선택 칸에 채운다)
