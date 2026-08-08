@@ -63,6 +63,12 @@ class Settings(BaseSettings):
     # 짧을수록 안전하고, 화면이 티켓을 받아 접속하는 데 걸리는 시간보다는 길어야 한다.
     STREAM_TICKET_TTL_SEC: int = 60
 
+    # 실측 기록 파일 경로. 비워두면 기록하지 않는다(운영 기본값).
+    # 1초 원시값은 DB에 쌓지 않기 때문에, 실측 후 "규칙과 모델이 각각 뭐라고
+    # 했는지"를 다시 보려면 세션 중에만 따로 남겨둬야 한다.
+    # 실측할 때만 켠다:  VITAL_RECORD_PATH=records/session1.ndjson
+    VITAL_RECORD_PATH: str = ""
+
     # CORS
 
     model_config = SettingsConfigDict(

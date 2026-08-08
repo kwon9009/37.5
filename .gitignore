@@ -18,6 +18,9 @@ npm-debug.log*
 .env.local
 .env.*.local
 
+# ===== 실측 기록 (세션마다 새로 생기는 원시 데이터) =====
+backend/records/
+
 # ===== OS / IDE =====
 .DS_Store
 Thumbs.db
