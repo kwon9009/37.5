@@ -39,6 +39,7 @@ import GuardianRecords from "./guardian/screens/Records.tsx";
 import GuardianSettings from "./guardian/screens/Settings.tsx";
 import GuardianAccountEdit from "./guardian/screens/AccountEdit.tsx";
 import GuardianHelp from "./guardian/screens/Help.tsx";
+import RequireLinkedPatient from "./guardian/components/RequireLinkedPatient.tsx";
 // 개발용: 병원 주소가 카카오 지도에서 찾아지는지 일괄 점검 (개발 모드에서만 동작)
 import DevHospitalMap from "./pages/dev-hospital-map/dev-hospital-map.tsx";
 // 개발용: 목업 병원으로 쓸 실제 요양병원을 카카오에서 찾아온다 (개발 모드에서만 동작)
@@ -90,16 +91,20 @@ function App() {
       <Route path="/guardian/patient-info" element={<GuardianPatientInfo />} />
       <Route path="/guardian/waiting" element={<GuardianWaiting />} />
 
-      {/* 보호자 전용 (role: GUARDIAN) */}
+      {/* 보호자 전용 (role: GUARDIAN)
+          RequireLinkedPatient: 아직 병원 승인을 못 받아 연결된 환자가 없으면
+          빈 화면 대신 승인 대기 화면으로 보낸다 */}
       <Route element={<RequireRole allow={["GUARDIAN"]} />}>
-        <Route path="/guardian/home" element={<GuardianHome />} />
-        <Route path="/guardian/notifications" element={<GuardianNotifications />} />
-        <Route path="/guardian/emergency" element={<GuardianEmergency />} />
-        <Route path="/guardian/emergency/guide" element={<GuardianEmergencyGuide />} />
-        <Route path="/guardian/records" element={<GuardianRecords />} />
-        <Route path="/guardian/settings" element={<GuardianSettings />} />
-        <Route path="/guardian/settings/account" element={<GuardianAccountEdit />} />
-        <Route path="/guardian/help" element={<GuardianHelp />} />
+        <Route element={<RequireLinkedPatient />}>
+          <Route path="/guardian/home" element={<GuardianHome />} />
+          <Route path="/guardian/notifications" element={<GuardianNotifications />} />
+          <Route path="/guardian/emergency" element={<GuardianEmergency />} />
+          <Route path="/guardian/emergency/guide" element={<GuardianEmergencyGuide />} />
+          <Route path="/guardian/records" element={<GuardianRecords />} />
+          <Route path="/guardian/settings" element={<GuardianSettings />} />
+          <Route path="/guardian/settings/account" element={<GuardianAccountEdit />} />
+          <Route path="/guardian/help" element={<GuardianHelp />} />
+        </Route>
       </Route>
     </Routes>
   );

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime
 import random
 
 from sqlalchemy.orm import Session
@@ -298,36 +298,75 @@ def create_patients(db: Session):
 
 
 def create_patient_link_requests(db: Session):
+    """보호자가 낸 환자 연동 신청 시드.
+
+    실제와 같은 모양이 되도록 두 가지를 맞춘다.
+
+      1) 신청 병원 = 그 환자가 실제로 입원해 있는 병원
+         다른 병원으로 신청하면 병원 화면에서 "일치하는 환자 없음"이 되어
+         승인 자체를 해볼 수 없다.
+
+      2) 신청한 보호자 = 그 환자와 아직 연결되지 않은 보호자
+         이미 연결이 끝난 사이를 다시 신청하는 상황은 현실에 없다.
+         (다른 가족이 뒤늦게 신청하는 상황을 흉내 낸다)
+
+    APPROVED로 둔 신청은 연결(patient_guardians)까지 만들어 앞뒤를 맞춘다.
+    승인됐다고 표시돼 있는데 정작 연결이 없으면 앞뒤가 안 맞는 데이터가 된다.
+
+    주의: create_patient_guardians 가 먼저 실행돼야 한다.
+          누가 이미 연결돼 있는지 보고 신청자를 고르기 때문이다.
+    """
 
     guardians = db.query(Guardian).order_by(Guardian.guardian_id).all()
-    hospitals = db.query(Hospital).order_by(Hospital.hospital_id).all()
     patients = db.query(Patient).order_by(Patient.patient_id).all()
 
-    requests = []
+    statuses = ["PENDING", "PENDING", "APPROVED", "REJECTED"]
+    relations = ["아들", "배우자", "딸", "형제"]
 
-    statuses = [
-        "PENDING",
-        "PENDING",
-        "APPROVED",
-        "REJECTED",
-    ]
+    requests = []
 
     for i in range(8):
 
         patient = patients[i]
-        guardian = guardians[i % len(guardians)]
-        hospital = hospitals[i % len(hospitals)]
+
+        # 환자는 부서를 거쳐 병원에 속한다
+        hospital_id = patient.department.hospital_id
+
+        # 이 환자와 이미 연결된 보호자는 신청자 후보에서 뺀다
+        linked_ids = {link.guardian_id for link in patient.patient_guardians}
+        candidates = [g for g in guardians if g.guardian_id not in linked_ids]
+
+        if not candidates:
+            continue
+
+        guardian = candidates[i % len(candidates)]
+        status = statuses[i % len(statuses)]
+        relation = relations[i % len(relations)]
 
         requests.append(
             PatientLinkRequest(
                 guardian_id=guardian.guardian_id,
-                hospital_id=hospital.hospital_id,
+                hospital_id=hospital_id,
                 patient_name=patient.name,
                 birthdate=patient.birthdate,
-                relation="아들" if i % 2 == 0 else "배우자",
-                status=statuses[i % len(statuses)],
+                relation=relation,
+                status=status,
+                # 대기 중이면 아직 처리 전이라 비워 둔다
+                processed_at=None if status == "PENDING" else datetime.now(),
             )
         )
+
+        # 승인된 신청은 실제 연결까지 만들어 둔다.
+        # (위에서 이미 연결된 보호자를 걸렀으므로 여기서 중복될 일은 없지만,
+        #  이 함수만 따로 다시 돌리는 경우를 위해 한 번 더 확인한다)
+        if status == "APPROVED" and guardian.guardian_id not in linked_ids:
+            db.add(
+                PatientGuardian(
+                    patient_id=patient.patient_id,
+                    guardian_id=guardian.guardian_id,
+                    relation=relation,
+                )
+            )
 
     db.add_all(requests)
     db.commit()
@@ -606,8 +645,10 @@ def main():
         create_departments(db)
         create_guardians(db)
         create_patients(db)
-        create_patient_link_requests(db)
+        # 연결(patient_guardians)을 먼저 만든다.
+        # 연동 신청 시드가 "이미 연결된 보호자"를 피해서 신청자를 고르기 때문이다.
         create_patient_guardians(db)
+        create_patient_link_requests(db)
         create_devices(db)
         create_vital_checks(db)
         create_alerts(db)
