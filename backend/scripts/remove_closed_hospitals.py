@@ -1,18 +1,19 @@
-"""폐업한 병원을 hospitals 테이블에서 지운다.
+"""이미 DB에 들어가 있는 폐업 병원을 지운다.
 
 왜 필요한가:
   대전 45개는 공공데이터에서 가져온 실제 병원인데, 그중 일부는 그 뒤에 폐업했다.
-  폐업한 병원이 목록에 남아 있으면 보호자가 그 병원으로 연동 신청을 할 수 있게 된다.
+  폐업한 병원이 목록에 남아 있으면 보호자가 그 병원으로 연동 신청을 하게 된다.
 
-어떻게 찾았나:
-  개발 화면 /dev/hospital-map 으로 63개 병원 주소를 카카오 지도에서 일괄 조회했더니
-  보아스요양병원만 어떤 방법으로도 안 잡혔다. 폐업하면 카카오에서도 내려가기 때문이다.
-  (나머지 병원은 전부 정상 조회되었다 = 아직 영업 중이라는 신호)
+  import_hospitals.py 는 이제 폐업 병원을 아예 넣지 않는다.
+  그래서 이 스크립트는 "그 전에 만들어진 DB"를 정리하는 용도다.
+  DB를 새로 만드는 경우에는 지울 것이 없어서 그냥 넘어간다.
+
+어느 병원이 폐업인지는 scripts/closed_hospitals.py 에 적어둔다.
 
 주의:
   외래키 때문에 병원을 참조하는 행을 먼저 지워야 한다.
-  아래 대상은 전부 시드(테스트) 데이터임을 확인하고 지운다.
-  실제 운영 데이터가 생긴 뒤에는 이 스크립트를 그대로 쓰면 안 된다.
+  지금은 그 대상이 전부 시드(테스트) 데이터임을 확인하고 지운다.
+  실제 환자 연동 데이터가 쌓인 뒤에는 이 스크립트를 그대로 쓰면 안 된다.
 
 여러 번 실행해도 안전하다. 이미 없으면 건너뛴다.
 """
@@ -23,11 +24,7 @@ from app.core.database import SessionLocal
 from app.models.admin_hospital import AdminHospital
 from app.models.hospital import Hospital
 from app.models.patient_link_request import PatientLinkRequest
-
-# 폐업이 확인되어 지울 병원 코드
-CLOSED_HOSPITAL_CODES = [
-    "DJ008",  # 보아스요양병원 (대전 서구 도산로 224) — 2026-08-08 폐업 확인
-]
+from scripts.closed_hospitals import CLOSED_CODES as CLOSED_HOSPITAL_CODES
 
 
 def main():
