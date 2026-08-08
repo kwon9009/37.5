@@ -5,15 +5,26 @@ import StatusBadge from "../status-badge/status-badge.jsx";
 import { PATIENTS } from "../../data/patients.js";
 import { useAuthStore } from "../../store/auth-store.js";
 import { useUnreadAlertCount } from "../../hooks/use-unread-alert-count.js";
+import { useMyHospital } from "../../hooks/use-my-hospital.js";
 
-function Header({ hospitalName = "서울중앙병원", userName, notificationCount }) {
+// 관리자는 특정 병원 소속이 아니라 여러 병원을 관리한다
+const ADMIN_LABEL = "37.5 SmartCare";
+
+function Header({ hospitalName, userName, notificationCount }) {
   const [searchQuery, setSearchQuery] = useState("");
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const navigate = useNavigate();
   const logout = useAuthStore((state) => state.logout);
   const loginId = useAuthStore((state) => state.loginId);
+  const role = useAuthStore((state) => state.role);
   const displayName = userName ?? loginId ?? "김간호 · RN";
+
+  // 로그인한 계정의 실제 소속 병원. prop으로 직접 준 이름이 있으면 그걸 우선한다
+  // (개발용 컴포넌트 목록 화면처럼 서버 없이 보여줘야 하는 곳이 있다).
+  const myHospital = useMyHospital();
+  const shownHospitalName =
+    hospitalName ?? myHospital ?? (role === "ADMIN" ? ADMIN_LABEL : "");
   const liveUnreadCount = useUnreadAlertCount();
   const badgeCount = notificationCount ?? liveUnreadCount;
 
@@ -38,7 +49,7 @@ function Header({ hospitalName = "서울중앙병원", userName, notificationCou
   return (
     <header className="header flex h-16 items-center justify-between bg-[#1E2A3A] px-6">
       <div className="header__left flex items-center gap-2">
-        <span className="text-base font-bold text-white">{hospitalName}</span>
+        <span className="text-base font-bold text-white">{shownHospitalName}</span>
       </div>
 
       <div className="header__search relative">
