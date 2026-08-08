@@ -208,13 +208,28 @@ def list_hospital_requests(
     return [_to_hospital_response(db=db, request=request) for request in requests]
 
 
-# 승인 / 거절
-def decide_request(
+# 신청 한 건 (상세 화면용)
+def get_hospital_request(
     db: Session,
     current_user: User,
     request_id: int,
-    decision: PatientLinkRequestDecision,
 ) -> PatientLinkRequestHospitalResponse:
+
+    link_request = _load_for_staff(
+        db=db,
+        current_user=current_user,
+        request_id=request_id,
+    )
+
+    return _to_hospital_response(db=db, request=link_request)
+
+
+# 병원 직원이 다룰 수 있는 신청인지 확인하고 가져온다
+def _load_for_staff(
+    db: Session,
+    current_user: User,
+    request_id: int,
+) -> PatientLinkRequest:
 
     link_request = patient_link_request_crud.get_by_id(
         db=db,
@@ -227,7 +242,7 @@ def decide_request(
             detail="존재하지 않는 신청입니다.",
         )
 
-    # 다른 병원 신청을 건드리지 못하게 막는다
+    # 다른 병원 신청은 보지도 건드리지도 못하게 막는다
     staff_hospital_id = _staff_hospital_id(db=db, current_user=current_user)
 
     if staff_hospital_id is not None and link_request.hospital_id != staff_hospital_id:
@@ -235,6 +250,23 @@ def decide_request(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="다른 병원의 신청입니다.",
         )
+
+    return link_request
+
+
+# 승인 / 거절
+def decide_request(
+    db: Session,
+    current_user: User,
+    request_id: int,
+    decision: PatientLinkRequestDecision,
+) -> PatientLinkRequestHospitalResponse:
+
+    link_request = _load_for_staff(
+        db=db,
+        current_user=current_user,
+        request_id=request_id,
+    )
 
     # 이미 처리된 신청을 다시 처리하지 못하게 한다.
     # 두 담당자가 동시에 열어두고 각각 승인/거절을 누르는 경우를 막는다.

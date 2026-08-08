@@ -78,6 +78,23 @@ def list_hospital_requests(
     )
 
 
+# 신청 한 건 조회 (병원 담당자 상세 화면용)
+@router.get(
+    "/{request_id}",
+    response_model=PatientLinkRequestHospitalResponse,
+)
+def get_hospital_request(
+    request_id: int = Path(..., ge=1),
+    current_user: User = Depends(require_role(UserRole.DEPARTMENT, UserRole.ADMIN)),
+    db: Session = Depends(get_db),
+) -> PatientLinkRequestHospitalResponse:
+    return patient_link_service.get_hospital_request(
+        db=db,
+        current_user=current_user,
+        request_id=request_id,
+    )
+
+
 # 신청 승인 / 거절 (병원 담당자용)
 @router.patch(
     "/{request_id}",
