@@ -38,6 +38,7 @@ def search_by_name(
     db: Session,
     query: str | None = None,
     area: str | None = None,
+    limit: int = 20,
 ) -> list[Hospital]:
     stmt = select(Hospital)
 
@@ -47,7 +48,7 @@ def search_by_name(
     if area:
         stmt = stmt.where(Hospital.area == area)
 
-    stmt = stmt.order_by(Hospital.name).limit(20)
+    stmt = stmt.order_by(Hospital.name).limit(limit)
 
     return list(db.scalars(stmt))
 

@@ -39,6 +39,10 @@ import GuardianRecords from "./guardian/screens/Records.tsx";
 import GuardianSettings from "./guardian/screens/Settings.tsx";
 import GuardianAccountEdit from "./guardian/screens/AccountEdit.tsx";
 import GuardianHelp from "./guardian/screens/Help.tsx";
+// 개발용: 병원 주소가 카카오 지도에서 찾아지는지 일괄 점검 (개발 모드에서만 동작)
+import DevHospitalMap from "./pages/dev-hospital-map/dev-hospital-map.tsx";
+// 개발용: 목업 병원으로 쓸 실제 요양병원을 카카오에서 찾아온다 (개발 모드에서만 동작)
+import DevHospitalFind from "./pages/dev-hospital-find/dev-hospital-find.tsx";
 
 function App() {
   return (
@@ -49,6 +53,10 @@ function App() {
       <Route path="/signup/hospital-code" element={<HospitalCodeRegister />} />
       <Route path="/admin-login" element={<AdminLogin />} />
       <Route path="/find-password" element={<FindPassword />} />
+
+      {/* 개발용 점검 화면. 로그인 없이 열 수 있게 두되, 화면 자체가 개발 모드에서만 동작한다 */}
+      <Route path="/dev/hospital-map" element={<DevHospitalMap />} />
+      <Route path="/dev/hospital-find" element={<DevHospitalFind />} />
 
       {/* 병원 스태프 전용 (role: DEPARTMENT, ADMIN) */}
       <Route element={<RequireRole allow={["DEPARTMENT", "ADMIN"]} />}>

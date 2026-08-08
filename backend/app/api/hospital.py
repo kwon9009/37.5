@@ -14,6 +14,8 @@ router = APIRouter(
 
 # 소속 병원 검색 (회원가입 화면에서 사용, 로그인 불필요)
 # query=이름 / area=지역. 둘 다 선택 사항이라 지역만으로도 목록을 볼 수 있다.
+# limit 은 화면에 한 번에 뿌릴 개수. 기본 20개면 검색 화면에는 충분하고,
+# 전체 목록이 필요한 도구(지도 일괄 점검 등)에서만 크게 준다.
 @router.get(
     "",
     response_model=list[HospitalResponse],
@@ -21,12 +23,14 @@ router = APIRouter(
 def search_hospitals(
     query: str | None = Query(default=None, min_length=1),
     area: str | None = Query(default=None, min_length=1),
+    limit: int = Query(default=20, ge=1, le=200),
     db: Session = Depends(get_db),
 ) -> list[HospitalResponse]:
     return search_by_name(
         db=db,
         query=query,
         area=area,
+        limit=limit,
     )
 
 
