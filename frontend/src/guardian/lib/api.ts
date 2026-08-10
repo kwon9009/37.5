@@ -51,8 +51,10 @@ export type GuardianData = {
   historyLog: HistoryItem[]
 }
 
-const HR_NORMAL = { min: 60, max: 100 }
-const RR_NORMAL = { min: 12, max: 20 }
+// 정상 범위와 판정 함수는 홈 화면 등 다른 곳에서도 같은 기준을 써야 해서 export 한다.
+// (각 화면이 임계값을 따로 들고 있으면 나중에 기준이 바뀔 때 서로 어긋난다)
+export const HR_NORMAL = { min: 60, max: 100 }
+export const RR_NORMAL = { min: 12, max: 20 }
 
 type Range = { min: number; max: number }
 
@@ -60,7 +62,7 @@ function isAbnormal(value: number, range: Range): boolean {
   return value < range.min || value > range.max
 }
 
-function levelLabel(value: number, range: Range): string {
+export function levelLabel(value: number, range: Range): string {
   if (value > range.max) return "높음"
   if (value < range.min) return "낮음"
   return "정상"
