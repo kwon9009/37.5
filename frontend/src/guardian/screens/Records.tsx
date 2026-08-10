@@ -70,15 +70,19 @@ export default function Records() {
   const [selectedDay, setSelectedDay] = useState(TODAY)
   const calendarRef = useRef<HTMLDivElement>(null)
 
-  // 당일이 캘린더 스크롤 영역의 가운데에 오도록 정렬
+  // 당일이 캘린더 스크롤 영역의 가운데에 오도록 정렬.
+  // offsetLeft 는 스크롤 컨테이너가 아니라 가장 가까운 위치지정 조상(.app-shell) 기준이라
+  // 바깥 여백(px-5)만큼 어긋난다. 두 요소의 실제 화면 좌표 차이로 계산해야 정확하다.
   useEffect(() => {
     const container = calendarRef.current
     const todayEl = container?.querySelector<HTMLElement>('[data-today="true"]')
     if (!container || !todayEl) return
-    container.scrollTo({
-      left: todayEl.offsetLeft - container.clientWidth / 2 + todayEl.clientWidth / 2,
-      behavior: "auto",
-    })
+    const containerRect = container.getBoundingClientRect()
+    const todayRect = todayEl.getBoundingClientRect()
+    // 컨테이너 왼쪽 끝에서 today 까지의 거리 - (가운데로 보내기 위해 빼야 할 여백)
+    const offsetInContainer = todayRect.left - containerRect.left
+    const centerOffset = container.clientWidth / 2 - todayRect.width / 2
+    container.scrollLeft += offsetInContainer - centerOffset
   }, [])
 
   return (
