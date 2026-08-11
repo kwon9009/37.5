@@ -12,6 +12,7 @@ from app.schemas.admin.hospital_detail_response import (
     AdminHospitalDetailResponse,
     AdminHospitalManagerResponse,
 )
+from app.schemas.admin.hospital_ward_response import AdminHospitalWardResponse
 
 
 # 주소에서 "OO구" 추출
@@ -184,3 +185,26 @@ def get_hospital_detail(
         bed_count=hospital.bed_count,
         manager=manager,
     )
+
+
+# 관리자 병원별 병동 현황 조회
+def get_hospital_wards(
+    db: Session,
+    hospital_id: int,
+) -> list[AdminHospitalWardResponse]:
+
+    rows = hospital_crud.get_wards_by_hospital_id(
+        db=db,
+        hospital_id=hospital_id,
+    )
+
+    return [
+        AdminHospitalWardResponse(
+            department_id=row.department_id,
+            name=row.name,
+            beds=row.bed_count,
+            occupied=row.occupied,
+            devices=row.devices,
+        )
+        for row in rows
+    ]

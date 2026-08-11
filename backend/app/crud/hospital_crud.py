@@ -1,4 +1,4 @@
-from sqlalchemy import func, select
+from sqlalchemy import func, select, case
 from sqlalchemy.orm import Session
 
 from app.models.admin import Admin
@@ -140,3 +140,51 @@ def get_detail_by_id(
     )
 
     return db.execute(stmt).first()
+
+
+# 관리자 병원별 병동 현황 조회
+def get_wards_by_hospital_id(
+    db: Session,
+    hospital_id: int,
+):
+    stmt = (
+        select(
+            Department.department_id,
+            Department.name,
+            Hospital.bed_count,
+            func.count(
+                func.distinct(
+                    case(
+                        (Patient.is_present.is_(True), Patient.patient_id),
+                    )
+                )
+            ).label("occupied"),
+            func.count(Device.device_id).label("devices"),
+        )
+        .select_from(Department)
+        .join(
+            Hospital,
+            Department.hospital_id == Hospital.hospital_id,
+        )
+        .outerjoin(
+            Patient,
+            Patient.department_id == Department.department_id,
+        )
+        .outerjoin(
+            Device,
+            Device.patient_id == Patient.patient_id,
+        )
+        .where(
+            Department.hospital_id == hospital_id,
+        )
+        .group_by(
+            Department.department_id,
+            Department.name,
+            Hospital.bed_count,
+        )
+        .order_by(
+            Department.department_id,
+        )
+    )
+
+    return db.execute(stmt).all()

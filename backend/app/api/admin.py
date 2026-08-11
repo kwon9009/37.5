@@ -9,6 +9,7 @@ from app.schemas.admin.admin_name_response import AdminNameResponse
 from app.schemas.admin.admin_hospital_create_request import AdminHospitalCreateRequest
 from app.schemas.admin.admin_hospital_create_response import AdminHospitalCreateResponse
 from app.schemas.admin.hospital_detail_response import AdminHospitalDetailResponse
+from app.schemas.admin.hospital_ward_response import AdminHospitalWardResponse
 from app.services import admin_service
 
 router = APIRouter(
@@ -66,6 +67,20 @@ def get_hospital_detail(
     db: Session = Depends(get_db),
 ):
     return admin_service.get_hospital_detail(
+        db=db,
+        hospital_id=hospital_id,
+    )
+
+
+@router.get(
+    "/hospitals/{hospital_id}/wards",
+    response_model=list[AdminHospitalWardResponse],
+)
+def get_hospital_wards(
+    hospital_id: int,
+    db: Session = Depends(get_db),
+):
+    return admin_service.get_hospital_wards(
         db=db,
         hospital_id=hospital_id,
     )
