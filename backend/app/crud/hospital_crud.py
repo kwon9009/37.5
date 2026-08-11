@@ -188,3 +188,33 @@ def get_wards_by_hospital_id(
     )
 
     return db.execute(stmt).all()
+
+
+# 관리자 병원별 연결 장치 현황 조회
+def get_device_stats_by_hospital_id(
+    db: Session,
+    hospital_id: int,
+):
+    stmt = (
+        select(
+            Device.status,
+            func.count(Device.device_id).label("device_count"),
+        )
+        .select_from(Device)
+        .join(
+            Patient,
+            Device.patient_id == Patient.patient_id,
+        )
+        .join(
+            Department,
+            Patient.department_id == Department.department_id,
+        )
+        .where(
+            Department.hospital_id == hospital_id,
+        )
+        .group_by(
+            Device.status,
+        )
+    )
+
+    return db.execute(stmt).all()

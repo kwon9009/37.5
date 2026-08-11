@@ -10,6 +10,9 @@ from app.schemas.admin.admin_hospital_create_request import AdminHospitalCreateR
 from app.schemas.admin.admin_hospital_create_response import AdminHospitalCreateResponse
 from app.schemas.admin.hospital_detail_response import AdminHospitalDetailResponse
 from app.schemas.admin.hospital_ward_response import AdminHospitalWardResponse
+from app.schemas.admin.hospital_device_stats_response import (
+    AdminHospitalDeviceStatsResponse,
+)
 from app.services import admin_service
 
 router = APIRouter(
@@ -34,7 +37,6 @@ def list_hospitals(
 @router.get(
     "/names",
     response_model=list[AdminNameResponse],
-    dependencies=[Depends(require_role(UserRole.ADMIN))],
 )
 def get_admin_names(
     db: Session = Depends(get_db),
@@ -81,6 +83,20 @@ def get_hospital_wards(
     db: Session = Depends(get_db),
 ):
     return admin_service.get_hospital_wards(
+        db=db,
+        hospital_id=hospital_id,
+    )
+
+
+@router.get(
+    "/hospitals/{hospital_id}/devices/stats",
+    response_model=AdminHospitalDeviceStatsResponse,
+)
+def get_hospital_device_stats(
+    hospital_id: int,
+    db: Session = Depends(get_db),
+):
+    return admin_service.get_hospital_device_stats(
         db=db,
         hospital_id=hospital_id,
     )

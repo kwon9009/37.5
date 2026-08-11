@@ -4,6 +4,7 @@ from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.crud import admin_crud, hospital_crud
+from app.models.enums import DeviceStatus
 from app.schemas.admin.hospital_list_response import AdminHospitalListItem
 from app.schemas.admin.admin_name_response import AdminNameResponse
 from app.schemas.admin.admin_hospital_create_request import AdminHospitalCreateRequest
@@ -13,6 +14,9 @@ from app.schemas.admin.hospital_detail_response import (
     AdminHospitalManagerResponse,
 )
 from app.schemas.admin.hospital_ward_response import AdminHospitalWardResponse
+from app.schemas.admin.hospital_device_stats_response import (
+    AdminHospitalDeviceStatsResponse,
+)
 
 
 # 주소에서 "OO구" 추출
@@ -208,3 +212,41 @@ def get_hospital_wards(
         )
         for row in rows
     ]
+
+
+# 관리자 병원별 연결 장치 현황 조회
+def get_hospital_device_stats(
+    db: Session,
+    hospital_id: int,
+) -> AdminHospitalDeviceStatsResponse:
+
+    hospital = hospital_crud.get_by_id(
+        db=db,
+        hospital_id=hospital_id,
+    )
+
+    if hospital is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="존재하지 않는 병원입니다.",
+        )
+
+    rows = hospital_crud.get_device_stats_by_hospital_id(
+        db=db,
+        hospital_id=hospital_id,
+    )
+
+    stats = {
+        DeviceStatus.ACTIVE: 0,
+        DeviceStatus.OFFLINE: 0,
+        DeviceStatus.ERROR: 0,
+    }
+
+    for row in rows:
+        stats[row.status] = row.device_count
+
+    return AdminHospitalDeviceStatsResponse(
+        active=stats[DeviceStatus.ACTIVE],
+        offline=stats[DeviceStatus.OFFLINE],
+        error=stats[DeviceStatus.ERROR],
+    )
