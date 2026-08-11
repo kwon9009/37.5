@@ -1,9 +1,8 @@
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
-from datetime import datetime
 
-from sqlalchemy import String, BigInteger, UniqueConstraint, Integer, TIMESTAMP, func
+from sqlalchemy import String, BigInteger, UniqueConstraint, Integer
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
@@ -33,12 +32,6 @@ class Hospital(Base):
     hospital_code: Mapped[str] = mapped_column(String(10), unique=True, nullable=False)
 
     bed_count: Mapped[int] = mapped_column(Integer, nullable=False)
-
-    created_at: Mapped[datetime] = mapped_column(
-        TIMESTAMP,
-        nullable=False,
-        server_default=func.now(),
-    )
 
     # Relationship
     departments: Mapped[list["Department"]] = relationship(
