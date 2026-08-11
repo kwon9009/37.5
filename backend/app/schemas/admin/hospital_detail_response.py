@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from pydantic import BaseModel
 
 
@@ -15,4 +17,5 @@ class AdminHospitalDetailResponse(BaseModel):
     area: str
     address: str
     bed_count: int
+    created_at: datetime
     manager: AdminHospitalManagerResponse | None
