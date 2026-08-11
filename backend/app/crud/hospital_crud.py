@@ -106,9 +106,37 @@ def list_all_with_stats(db: Session):
             func.coalesce(device_count_subq.c.device_count, 0).label("device_count"),
             manager_subq.c.manager_name,
         )
-        .outerjoin(device_count_subq, device_count_subq.c.hospital_id == Hospital.hospital_id)
+        .outerjoin(
+            device_count_subq, device_count_subq.c.hospital_id == Hospital.hospital_id
+        )
         .outerjoin(manager_subq, manager_subq.c.hospital_id == Hospital.hospital_id)
         .order_by(Hospital.hospital_id)
     )
 
     return db.execute(stmt).all()
+
+
+# 관리자 병원 상세 조회
+def get_detail_by_id(
+    db: Session,
+    hospital_id: int,
+):
+    stmt = (
+        select(
+            Hospital,
+            Admin,
+        )
+        .outerjoin(
+            AdminHospital,
+            AdminHospital.hospital_id == Hospital.hospital_id,
+        )
+        .outerjoin(
+            Admin,
+            Admin.admin_id == AdminHospital.admin_id,
+        )
+        .where(
+            Hospital.hospital_id == hospital_id,
+        )
+    )
+
+    return db.execute(stmt).first()

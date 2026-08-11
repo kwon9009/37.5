@@ -6,11 +6,11 @@ from sqlalchemy.orm import Session
 from app.crud import admin_crud, hospital_crud
 from app.schemas.admin.hospital_list_response import AdminHospitalListItem
 from app.schemas.admin.admin_name_response import AdminNameResponse
-from app.schemas.admin.admin_hospital_create_request import (
-    AdminHospitalCreateRequest,
-)
-from app.schemas.admin.admin_hospital_create_response import (
-    AdminHospitalCreateResponse,
+from app.schemas.admin.admin_hospital_create_request import AdminHospitalCreateRequest
+from app.schemas.admin.admin_hospital_create_response import AdminHospitalCreateResponse
+from app.schemas.admin.hospital_detail_response import (
+    AdminHospitalDetailResponse,
+    AdminHospitalManagerResponse,
 )
 
 
@@ -144,3 +144,43 @@ def create_hospital(
     except Exception:
         db.rollback()
         raise
+
+
+# 관리자 병원 상세 조회
+def get_hospital_detail(
+    db: Session,
+    hospital_id: int,
+) -> AdminHospitalDetailResponse:
+
+    result = hospital_crud.get_detail_by_id(
+        db=db,
+        hospital_id=hospital_id,
+    )
+
+    if result is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="존재하지 않는 병원입니다.",
+        )
+
+    hospital, admin = result
+
+    manager = None
+
+    if admin is not None:
+        manager = AdminHospitalManagerResponse(
+            admin_id=admin.admin_id,
+            name=admin.name,
+            email=admin.email,
+            phone=admin.phone,
+        )
+
+    return AdminHospitalDetailResponse(
+        hospital_id=hospital.hospital_id,
+        name=hospital.name,
+        hospital_code=hospital.hospital_code,
+        area=hospital.area,
+        address=hospital.address,
+        bed_count=hospital.bed_count,
+        manager=manager,
+    )
