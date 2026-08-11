@@ -188,6 +188,7 @@ def get_hospital_detail(
         area=hospital.area,
         address=hospital.address,
         bed_count=hospital.bed_count,
+        created_at=hospital.created_at,
         manager=manager,
     )
 
