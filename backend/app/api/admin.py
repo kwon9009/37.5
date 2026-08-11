@@ -13,6 +13,7 @@ from app.schemas.admin.hospital_ward_response import AdminHospitalWardResponse
 from app.schemas.admin.hospital_device_stats_response import (
     AdminHospitalDeviceStatsResponse,
 )
+from app.schemas.admin.hospital_update_request import AdminHospitalUpdateRequest
 from app.services import admin_service
 
 router = APIRouter(
@@ -22,6 +23,7 @@ router = APIRouter(
 )
 
 
+# 관리자 병원 목록 조회
 @router.get(
     "/hospitals",
     response_model=list[AdminHospitalListItem],
@@ -34,6 +36,7 @@ def list_hospitals(
     )
 
 
+# 관리자 이름 목록 조회
 @router.get(
     "/names",
     response_model=list[AdminNameResponse],
@@ -46,6 +49,7 @@ def get_admin_names(
     )
 
 
+# 관리자 병원 직접 추가
 @router.post(
     "/hospitals",
     response_model=AdminHospitalCreateResponse,
@@ -60,6 +64,7 @@ def create_hospital(
     )
 
 
+# 관리자 병원 상세 조회
 @router.get(
     "/hospitals/{hospital_id}",
     response_model=AdminHospitalDetailResponse,
@@ -74,6 +79,7 @@ def get_hospital_detail(
     )
 
 
+# 관리자 병원 병동 현황 조회
 @router.get(
     "/hospitals/{hospital_id}/wards",
     response_model=list[AdminHospitalWardResponse],
@@ -88,6 +94,7 @@ def get_hospital_wards(
     )
 
 
+# 관리자 병원 연결 장치 현황 조회
 @router.get(
     "/hospitals/{hospital_id}/devices/stats",
     response_model=AdminHospitalDeviceStatsResponse,
@@ -99,4 +106,21 @@ def get_hospital_device_stats(
     return admin_service.get_hospital_device_stats(
         db=db,
         hospital_id=hospital_id,
+    )
+
+
+# 관리자 병원 정보 수정
+@router.put(
+    "/hospitals/{hospital_id}",
+    response_model=AdminHospitalCreateResponse,
+)
+def update_hospital(
+    hospital_id: int,
+    request: AdminHospitalUpdateRequest,
+    db: Session = Depends(get_db),
+):
+    return admin_service.update_hospital(
+        db=db,
+        hospital_id=hospital_id,
+        request=request,
     )

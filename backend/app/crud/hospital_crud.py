@@ -116,6 +116,30 @@ def list_all_with_stats(db: Session):
     return db.execute(stmt).all()
 
 
+# 병원 생성
+def create(
+    db: Session,
+    name: str,
+    hospital_code: str,
+    area: str,
+    address: str,
+    bed_count: int,
+) -> Hospital:
+
+    hospital = Hospital(
+        name=name,
+        hospital_code=hospital_code,
+        area=area,
+        address=address,
+        bed_count=bed_count,
+    )
+
+    db.add(hospital)
+    db.flush()
+
+    return hospital
+
+
 # 관리자 병원 상세 조회
 def get_detail_by_id(
     db: Session,
@@ -218,3 +242,25 @@ def get_device_stats_by_hospital_id(
     )
 
     return db.execute(stmt).all()
+
+
+# 병원 정보 수정
+def update(
+    db: Session,
+    hospital: Hospital,
+    name: str,
+    hospital_code: str,
+    area: str,
+    address: str,
+    bed_count: int,
+) -> Hospital:
+
+    hospital.name = name
+    hospital.hospital_code = hospital_code
+    hospital.area = area
+    hospital.address = address
+    hospital.bed_count = bed_count
+
+    db.flush()
+
+    return hospital
