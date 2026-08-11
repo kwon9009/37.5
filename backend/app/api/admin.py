@@ -6,6 +6,8 @@ from app.dependencies.auth import require_role
 from app.models.enums import UserRole
 from app.schemas.admin.hospital_list_response import AdminHospitalListItem
 from app.schemas.admin.admin_name_response import AdminNameResponse
+from app.schemas.admin.admin_hospital_create_request import AdminHospitalCreateRequest
+from app.schemas.admin.admin_hospital_create_response import AdminHospitalCreateResponse
 from app.services import admin_service
 
 router = APIRouter(
@@ -37,4 +39,18 @@ def get_admin_names(
 ):
     return admin_service.get_admin_names(
         db=db,
+    )
+
+
+@router.post(
+    "/hospitals",
+    response_model=AdminHospitalCreateResponse,
+)
+def create_hospital(
+    request: AdminHospitalCreateRequest,
+    db: Session = Depends(get_db),
+):
+    return admin_service.create_hospital(
+        db=db,
+        request=request,
     )
