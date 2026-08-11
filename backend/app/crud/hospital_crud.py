@@ -1,4 +1,4 @@
-from sqlalchemy import func, select
+from sqlalchemy import func, select, case
 from sqlalchemy.orm import Session
 
 from app.models.admin import Admin
@@ -106,9 +106,161 @@ def list_all_with_stats(db: Session):
             func.coalesce(device_count_subq.c.device_count, 0).label("device_count"),
             manager_subq.c.manager_name,
         )
-        .outerjoin(device_count_subq, device_count_subq.c.hospital_id == Hospital.hospital_id)
+        .outerjoin(
+            device_count_subq, device_count_subq.c.hospital_id == Hospital.hospital_id
+        )
         .outerjoin(manager_subq, manager_subq.c.hospital_id == Hospital.hospital_id)
         .order_by(Hospital.hospital_id)
     )
 
     return db.execute(stmt).all()
+
+
+# 병원 생성
+def create(
+    db: Session,
+    name: str,
+    hospital_code: str,
+    area: str,
+    address: str,
+    bed_count: int,
+) -> Hospital:
+
+    hospital = Hospital(
+        name=name,
+        hospital_code=hospital_code,
+        area=area,
+        address=address,
+        bed_count=bed_count,
+    )
+
+    db.add(hospital)
+    db.flush()
+
+    return hospital
+
+
+# 관리자 병원 상세 조회
+def get_detail_by_id(
+    db: Session,
+    hospital_id: int,
+):
+    stmt = (
+        select(
+            Hospital,
+            Admin,
+        )
+        .outerjoin(
+            AdminHospital,
+            AdminHospital.hospital_id == Hospital.hospital_id,
+        )
+        .outerjoin(
+            Admin,
+            Admin.admin_id == AdminHospital.admin_id,
+        )
+        .where(
+            Hospital.hospital_id == hospital_id,
+        )
+    )
+
+    return db.execute(stmt).first()
+
+
+# 관리자 병원별 병동 현황 조회
+def get_wards_by_hospital_id(
+    db: Session,
+    hospital_id: int,
+):
+    stmt = (
+        select(
+            Department.department_id,
+            Department.name,
+            Hospital.bed_count,
+            func.count(
+                func.distinct(
+                    case(
+                        (Patient.is_present.is_(True), Patient.patient_id),
+                    )
+                )
+            ).label("occupied"),
+            func.count(Device.device_id).label("devices"),
+        )
+        .select_from(Department)
+        .join(
+            Hospital,
+            Department.hospital_id == Hospital.hospital_id,
+        )
+        .outerjoin(
+            Patient,
+            Patient.department_id == Department.department_id,
+        )
+        .outerjoin(
+            Device,
+            Device.patient_id == Patient.patient_id,
+        )
+        .where(
+            Department.hospital_id == hospital_id,
+        )
+        .group_by(
+            Department.department_id,
+            Department.name,
+            Hospital.bed_count,
+        )
+        .order_by(
+            Department.department_id,
+        )
+    )
+
+    return db.execute(stmt).all()
+
+
+# 관리자 병원별 연결 장치 현황 조회
+def get_device_stats_by_hospital_id(
+    db: Session,
+    hospital_id: int,
+):
+    stmt = (
+        select(
+            Device.status,
+            func.count(Device.device_id).label("device_count"),
+        )
+        .select_from(Device)
+        .join(
+            Patient,
+            Device.patient_id == Patient.patient_id,
+        )
+        .join(
+            Department,
+            Patient.department_id == Department.department_id,
+        )
+        .where(
+            Department.hospital_id == hospital_id,
+        )
+        .group_by(
+            Device.status,
+        )
+    )
+
+    return db.execute(stmt).all()
+
+
+# 병원 정보 수정
+def update(
+    db: Session,
+    hospital: Hospital,
+    name: str,
+    hospital_code: str,
+    area: str,
+    address: str,
+    bed_count: int,
+) -> Hospital:
+
+    hospital.name = name
+    hospital.hospital_code = hospital_code
+    hospital.area = area
+    hospital.address = address
+    hospital.bed_count = bed_count
+
+    db.flush()
+
+    return hospital

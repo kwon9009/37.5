@@ -1,0 +1,365 @@
+import re
+
+from fastapi import HTTPException, status
+from sqlalchemy.orm import Session
+
+from app.crud import admin_crud, hospital_crud, admin_hospital_crud
+from app.models.enums import DeviceStatus
+from app.schemas.admin.hospital_list_response import AdminHospitalListItem
+from app.schemas.admin.admin_name_response import AdminNameResponse
+from app.schemas.admin.admin_hospital_create_request import AdminHospitalCreateRequest
+from app.schemas.admin.admin_hospital_create_response import AdminHospitalCreateResponse
+from app.schemas.admin.hospital_detail_response import (
+    AdminHospitalDetailResponse,
+    AdminHospitalManagerResponse,
+)
+from app.schemas.admin.hospital_ward_response import AdminHospitalWardResponse
+from app.schemas.admin.hospital_device_stats_response import (
+    AdminHospitalDeviceStatsResponse,
+)
+from app.schemas.admin.hospital_update_request import AdminHospitalUpdateRequest
+
+
+# 주소에서 "OO구" 추출
+def _extract_district(address: str) -> str:
+    match = re.search(r"\S+구", address)
+    return match.group(0) if match else ""
+
+
+# 관리자 병원관리 목록 조회
+def get_hospital_list(
+    db: Session,
+) -> list[AdminHospitalListItem]:
+
+    rows = hospital_crud.list_all_with_stats(db)
+
+    return [
+        AdminHospitalListItem(
+            hospital_id=hospital.hospital_id,
+            name=hospital.name,
+            region=_extract_district(hospital.address),
+            beds=hospital.bed_count,
+            devices=device_count,
+            manager=manager_name or "-",
+            active=True,
+        )
+        for hospital, device_count, manager_name in rows
+    ]
+
+
+# 관리자 이름 목록 조회
+def get_admin_names(
+    db: Session,
+) -> list[AdminNameResponse]:
+
+    admins = admin_crud.get_admin_names(
+        db=db,
+    )
+
+    return [
+        AdminNameResponse(
+            admin_id=admin.admin_id,
+            name=admin.name,
+        )
+        for admin in admins
+    ]
+
+
+# 관리자 병원 직접 추가
+def create_hospital(
+    db: Session,
+    request: AdminHospitalCreateRequest,
+) -> AdminHospitalCreateResponse:
+
+    # 담당 관리자가 지정되지 않은 경우
+    # 시스템 관리자(admin_id=1)를 사용한다.
+    admin_id = request.admin_id if request.admin_id is not None else 1
+
+    # 관리자 존재 여부 확인
+    admin = admin_crud.get_admin_by_id(
+        db=db,
+        admin_id=admin_id,
+    )
+
+    if admin is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="존재하지 않는 관리자입니다.",
+        )
+
+    # 병원 코드 중복 확인
+    existing_hospital = hospital_crud.get_by_code(
+        db=db,
+        hospital_code=request.hospital_code,
+    )
+
+    if existing_hospital is not None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="이미 사용 중인 병원 코드입니다.",
+        )
+
+    # 병원명 + 주소 중복 확인
+    existing_hospital = hospital_crud.get_by_name_and_address(
+        db=db,
+        name=request.name,
+        address=request.address,
+    )
+
+    if existing_hospital is not None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="이미 등록된 병원입니다.",
+        )
+
+    try:
+        # 병원 생성
+        hospital = hospital_crud.create(
+            db=db,
+            name=request.name,
+            hospital_code=request.hospital_code,
+            area=request.area,
+            address=request.address,
+            bed_count=request.bed_count,
+        )
+
+        # 관리자-병원 관계 생성
+        admin_hospital_crud.create(
+            db=db,
+            admin_id=admin_id,
+            hospital_id=hospital.hospital_id,
+        )
+
+        # 병원과 관리자 관계를 하나의 트랜잭션으로 확정
+        db.commit()
+
+        # DB에서 확정된 병원 정보를 다시 반영
+        db.refresh(hospital)
+
+        return AdminHospitalCreateResponse(
+            hospital_id=hospital.hospital_id,
+            name=hospital.name,
+            hospital_code=hospital.hospital_code,
+            area=hospital.area,
+            address=hospital.address,
+            bed_count=hospital.bed_count,
+            admin_id=admin.admin_id,
+            admin_name=admin.name,
+        )
+
+    except Exception:
+        db.rollback()
+        raise
+
+
+# 관리자 병원 상세 조회
+def get_hospital_detail(
+    db: Session,
+    hospital_id: int,
+) -> AdminHospitalDetailResponse:
+
+    result = hospital_crud.get_detail_by_id(
+        db=db,
+        hospital_id=hospital_id,
+    )
+
+    if result is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="존재하지 않는 병원입니다.",
+        )
+
+    hospital, admin = result
+
+    manager = None
+
+    if admin is not None:
+        manager = AdminHospitalManagerResponse(
+            admin_id=admin.admin_id,
+            name=admin.name,
+            email=admin.email,
+            phone=admin.phone,
+        )
+
+    return AdminHospitalDetailResponse(
+        hospital_id=hospital.hospital_id,
+        name=hospital.name,
+        hospital_code=hospital.hospital_code,
+        area=hospital.area,
+        address=hospital.address,
+        bed_count=hospital.bed_count,
+        created_at=hospital.created_at,
+        manager=manager,
+    )
+
+
+# 관리자 병원별 병동 현황 조회
+def get_hospital_wards(
+    db: Session,
+    hospital_id: int,
+) -> list[AdminHospitalWardResponse]:
+
+    rows = hospital_crud.get_wards_by_hospital_id(
+        db=db,
+        hospital_id=hospital_id,
+    )
+
+    return [
+        AdminHospitalWardResponse(
+            department_id=row.department_id,
+            name=row.name,
+            beds=row.bed_count,
+            occupied=row.occupied,
+            devices=row.devices,
+        )
+        for row in rows
+    ]
+
+
+# 관리자 병원별 연결 장치 현황 조회
+def get_hospital_device_stats(
+    db: Session,
+    hospital_id: int,
+) -> AdminHospitalDeviceStatsResponse:
+
+    hospital = hospital_crud.get_by_id(
+        db=db,
+        hospital_id=hospital_id,
+    )
+
+    if hospital is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="존재하지 않는 병원입니다.",
+        )
+
+    rows = hospital_crud.get_device_stats_by_hospital_id(
+        db=db,
+        hospital_id=hospital_id,
+    )
+
+    stats = {
+        DeviceStatus.ACTIVE: 0,
+        DeviceStatus.OFFLINE: 0,
+        DeviceStatus.ERROR: 0,
+    }
+
+    for row in rows:
+        stats[row.status] = row.device_count
+
+    return AdminHospitalDeviceStatsResponse(
+        active=stats[DeviceStatus.ACTIVE],
+        offline=stats[DeviceStatus.OFFLINE],
+        error=stats[DeviceStatus.ERROR],
+    )
+
+
+# 관리자 병원 정보 수정
+def update_hospital(
+    db: Session,
+    hospital_id: int,
+    request: AdminHospitalUpdateRequest,
+) -> AdminHospitalCreateResponse:
+
+    # 병원 존재 여부 확인
+    hospital = hospital_crud.get_by_id(
+        db=db,
+        hospital_id=hospital_id,
+    )
+
+    if hospital is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="존재하지 않는 병원입니다.",
+        )
+
+    # 관리자 존재 여부 확인
+    admin = admin_crud.get_admin_by_id(
+        db=db,
+        admin_id=request.admin_id,
+    )
+
+    if admin is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="존재하지 않는 관리자입니다.",
+        )
+
+    # 병원 코드 중복 확인
+    existing_hospital = hospital_crud.get_by_code(
+        db=db,
+        hospital_code=request.hospital_code,
+    )
+
+    if existing_hospital is not None and existing_hospital.hospital_id != hospital_id:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="이미 사용 중인 병원 코드입니다.",
+        )
+
+    # 병원명 + 주소 중복 확인
+    existing_hospital = hospital_crud.get_by_name_and_address(
+        db=db,
+        name=request.name,
+        address=request.address,
+    )
+
+    if existing_hospital is not None and existing_hospital.hospital_id != hospital_id:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="이미 등록된 병원입니다.",
+        )
+
+    try:
+        # 병원 정보 수정
+        hospital = hospital_crud.update(
+            db=db,
+            hospital=hospital,
+            name=request.name,
+            hospital_code=request.hospital_code,
+            area=request.area,
+            address=request.address,
+            bed_count=request.bed_count,
+        )
+
+        # 기존 관리자-병원 관계 조회
+        admin_hospital = admin_hospital_crud.get_by_hospital_id(
+            db=db,
+            hospital_id=hospital_id,
+        )
+
+        if admin_hospital is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="병원 관리자 연결 정보를 찾을 수 없습니다.",
+            )
+
+        # 담당 관리자 변경
+        admin_hospital_crud.update_admin(
+            db=db,
+            admin_hospital=admin_hospital,
+            admin_id=request.admin_id,
+        )
+
+        db.commit()
+
+        db.refresh(hospital)
+
+        return AdminHospitalCreateResponse(
+            hospital_id=hospital.hospital_id,
+            name=hospital.name,
+            hospital_code=hospital.hospital_code,
+            area=hospital.area,
+            address=hospital.address,
+            bed_count=hospital.bed_count,
+            admin_id=admin.admin_id,
+            admin_name=admin.name,
+        )
+
+    except HTTPException:
+        db.rollback()
+        raise
+
+    except Exception:
+        db.rollback()
+        raise
