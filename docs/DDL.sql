@@ -22,6 +22,7 @@ area VARCHAR(20) NOT NULL, -- 2026-08-05 추가: 시·도 단위 지역명(예: 
 address VARCHAR(255) NOT NULL, -- 2026-08-05 수정: VARCHAR(50) -> VARCHAR(255). 대전 45개 병원 실측 최대 47자로 한도에 3자밖에 안 남아 입력 실패 위험
 hospital_code VARCHAR(10) NOT NULL UNIQUE, -- 보호자에게 문자로 전달하는 병원 코드. 지역별 접두사(대전 DJ, 서울 SU, 경기 GG, 부산 BS, 대구 DG)
 bed_count INT NOT NULL,
+created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP, -- 2026-08-12 추가: 관리자 병원 관리 화면의 등록일 표시용. 모델(Hospital)에 먼저 들어가 있어서 이 컬럼이 없으면 병원을 읽는 모든 조회가 실패한다
 UNIQUE KEY uk_hospital_name_address (name, address)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
