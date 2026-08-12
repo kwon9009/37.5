@@ -1,73 +1,199 @@
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { useNavigate } from "react-router-dom"
-import { Heart, Wind, UserCheck, UserX, Phone, FileText, X, AlertTriangle, Bell, Trash2 } from "lucide-react"
+import { Area, AreaChart, CartesianGrid, ReferenceArea, Tooltip, XAxis, YAxis } from "recharts"
+import { Heart, Wind, UserCheck, UserX, X, AlertTriangle, Bell, Trash2 } from "lucide-react"
 import { Screen, TopBar } from "@/guardian/components/Screen"
 import { BottomNav } from "@/guardian/components/BottomNav"
-import { useGuardianData } from "@/guardian/lib/api"
 import {
-  fetchHospitalByCode,
-  findHospitalByName,
-  getRegisteredHospitalCode,
-  telHref,
-  type HospitalInfo,
-} from "@/guardian/lib/hospitals"
+  useGuardianData,
+  heartRateLevel,
+  respirationLevel,
+  HR_NORMAL,
+  RR_NORMAL,
+  type VitalLevel,
+} from "@/guardian/lib/api"
+import { cn } from "@/guardian/lib/utils"
 
-// 백엔드 미연결 시에도 응급 상황(10초 타이머) 데모가 특이사항까지 보여주도록 하는 폴백
-const DEMO_SPECIAL_NOTE =
-  "고혈압·협심증 병력, 심장질환 관리 중이며 항혈전제·심장약 규칙적 복용 필요, 흉통 호소 여부 확인 요망."
+/** 그래프에서 한 시간이 차지하는 가로 폭(px).
+ *  24시간을 폰 화면에 다 넣으면 시각 숫자가 겹치므로, 폭을 고정하고 가로 스크롤로 넘겨 본다. */
+const HOUR_W = 46
 
-function VitalCard({
+/** 등급별 배지 색. 정상은 초록, 한 단계 벗어나면 주황, 두 단계면 빨강. */
+const LEVEL_STYLE: Record<VitalLevel, string> = {
+  "매우 낮음": "bg-danger/15 text-danger",
+  낮음: "bg-accent/20 text-accent-foreground",
+  정상: "bg-success/15 text-success",
+  높음: "bg-accent/20 text-accent-foreground",
+  "매우 높음": "bg-danger/15 text-danger",
+  "기록 없음": "bg-muted text-muted-foreground",
+}
+
+/**
+ * 서버가 주는 값은 1분 평균 로그라서 하루치면 1440개가 된다.
+ * 그대로 그리면 점이 너무 많아 읽기 어렵고 "시간당"도 아니므로,
+ * 같은 시(00~23)끼리 평균 내어 최대 24개(=하루치)로 줄인다.
+ */
+function toHourlySeries(series: { t: string; value: number }[]) {
+  const sum = new Map<string, { total: number; count: number }>()
+  for (const point of series) {
+    if (point.value == null) continue
+    const acc = sum.get(point.t) ?? { total: 0, count: 0 }
+    acc.total += point.value
+    acc.count += 1
+    sum.set(point.t, acc)
+  }
+  // 00~23시 뼈대를 먼저 깔고 값을 채운다.
+  // 기록이 있는 시간만 넣으면 방금 켠 경우 점이 하나만 찍혀 "지금 시각"만 있는 것처럼 보인다.
+  // 기록이 없는 시간도 축에는 나와야 하루 흐름을 읽을 수 있다(값은 null → 선이 끊김).
+  return Array.from({ length: 24 }, (_, hour) => {
+    const t = String(hour).padStart(2, "0")
+    const acc = sum.get(t)
+    return { t, value: acc ? Math.round(acc.total / acc.count) : null }
+  })
+}
+
+/**
+ * 생체신호 큰 카드: 위에 현재값, 아래에 시간당 추이 그래프.
+ * 그래프는 하루치(00~23시)를 보여주며, 서버가 준 1분 평균 로그를 시간 단위로 묶어서 그린다.
+ */
+function VitalPanel({
   icon,
   label,
   value,
   unit,
-  tone,
+  status,
+  series,
+  color,
+  chartId,
+  fallbackDomain,
+  normalRange,
 }: {
   icon: React.ReactNode
   label: string
   value: string | number
   unit: string
-  tone: string
+  status: VitalLevel
+  /** 00~23시 24칸. 기록이 없는 시간은 value 가 null 이라 선이 끊겨 그려진다. */
+  series: { t: string; value: number | null }[]
+  color: string
+  chartId: string
+  /** 값이 하나도 없을 때 y축이 0~0 으로 뭉개지지 않도록 잡아 줄 기본 범위 */
+  fallbackDomain: [number, number]
+  /** 정상 범위. 축 숫자 대신 옅은 띠로 깔아 값의 높낮이를 가늠하게 한다. */
+  normalRange: { min: number; max: number }
 }) {
+  const hasAnyValue = series.some((p) => p.value != null)
+  const scrollRef = useRef<HTMLDivElement>(null)
+
+  // 지금 시각이 화면 가운데 오도록 맞춰 둔다. 그래야 열자마자 최근 흐름이 보이고,
+  // 지나간 시간은 왼쪽으로 밀어서(스와이프) 볼 수 있다.
+  //
+  // 위치를 HOUR_W 로 계산하면 recharts 내부 여백만큼 어긋난다(실측 13px).
+  // 기록 화면 캘린더와 같은 방식으로, 실제 그려진 눈금의 화면 좌표를 재서 맞춘다.
+  // 단 마운트 직후에는 recharts 가 아직 눈금을 그리기 전이라 요소를 못 찾는다.
+  // 그려질 때까지 몇 프레임 기다렸다가 맞추고, 끝내 못 찾으면 계산식으로라도 맞춘다.
+  useEffect(() => {
+    const el = scrollRef.current
+    if (!el) return
+    const nowLabel = String(new Date().getHours()).padStart(2, "0")
+    let raf = 0
+    let tries = 0
+
+    const center = () => {
+      const tick = [...el.querySelectorAll("svg text")].find((t) => t.textContent === nowLabel)
+      if (tick) {
+        const containerRect = el.getBoundingClientRect()
+        const tickRect = tick.getBoundingClientRect()
+        const offsetInContainer = tickRect.left - containerRect.left
+        const centerOffset = el.clientWidth / 2 - tickRect.width / 2
+        el.scrollLeft += offsetInContainer - centerOffset
+        return
+      }
+      if (tries++ < 10) {
+        raf = requestAnimationFrame(center)
+      } else {
+        el.scrollLeft = new Date().getHours() * HOUR_W + HOUR_W / 2 - el.clientWidth / 2
+      }
+    }
+
+    raf = requestAnimationFrame(center)
+    return () => cancelAnimationFrame(raf)
+  }, [])
+
   return (
-    <div className="flex flex-col items-center rounded-3xl border border-border bg-card p-4 text-center shadow-sm">
-      <span className={`mb-3 grid h-10 w-10 place-items-center rounded-2xl ${tone}`}>{icon}</span>
-      <span className="text-sm text-muted-foreground">{label}</span>
-      <span className="mt-1 flex items-baseline gap-1">
-        <span className="text-3xl font-bold text-foreground">{value}</span>
-        <span className="text-sm font-medium text-muted-foreground">{unit}</span>
-      </span>
+    <div className="rounded-3xl border border-border bg-card p-5 shadow-sm">
+      <div className="flex items-center gap-2">
+        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-2xl bg-danger/10" style={{ color }}>
+          {icon}
+        </span>
+        <span className="flex-1 font-semibold text-foreground">{label}</span>
+        <span className={cn("rounded-full px-2.5 py-1 text-xs font-bold", LEVEL_STYLE[status])}>
+          {status}
+        </span>
+      </div>
+
+      {/* 현재값 - 화면에서 가장 크게.
+          단위를 숫자 옆에 두면 "숫자+단위" 덩어리가 가운데로 정렬돼서
+          정작 숫자는 중앙에서 왼쪽으로 밀린다. 단위를 아래로 내려
+          자릿수(78/100 등)가 바뀌어도 숫자가 항상 정중앙에 오게 한다. */}
+      <div className="mt-3 flex flex-col items-center">
+        <span className="text-5xl font-bold leading-none text-foreground">{value}</span>
+        <span className="mt-1.5 text-sm font-medium text-muted-foreground">{unit}</span>
+      </div>
+
+      {/* 시간당 추이 (하루치).
+          24시간을 폰 화면에 다 욱여넣으면 시각 숫자가 겹쳐서, 한 시간을 고정 폭으로 두고
+          가로로 넘겨(스와이프) 보게 한다. 기록이 없는 시간도 축에는 그대로 나온다. */}
+      <div ref={scrollRef} className="mt-4 -mx-1 overflow-x-auto px-1 pb-1">
+        <div className="h-36" style={{ width: HOUR_W * 24 }}>
+          <AreaChart
+            width={HOUR_W * 24}
+            height={144}
+            data={series}
+            margin={{ top: 8, right: 4, left: 4, bottom: 0 }}
+          >
+            <defs>
+              <linearGradient id={chartId} x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor={color} stopOpacity={0.35} />
+                <stop offset="100%" stopColor={color} stopOpacity={0} />
+              </linearGradient>
+            </defs>
+            <CartesianGrid vertical={false} stroke="#f1d6d0" strokeDasharray="3 3" />
+            {/* 축 숫자 대신 정상 범위를 옅은 띠로 깔아, 값이 높은지 낮은지 바로 보이게 한다 */}
+            <ReferenceArea y1={normalRange.min} y2={normalRange.max} fill="#8fbf7a" fillOpacity={0.12} />
+            <XAxis
+              dataKey="t"
+              tickLine={false}
+              axisLine={false}
+              fontSize={11}
+              stroke="#806467"
+              interval={0}
+            />
+            <YAxis hide domain={hasAnyValue ? ["auto", "auto"] : fallbackDomain} />
+            <Tooltip
+              contentStyle={{ borderRadius: 12, border: "1px solid #f1d6d0", fontSize: 12 }}
+              formatter={(v) => [v == null ? "기록 없음" : `${v} ${unit}`, ""]}
+              labelFormatter={(l) => `${l}시`}
+            />
+            <Area type="monotone" dataKey="value" stroke={color} strokeWidth={2.5} fill={`url(#${chartId})`} />
+          </AreaChart>
+        </div>
+      </div>
     </div>
   )
 }
 
 export default function Home() {
   const navigate = useNavigate()
-  const { patient, vitals, notifications, specialNote } = useGuardianData()
-  const [showNote, setShowNote] = useState(false)
+  const { patient, vitals, notifications, heartRateSeries, respirationSeries } = useGuardianData()
   const [showNotifications, setShowNotifications] = useState(false)
   const [notifItems, setNotifItems] = useState(notifications)
   useEffect(() => setNotifItems(notifications), [notifications])
   const urgentCount = notifItems.filter((n) => n.type === "urgent").length
 
-  // 병원 연락처.
-  // 회원가입 때 등록한 병원 코드로 서버에서 조회하고, 코드가 없으면
-  // 서버가 준 병원 이름으로 개발용 목록에서 찾는다.
-  const [hospitalContact, setHospitalContact] = useState<HospitalInfo | null>(null)
-  useEffect(() => {
-    let alive = true
-    const code = getRegisteredHospitalCode()
-    if (code) {
-      fetchHospitalByCode(code).then((found) => {
-        if (alive) setHospitalContact(found ?? findHospitalByName(patient.hospital))
-      })
-    } else {
-      setHospitalContact(findHospitalByName(patient.hospital))
-    }
-    return () => {
-      alive = false
-    }
-  }, [patient.hospital])
+  // 1분 단위 로그를 시간당(최대 24개)으로 묶어 그래프에 넘긴다.
+  const hourlyHeartRate = useMemo(() => toHourlySeries(heartRateSeries), [heartRateSeries])
+  const hourlyRespiration = useMemo(() => toHourlySeries(respirationSeries), [respirationSeries])
 
   // [일시 비활성 - 개발용] 홈 화면에 상주한 지 10초가 지나면 응급 화면으로 자동 이동하는 데모 기능.
   // 개발 중에는 홈에 10초만 머물러도 긴급 화면으로 튕겨서 작업이 어려우므로 잠시 꺼둔다.
@@ -126,106 +252,38 @@ export default function Home() {
           </button>
         )}
 
-        {/* Vitals */}
-        <div>
-          <h2 className="mb-2 text-sm font-semibold text-muted-foreground">실시간 생체신호</h2>
-          <div className="grid grid-cols-2 gap-3">
-            <VitalCard
-              icon={<Heart size={20} aria-hidden />}
-              label="심박수"
-              value={vitals.heartRate}
-              unit="bpm"
-              tone="bg-danger/10 text-danger"
-            />
-            <VitalCard
-              icon={<Wind size={20} aria-hidden />}
-              label="호흡수"
-              value={vitals.respiration}
-              unit="회/분"
-              tone="bg-danger/10 text-primary"
-            />
-          </div>
+        {/* Vitals - 위: 심박수 / 아래: 호흡수 (각각 현재값 + 시간당 추이) */}
+        <div className="space-y-4">
+          <h2 className="text-sm font-semibold text-muted-foreground">실시간 생체신호</h2>
+          <VitalPanel
+            icon={<Heart size={18} aria-hidden />}
+            label="심박수"
+            value={vitals.heartRate}
+            unit="bpm"
+            status={heartRateLevel(vitals.heartRate)}
+            series={hourlyHeartRate}
+            color="#dc2626"
+            chartId="home-hr"
+            fallbackDomain={[40, 140]}
+            normalRange={HR_NORMAL}
+          />
+          <VitalPanel
+            icon={<Wind size={18} aria-hidden />}
+            label="호흡수"
+            value={vitals.respiration}
+            unit="회/분"
+            status={respirationLevel(vitals.respiration)}
+            series={hourlyRespiration}
+            color="#d76773"
+            chartId="home-rr"
+            fallbackDomain={[0, 40]}
+            normalRange={RR_NORMAL}
+          />
         </div>
 
-        {/* Quick actions */}
-        <div>
-          <h2 className="mb-2 text-sm font-semibold text-muted-foreground">빠른 실행</h2>
-          <div className="grid grid-cols-2 gap-3">
-            {/* 회원가입 때 등록한 병원 번호로 전화 앱을 연다.
-                번호를 못 찾으면(등록 전이거나 목록에 없는 병원) 눌리지 않게 비활성 처리. */}
-            {hospitalContact?.phone ? (
-              <a
-                href={telHref(hospitalContact.phone)}
-                aria-label={`${hospitalContact.name} ${hospitalContact.phone} 로 전화 걸기`}
-                className="flex flex-col items-center rounded-3xl border border-border bg-card p-4 text-center shadow-sm"
-              >
-                <span className="mb-3 grid h-10 w-10 place-items-center rounded-2xl bg-primary/10 text-primary">
-                  <Phone size={20} aria-hidden />
-                </span>
-                <span className="font-semibold text-foreground">병원 연락</span>
-                <span className="mt-0.5 text-xs text-muted-foreground">{hospitalContact.phone}</span>
-              </a>
-            ) : (
-              <div
-                className="flex flex-col items-center rounded-3xl border border-border bg-card p-4 text-center opacity-60 shadow-sm"
-                role="note"
-              >
-                <span className="mb-3 grid h-10 w-10 place-items-center rounded-2xl bg-muted text-muted-foreground">
-                  <Phone size={20} aria-hidden />
-                </span>
-                <span className="font-semibold text-foreground">병원 연락</span>
-                <span className="mt-0.5 text-xs text-muted-foreground">번호 확인 중</span>
-              </div>
-            )}
-
-            {/* Special note */}
-            <button
-              onClick={() => setShowNote(true)}
-              className="flex flex-col items-center rounded-3xl border border-border bg-card p-4 text-center shadow-sm"
-            >
-              <span className="mb-3 grid h-10 w-10 place-items-center rounded-2xl bg-primary/10 text-primary">
-                <FileText size={20} aria-hidden />
-              </span>
-              <span className="font-semibold text-foreground">특이사항확인</span>
-            </button>
-          </div>
-        </div>
       </div>
 
       <BottomNav />
-
-      {showNote && (
-        <div
-          className="fixed inset-0 z-40 flex items-end justify-center bg-foreground/40 sm:items-center"
-          onClick={() => setShowNote(false)}
-        >
-          <div
-            className="fade-up w-full max-w-[26rem] rounded-t-3xl bg-card p-6 sm:rounded-3xl"
-            onClick={(e) => e.stopPropagation()}
-            role="dialog"
-            aria-modal="true"
-            aria-label="응급 스크리닝 필요"
-          >
-            <div className="mb-3 flex items-center justify-between">
-              <h3 className="text-lg font-bold text-foreground">응급 스크리닝 필요</h3>
-              <button
-                aria-label="닫기"
-                onClick={() => setShowNote(false)}
-                className="grid h-9 w-9 place-items-center rounded-full text-muted-foreground hover:bg-muted"
-              >
-                <X size={20} aria-hidden />
-              </button>
-            </div>
-            <p className="leading-relaxed text-foreground">{specialNote || DEMO_SPECIAL_NOTE}</p>
-            <button
-              onClick={() => setShowNote(false)}
-              className="mt-6 h-12 w-full rounded-2xl bg-primary font-semibold text-primary-foreground"
-            >
-              확인
-            </button>
-          </div>
-        </div>
-      )}
 
       {/* 알림 서랍 - 오른쪽에서 슬라이드로 열리고 반투명해서 메인화면이 비쳐 보임 */}
       {showNotifications && (

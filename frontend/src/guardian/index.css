@@ -54,6 +54,32 @@
   }
 }
 
+/* 스크롤바를 앱 테마(분홍)에 맞춘다. 기본 회색 막대가 카드 안에서 유난히 튀어서,
+   생체신호 그래프처럼 가로로 넘겨 보는 곳이 지저분해 보인다.
+   .app-shell 안쪽에만 걸어 병원 대시보드 스크롤바는 건드리지 않는다. */
+.app-shell,
+.app-shell * {
+  /* Firefox / 크롬 121+ */
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-accent) transparent;
+}
+
+/* WebKit(사파리·구버전 크롬). 위 표준 속성을 아직 안 쓰는 브라우저용 */
+.app-shell::-webkit-scrollbar,
+.app-shell *::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.app-shell::-webkit-scrollbar-track,
+.app-shell *::-webkit-scrollbar-track {
+  background: transparent;
+}
+.app-shell::-webkit-scrollbar-thumb,
+.app-shell *::-webkit-scrollbar-thumb {
+  background-color: var(--color-accent);
+  border-radius: 999px;
+}
+
 @layer base {
   /* 자리표시 문구(placeholder)는 실제로 입력한 글씨보다 한 단계 작게(14px) 보여준다.
      - 입력 글씨 자체는 16px 그대로 둔다: iOS 사파리는 입력칸 글씨가 16px보다 작으면

@@ -32,7 +32,7 @@ export default function EmergencyGuide() {
 
   return (
     <Screen>
-      <TopBar title="의료 응급상황 대응 가이드" back />
+      <TopBar title="의료 응급상황 대응 가이드" back titleClassName="text-sm" />
       <div className="flex-1 overflow-y-auto px-5 py-5">
         {/* 1·2·3단계 대응을 픽토그램으로 요약 */}
         <div className="rounded-3xl bg-danger/10 p-5">
@@ -78,8 +78,12 @@ export default function EmergencyGuide() {
           <Phone size={20} aria-hidden />
           병원 연락하기
         </a>
+        {/* 이 화면은 응급 화면과 도움말 두 곳에서 들어온다.
+            응급 화면으로 고정해두면, 도움말에서 열어본 사용자가 응급 상황도 아닌데
+            경고음이 울리는 긴급 화면으로 튕긴다. 그래서 온 곳으로 되돌아가게 한다.
+            (링크로 바로 들어와 이전 기록이 없으면 홈으로) */}
         <button
-          onClick={() => navigate("/guardian/emergency")}
+          onClick={() => (window.history.length > 1 ? navigate(-1) : navigate("/guardian/home"))}
           className="h-12 w-full text-sm font-medium text-muted-foreground"
         >
           돌아가기

@@ -147,9 +147,11 @@ type TopBarProps = {
   onBellClick?: () => void
   right?: ReactNode
   logo?: boolean
+  /** 제목이 길어 기본 크기(text-base)로 부담스러울 때 화면별로 축소 지정 */
+  titleClassName?: string
 }
 
-export function TopBar({ title, back, bell, bellCount = 0, onBellClick, right, logo }: TopBarProps) {
+export function TopBar({ title, back, bell, bellCount = 0, onBellClick, right, logo, titleClassName }: TopBarProps) {
   const navigate = useNavigate()
   return (
     <header className="sticky top-0 z-20 flex h-14 items-center justify-between border-b border-border bg-card/95 px-2 backdrop-blur">
@@ -172,7 +174,7 @@ export function TopBar({ title, back, bell, bellCount = 0, onBellClick, right, l
           )
         )}
       </div>
-      <h1 className="truncate text-base font-semibold text-foreground">{title}</h1>
+      <h1 className={cn("truncate text-base font-semibold text-foreground", titleClassName)}>{title}</h1>
       <div className="flex w-12 justify-end">
         {right}
         {bell && (
