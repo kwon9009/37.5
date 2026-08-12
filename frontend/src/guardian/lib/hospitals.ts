@@ -2,30 +2,33 @@ import { apiClient } from "@/api/client.js"
 
 /**
  * 병원 정보.
- * 실제 DB(hospitals 테이블)에는 아직 전화번호 컬럼이 없어서 phone 은 optional 이다.
- * 백엔드에 phone 이 추가되면 그대로 채워져 내려온다.
+ * phone 은 서버(hospitals.phone)에서 내려온다. 아직 번호를 못 구한 병원이
+ * 있어서 optional 이고, 없으면 "병원 연락하기" 버튼이 비활성된다.
  */
 export type HospitalInfo = {
   code: string
   name: string
   address: string
-  /** 백엔드에 phone 컬럼 추가 전까지는 없을 수 있음 → "병원 연락" 버튼이 비활성됨 */
+  /** 번호를 못 구한 병원은 없을 수 있음 → "병원 연락하기" 버튼이 비활성됨 */
   phone?: string
 }
 
 /**
  * ── 개발용 임시 목록 ──────────────────────────────────────────────
- * 서버가 없거나 조회 API 가 아직 없을 때만 쓰이는 폴백이다.
- * 실제 DB 에는 병원이 63개 있고 코드 형식은 DJ001(3자리)이다.
+ * 서버에 연결하지 못했을 때만 쓰이는 폴백이다.
+ * 실제 DB 에는 병원이 62개 있고 코드 형식은 DJ001(3자리)이다.
  * DJ001·DJ002 는 실제 DB 와 이름을 맞춰 두었고, 나머지는 개발 테스트용이다.
- * 전화번호는 DB 에 아직 없어서 여기 값도 전부 임시다.
+ *
+ * 전화번호는 일부러 넣지 않는다. 지어낸 번호를 넣어 두면 서버가 안 붙은
+ * 상태에서 "병원 연락하기"가 멀쩡히 활성화되고, 보호자가 엉뚱한 곳으로
+ * 전화를 걸게 된다. 번호가 없으면 버튼이 비활성으로 표시되어 안전하다.
  * ────────────────────────────────────────────────────────────── */
 export const hospitalDirectory: HospitalInfo[] = [
-  { code: "DJ001", name: "둔산엔젤요양병원", address: "대전 서구 둔산로 100", phone: "042-000-0001" },
-  { code: "DJ002", name: "중부요양병원", address: "대전 중구 문화로 282", phone: "042-000-0002" },
-  { code: "DJ003", name: "유성온천요양병원", address: "대전 유성구 온천북로 55", phone: "042-000-0003" },
-  { code: "DJ004", name: "대덕행복요양병원", address: "대전 대덕구 계족로 210", phone: "042-000-0004" },
-  { code: "DJ005", name: "동구사랑요양병원", address: "대전 동구 동서대로 1720", phone: "042-000-0005" },
+  { code: "DJ001", name: "둔산엔젤요양병원", address: "대전 서구 둔산로 100" },
+  { code: "DJ002", name: "중부요양병원", address: "대전 중구 문화로 282" },
+  { code: "DJ003", name: "유성온천요양병원", address: "대전 유성구 온천북로 55" },
+  { code: "DJ004", name: "대덕행복요양병원", address: "대전 대덕구 계족로 210" },
+  { code: "DJ005", name: "동구사랑요양병원", address: "대전 동구 동서대로 1720" },
 ]
 
 /** 개발용 목록에서 코드로 찾기 (서버 조회 실패 시 폴백) */
@@ -44,9 +47,9 @@ export function findHospitalByName(name: string): HospitalInfo | null {
 /**
  * 병원 코드로 병원 정보를 가져온다. 서버를 먼저 보고, 실패하면 개발용 목록으로 대체한다.
  *
- * TODO(백엔드): GET /hospitals/by-code/{code} 엔드포인트가 아직 없다.
- *   생기면 아래 catch 의 폴백은 그대로 두고 정상 동작한다.
- *   응답에 phone 이 포함되면 "병원 연락" 버튼이 자동으로 살아난다.
+ * 서버의 GET /hospitals/by-code/{code} 는 전화번호까지 함께 준다.
+ * 아직 번호를 못 구한 병원은 phone 이 없이 오고, 그때 "병원 연락하기"
+ * 버튼은 비활성으로 표시된다.
  */
 export async function fetchHospitalByCode(code: string): Promise<HospitalInfo | null> {
   const key = code.trim().toUpperCase()

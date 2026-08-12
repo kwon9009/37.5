@@ -1,15 +1,3 @@
--- =====================================================================
--- 37.5 SmartCare DDL
--- 최종 수정: 2026-08-05
---
--- 2026-08-05 변경 요약 (5건)
---   1) hospitals.area                    추가        <- 이번에 새로 추가
---   2) hospitals.address                 VARCHAR(50) -> VARCHAR(255)
---   3) hospital_requests.bed_count       추가
---   4) patient_link_requests.updated_at  추가
---   5) patient_link_requests             UNIQUE 제약 제거 + 조회 인덱스 2개 추가
--- =====================================================================
-
 CREATE DATABASE IF NOT EXISTS human_exe
 DEFAULT CHARACTER SET utf8mb4
 DEFAULT COLLATE utf8mb4_unicode_ci;
@@ -22,7 +10,8 @@ area VARCHAR(20) NOT NULL, -- 2026-08-05 추가: 시·도 단위 지역명(예: 
 address VARCHAR(255) NOT NULL, -- 2026-08-05 수정: VARCHAR(50) -> VARCHAR(255). 대전 45개 병원 실측 최대 47자로 한도에 3자밖에 안 남아 입력 실패 위험
 hospital_code VARCHAR(10) NOT NULL UNIQUE, -- 보호자에게 문자로 전달하는 병원 코드. 지역별 접두사(대전 DJ, 서울 SU, 경기 GG, 부산 BS, 대구 DG)
 bed_count INT NOT NULL,
-created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP, -- 2026-08-12 추가: 관리자 병원 관리 화면의 등록일 표시용. 모델(Hospital)에 먼저 들어가 있어서 이 컬럼이 없으면 병원을 읽는 모든 조회가 실패한다
+phone VARCHAR(20) NULL, -- 2026-08-12 추가: 병원 대표 전화번호. 보호자 앱의 "병원 연락하기" 버튼이 이 번호로 건다. 폐업·개명 등으로 못 구한 병원이 있어 NULL 허용(그 병원은 버튼이 비활성된다)
+created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
 UNIQUE KEY uk_hospital_name_address (name, address)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 

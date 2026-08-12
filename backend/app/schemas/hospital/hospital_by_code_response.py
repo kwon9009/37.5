@@ -16,6 +16,6 @@ class HospitalByCodeResponse(BaseModel):
     area: str
     address: str
 
-    # hospitals 테이블에 아직 전화번호 컬럼이 없어 항상 None으로 나간다.
-    # 앱은 이 값이 없으면 "병원 연락" 버튼을 비활성으로 둔다.
+    # 병원 대표 전화번호. 아직 못 구한 병원은 None으로 나가고,
+    # 그때 앱은 "병원 연락하기" 버튼을 비활성으로 둔다.
     phone: str | None = Field(default=None)

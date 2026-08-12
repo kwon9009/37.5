@@ -34,6 +34,10 @@ class Hospital(Base):
 
     bed_count: Mapped[int] = mapped_column(Integer, nullable=False)
 
+    # 병원 대표 전화번호. 보호자 앱의 "병원 연락하기" 버튼이 이 번호로 건다.
+    # 못 구한 병원이 있을 수 있어 NULL을 허용한다(그 병원은 버튼이 비활성된다).
+    phone: Mapped[str | None] = mapped_column(String(20), nullable=True)
+
     created_at: Mapped[datetime] = mapped_column(
         TIMESTAMP,
         nullable=False,
