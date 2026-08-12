@@ -1,11 +1,32 @@
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { useNavigate } from "react-router-dom"
-import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts"
+import { Area, AreaChart, CartesianGrid, ReferenceArea, Tooltip, XAxis, YAxis } from "recharts"
 import { Heart, Wind, UserCheck, UserX, X, AlertTriangle, Bell, Trash2 } from "lucide-react"
 import { Screen, TopBar } from "@/guardian/components/Screen"
 import { BottomNav } from "@/guardian/components/BottomNav"
-import { useGuardianData, levelLabel, HR_NORMAL, RR_NORMAL } from "@/guardian/lib/api"
+import {
+  useGuardianData,
+  heartRateLevel,
+  respirationLevel,
+  HR_NORMAL,
+  RR_NORMAL,
+  type VitalLevel,
+} from "@/guardian/lib/api"
 import { cn } from "@/guardian/lib/utils"
+
+/** 그래프에서 한 시간이 차지하는 가로 폭(px).
+ *  24시간을 폰 화면에 다 넣으면 시각 숫자가 겹치므로, 폭을 고정하고 가로 스크롤로 넘겨 본다. */
+const HOUR_W = 46
+
+/** 등급별 배지 색. 정상은 초록, 한 단계 벗어나면 주황, 두 단계면 빨강. */
+const LEVEL_STYLE: Record<VitalLevel, string> = {
+  "매우 낮음": "bg-danger/15 text-danger",
+  낮음: "bg-accent/20 text-accent-foreground",
+  정상: "bg-success/15 text-success",
+  높음: "bg-accent/20 text-accent-foreground",
+  "매우 높음": "bg-danger/15 text-danger",
+  "기록 없음": "bg-muted text-muted-foreground",
+}
 
 /**
  * 서버가 주는 값은 1분 평균 로그라서 하루치면 1440개가 된다.
@@ -21,9 +42,14 @@ function toHourlySeries(series: { t: string; value: number }[]) {
     acc.count += 1
     sum.set(point.t, acc)
   }
-  return [...sum.entries()]
-    .map(([t, { total, count }]) => ({ t, value: Math.round(total / count) }))
-    .sort((a, b) => a.t.localeCompare(b.t))
+  // 00~23시 뼈대를 먼저 깔고 값을 채운다.
+  // 기록이 있는 시간만 넣으면 방금 켠 경우 점이 하나만 찍혀 "지금 시각"만 있는 것처럼 보인다.
+  // 기록이 없는 시간도 축에는 나와야 하루 흐름을 읽을 수 있다(값은 null → 선이 끊김).
+  return Array.from({ length: 24 }, (_, hour) => {
+    const t = String(hour).padStart(2, "0")
+    const acc = sum.get(t)
+    return { t, value: acc ? Math.round(acc.total / acc.count) : null }
+  })
 }
 
 /**
@@ -39,17 +65,61 @@ function VitalPanel({
   series,
   color,
   chartId,
+  fallbackDomain,
+  normalRange,
 }: {
   icon: React.ReactNode
   label: string
   value: string | number
   unit: string
-  status: string
-  series: { t: string; value: number }[]
+  status: VitalLevel
+  /** 00~23시 24칸. 기록이 없는 시간은 value 가 null 이라 선이 끊겨 그려진다. */
+  series: { t: string; value: number | null }[]
   color: string
   chartId: string
+  /** 값이 하나도 없을 때 y축이 0~0 으로 뭉개지지 않도록 잡아 줄 기본 범위 */
+  fallbackDomain: [number, number]
+  /** 정상 범위. 축 숫자 대신 옅은 띠로 깔아 값의 높낮이를 가늠하게 한다. */
+  normalRange: { min: number; max: number }
 }) {
-  const abnormal = status !== "정상"
+  const hasAnyValue = series.some((p) => p.value != null)
+  const scrollRef = useRef<HTMLDivElement>(null)
+
+  // 지금 시각이 화면 가운데 오도록 맞춰 둔다. 그래야 열자마자 최근 흐름이 보이고,
+  // 지나간 시간은 왼쪽으로 밀어서(스와이프) 볼 수 있다.
+  //
+  // 위치를 HOUR_W 로 계산하면 recharts 내부 여백만큼 어긋난다(실측 13px).
+  // 기록 화면 캘린더와 같은 방식으로, 실제 그려진 눈금의 화면 좌표를 재서 맞춘다.
+  // 단 마운트 직후에는 recharts 가 아직 눈금을 그리기 전이라 요소를 못 찾는다.
+  // 그려질 때까지 몇 프레임 기다렸다가 맞추고, 끝내 못 찾으면 계산식으로라도 맞춘다.
+  useEffect(() => {
+    const el = scrollRef.current
+    if (!el) return
+    const nowLabel = String(new Date().getHours()).padStart(2, "0")
+    let raf = 0
+    let tries = 0
+
+    const center = () => {
+      const tick = [...el.querySelectorAll("svg text")].find((t) => t.textContent === nowLabel)
+      if (tick) {
+        const containerRect = el.getBoundingClientRect()
+        const tickRect = tick.getBoundingClientRect()
+        const offsetInContainer = tickRect.left - containerRect.left
+        const centerOffset = el.clientWidth / 2 - tickRect.width / 2
+        el.scrollLeft += offsetInContainer - centerOffset
+        return
+      }
+      if (tries++ < 10) {
+        raf = requestAnimationFrame(center)
+      } else {
+        el.scrollLeft = new Date().getHours() * HOUR_W + HOUR_W / 2 - el.clientWidth / 2
+      }
+    }
+
+    raf = requestAnimationFrame(center)
+    return () => cancelAnimationFrame(raf)
+  }, [])
+
   return (
     <div className="rounded-3xl border border-border bg-card p-5 shadow-sm">
       <div className="flex items-center gap-2">
@@ -57,12 +127,7 @@ function VitalPanel({
           {icon}
         </span>
         <span className="flex-1 font-semibold text-foreground">{label}</span>
-        <span
-          className={cn(
-            "rounded-full px-2.5 py-1 text-xs font-bold",
-            abnormal ? "bg-danger/15 text-danger" : "bg-success/15 text-success",
-          )}
-        >
+        <span className={cn("rounded-full px-2.5 py-1 text-xs font-bold", LEVEL_STYLE[status])}>
           {status}
         </span>
       </div>
@@ -76,32 +141,43 @@ function VitalPanel({
         <span className="mt-1.5 text-sm font-medium text-muted-foreground">{unit}</span>
       </div>
 
-      {/* 시간당 추이 (하루치) */}
-      <div className="mt-4 h-36 w-full">
-        {series.length > 0 ? (
-          <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={series} margin={{ top: 8, right: 8, left: -18, bottom: 0 }}>
-              <defs>
-                <linearGradient id={chartId} x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor={color} stopOpacity={0.35} />
-                  <stop offset="100%" stopColor={color} stopOpacity={0} />
-                </linearGradient>
-              </defs>
-              <XAxis dataKey="t" tickLine={false} axisLine={false} fontSize={11} stroke="#806467" />
-              <YAxis tickLine={false} axisLine={false} fontSize={11} stroke="#806467" width={34} />
-              <Tooltip
-                contentStyle={{ borderRadius: 12, border: "1px solid #f1d6d0", fontSize: 12 }}
-                formatter={(v) => [v == null ? "-" : `${v} ${unit}`, ""]}
-                labelFormatter={(l) => `${l}시`}
-              />
-              <Area type="monotone" dataKey="value" stroke={color} strokeWidth={2.5} fill={`url(#${chartId})`} />
-            </AreaChart>
-          </ResponsiveContainer>
-        ) : (
-          <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
-            아직 기록된 추이가 없습니다
-          </div>
-        )}
+      {/* 시간당 추이 (하루치).
+          24시간을 폰 화면에 다 욱여넣으면 시각 숫자가 겹쳐서, 한 시간을 고정 폭으로 두고
+          가로로 넘겨(스와이프) 보게 한다. 기록이 없는 시간도 축에는 그대로 나온다. */}
+      <div ref={scrollRef} className="mt-4 -mx-1 overflow-x-auto px-1 pb-1">
+        <div className="h-36" style={{ width: HOUR_W * 24 }}>
+          <AreaChart
+            width={HOUR_W * 24}
+            height={144}
+            data={series}
+            margin={{ top: 8, right: 4, left: 4, bottom: 0 }}
+          >
+            <defs>
+              <linearGradient id={chartId} x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor={color} stopOpacity={0.35} />
+                <stop offset="100%" stopColor={color} stopOpacity={0} />
+              </linearGradient>
+            </defs>
+            <CartesianGrid vertical={false} stroke="#f1d6d0" strokeDasharray="3 3" />
+            {/* 축 숫자 대신 정상 범위를 옅은 띠로 깔아, 값이 높은지 낮은지 바로 보이게 한다 */}
+            <ReferenceArea y1={normalRange.min} y2={normalRange.max} fill="#8fbf7a" fillOpacity={0.12} />
+            <XAxis
+              dataKey="t"
+              tickLine={false}
+              axisLine={false}
+              fontSize={11}
+              stroke="#806467"
+              interval={0}
+            />
+            <YAxis hide domain={hasAnyValue ? ["auto", "auto"] : fallbackDomain} />
+            <Tooltip
+              contentStyle={{ borderRadius: 12, border: "1px solid #f1d6d0", fontSize: 12 }}
+              formatter={(v) => [v == null ? "기록 없음" : `${v} ${unit}`, ""]}
+              labelFormatter={(l) => `${l}시`}
+            />
+            <Area type="monotone" dataKey="value" stroke={color} strokeWidth={2.5} fill={`url(#${chartId})`} />
+          </AreaChart>
+        </div>
       </div>
     </div>
   )
@@ -184,20 +260,24 @@ export default function Home() {
             label="심박수"
             value={vitals.heartRate}
             unit="bpm"
-            status={levelLabel(vitals.heartRate, HR_NORMAL)}
+            status={heartRateLevel(vitals.heartRate)}
             series={hourlyHeartRate}
             color="#dc2626"
             chartId="home-hr"
+            fallbackDomain={[40, 140]}
+            normalRange={HR_NORMAL}
           />
           <VitalPanel
             icon={<Wind size={18} aria-hidden />}
             label="호흡수"
             value={vitals.respiration}
             unit="회/분"
-            status={levelLabel(vitals.respiration, RR_NORMAL)}
+            status={respirationLevel(vitals.respiration)}
             series={hourlyRespiration}
             color="#d76773"
             chartId="home-rr"
+            fallbackDomain={[0, 40]}
+            normalRange={RR_NORMAL}
           />
         </div>
 

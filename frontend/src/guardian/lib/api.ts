@@ -51,21 +51,52 @@ export type GuardianData = {
   historyLog: HistoryItem[]
 }
 
-// 정상 범위와 판정 함수는 홈 화면 등 다른 곳에서도 같은 기준을 써야 해서 export 한다.
-// (각 화면이 임계값을 따로 들고 있으면 나중에 기준이 바뀔 때 서로 어긋난다)
-export const HR_NORMAL = { min: 60, max: 100 }
-export const RR_NORMAL = { min: 12, max: 20 }
+// ── 생체신호 판정 기준 ─────────────────────────────────────────────
+// 병원에서 환자 악화를 조기에 잡을 때 쓰는 NEWS2(National Early Warning Score 2,
+// 영국 왕립내과의사회) 성인 기준을 그대로 따른다. 임의로 정한 숫자가 아니라
+// 실제 병동에서 쓰는 표라서, 병원 대시보드/의료진과 말이 맞는다.
+//
+//            매우 낮음    낮음      정상      높음       매우 높음
+//   심박수    ≤40        41~50    51~90    91~110     ≥111
+//   호흡수    ≤8         9~11     12~20    21~24      ≥25
+//
+// 주의: 이 등급은 참고용 선별(screening) 표시이지 진단이 아니다.
+//       최종 판단은 의료진이 한다.
+export type VitalLevel = "매우 낮음" | "낮음" | "정상" | "높음" | "매우 높음" | "기록 없음"
+
+/** 등급 경계값. 각 칸은 "이 값 이하까지 이 등급"을 뜻한다. */
+const HR_CUTS = { veryLow: 40, low: 50, normal: 90, high: 110 }
+const RR_CUTS = { veryLow: 8, low: 11, normal: 20, high: 24 }
+
+// 정상 범위(그래프의 초록 띠, 이상 여부 판정에 사용).
+// 위 등급표의 "정상" 칸에서 그대로 끌어온다 — 표와 띠가 어긋나지 않게 하기 위함.
+export const HR_NORMAL = { min: HR_CUTS.low + 1, max: HR_CUTS.normal }
+export const RR_NORMAL = { min: RR_CUTS.low + 1, max: RR_CUTS.normal }
 
 type Range = { min: number; max: number }
+type Cuts = { veryLow: number; low: number; normal: number; high: number }
 
 function isAbnormal(value: number, range: Range): boolean {
   return value < range.min || value > range.max
 }
 
-export function levelLabel(value: number, range: Range): string {
-  if (value > range.max) return "높음"
-  if (value < range.min) return "낮음"
-  return "정상"
+function classify(value: number, cuts: Cuts): VitalLevel {
+  // 0 이하는 측정값이 아니라 "아직 안 들어옴"이다.
+  // 이걸 매우 낮음으로 보여주면 멀쩡한 환자가 위독한 것처럼 보인다.
+  if (!value || value <= 0) return "기록 없음"
+  if (value <= cuts.veryLow) return "매우 낮음"
+  if (value <= cuts.low) return "낮음"
+  if (value <= cuts.normal) return "정상"
+  if (value <= cuts.high) return "높음"
+  return "매우 높음"
+}
+
+export function heartRateLevel(value: number): VitalLevel {
+  return classify(value, HR_CUTS)
+}
+
+export function respirationLevel(value: number): VitalLevel {
+  return classify(value, RR_CUTS)
 }
 
 function relativeTime(sentAt: string): string {
@@ -209,8 +240,8 @@ export function useGuardianData(): GuardianData {
             eventType: latestEmergency?.event_type ?? "cardiac",
             heartAbnormal,
             respAbnormal,
-            heartStatus: levelLabel(evHeart, HR_NORMAL),
-            respStatus: levelLabel(evResp, RR_NORMAL),
+            heartStatus: heartRateLevel(evHeart),
+            respStatus: respirationLevel(evResp),
           },
           notifications,
           specialNote: detail.patient.special_notes ?? "",
@@ -264,8 +295,8 @@ export function useGuardianData(): GuardianData {
         respiration: liveVitals.respiration,
         heartAbnormal: isAbnormal(liveVitals.heartRate, HR_NORMAL),
         respAbnormal: isAbnormal(liveVitals.respiration, RR_NORMAL),
-        heartStatus: levelLabel(liveVitals.heartRate, HR_NORMAL),
-        respStatus: levelLabel(liveVitals.respiration, RR_NORMAL),
+        heartStatus: heartRateLevel(liveVitals.heartRate),
+        respStatus: respirationLevel(liveVitals.respiration),
       }
     : data.emergencyEvent
 
