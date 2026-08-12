@@ -32,10 +32,49 @@ from app.schemas.admin.device_list_response import (
 )
 
 
-# 주소에서 "OO구" 추출
+# 주소에서 시·군·구 추출
+#
+# 첫 낱말(시·도)은 건너뛴다. "대구광역시 수성구 …"에서 앞부터 찾으면 "대구광역시"
+# 안의 "대구"가 먼저 걸려서 지역이 전부 '대구'로 뭉개진다.
+# (우리 주소 데이터는 항상 시·도로 시작한다)
+#
+# 구를 먼저 찾고 없을 때만 시·군을 쓴다. "경기도 성남시 분당구"처럼 둘 다 있으면
+# 더 좁은 단위인 구가 병원을 구분하는 데 쓸모 있기 때문이다.
 def _extract_district(address: str) -> str:
-    match = re.search(r"\S+구", address)
-    return match.group(0) if match else ""
+    tokens = address.split()[1:]
+
+    for token in tokens:
+        if token.endswith("구"):
+            return token
+
+    for token in tokens:
+        if token.endswith(("시", "군")):
+            return token
+
+    return ""
+
+
+# 시·도 이름 축약. "대전광역시" -> "대전"
+_AREA_SHORT = {
+    "서울특별시": "서울", "부산광역시": "부산", "대구광역시": "대구",
+    "인천광역시": "인천", "광주광역시": "광주", "대전광역시": "대전",
+    "울산광역시": "울산", "세종특별자치시": "세종", "경기도": "경기",
+    "강원특별자치도": "강원", "충청북도": "충북", "충청남도": "충남",
+    "전북특별자치도": "전북", "전라남도": "전남", "경상북도": "경북",
+    "경상남도": "경남", "제주특별자치도": "제주",
+}
+
+
+# 관리자 병원 목록의 '지역' 칸과 지역 필터에 쓸 표기.
+#
+# 구만 쓰면 안 된다. 중구·동구·서구는 여러 시에 다 있어서(지금 데이터도 중구·동구가
+# 대전과 대구에 겹친다) 어느 시의 구인지 구분이 안 되고, 지역 필터를 걸면 다른 시의
+# 병원이 섞여 나온다. 그래서 시·도를 앞에 붙여 "대전 서구"처럼 만든다.
+def _format_region(area: str, address: str) -> str:
+    city = _AREA_SHORT.get(area, area)
+    district = _extract_district(address)
+
+    return f"{city} {district}" if district else city
 
 
 # 관리자 병원관리 목록 조회
@@ -49,7 +88,7 @@ def get_hospital_list(
         AdminHospitalListItem(
             hospital_id=hospital.hospital_id,
             name=hospital.name,
-            region=_extract_district(hospital.address),
+            region=_format_region(hospital.area, hospital.address),
             beds=hospital.bed_count,
             devices=device_count,
             manager=manager_name or "-",
