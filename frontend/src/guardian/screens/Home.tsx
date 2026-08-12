@@ -52,16 +52,51 @@ function toHourlySeries(series: { t: string; value: number }[]) {
   })
 }
 
-/**
- * 생체신호 큰 카드: 위에 현재값, 아래에 시간당 추이 그래프.
- * 그래프는 하루치(00~23시)를 보여주며, 서버가 준 1분 평균 로그를 시간 단위로 묶어서 그린다.
- */
-function VitalPanel({
+/** 현재값 카드. 지금 상태를 좌우로 나란히 놓고 한눈에 비교하는 용도. */
+function VitalValueCard({
   icon,
   label,
   value,
   unit,
   status,
+  color,
+}: {
+  icon: React.ReactNode
+  label: string
+  value: string | number
+  unit: string
+  status: VitalLevel
+  color: string
+}) {
+  return (
+    <div className="flex flex-col items-center rounded-3xl border border-border bg-card p-4 shadow-sm">
+      <span className="flex items-center gap-1.5">
+        <span className="grid h-7 w-7 shrink-0 place-items-center rounded-xl bg-danger/10" style={{ color }}>
+          {icon}
+        </span>
+        <span className="text-sm font-semibold text-foreground">{label}</span>
+      </span>
+
+      {/* 단위를 숫자 옆이 아니라 아래에 둔다. 옆에 두면 "숫자+단위" 덩어리가
+          가운데 정렬돼서 자릿수(78→100)가 바뀔 때 숫자가 좌우로 흔들린다. */}
+      <span className="mt-3 text-4xl font-bold leading-none text-foreground">{value}</span>
+      <span className="mt-1 text-xs font-medium text-muted-foreground">{unit}</span>
+
+      <span className={cn("mt-3 rounded-full px-2.5 py-1 text-xs font-bold", LEVEL_STYLE[status])}>
+        {status}
+      </span>
+    </div>
+  )
+}
+
+/**
+ * 시간별 추이 그래프 카드.
+ * 하루치(00~23시)를 보여주며, 서버가 준 1분 평균 로그를 시간 단위로 묶어서 그린다.
+ */
+function VitalTrendCard({
+  icon,
+  label,
+  unit,
   series,
   color,
   chartId,
@@ -70,9 +105,7 @@ function VitalPanel({
 }: {
   icon: React.ReactNode
   label: string
-  value: string | number
   unit: string
-  status: VitalLevel
   /** 00~23시 24칸. 기록이 없는 시간은 value 가 null 이라 선이 끊겨 그려진다. */
   series: { t: string; value: number | null }[]
   color: string
@@ -123,28 +156,16 @@ function VitalPanel({
   return (
     <div className="rounded-3xl border border-border bg-card p-5 shadow-sm">
       <div className="flex items-center gap-2">
-        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-2xl bg-danger/10" style={{ color }}>
+        <span className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-danger/10" style={{ color }}>
           {icon}
         </span>
-        <span className="flex-1 font-semibold text-foreground">{label}</span>
-        <span className={cn("rounded-full px-2.5 py-1 text-xs font-bold", LEVEL_STYLE[status])}>
-          {status}
-        </span>
-      </div>
-
-      {/* 현재값 - 화면에서 가장 크게.
-          단위를 숫자 옆에 두면 "숫자+단위" 덩어리가 가운데로 정렬돼서
-          정작 숫자는 중앙에서 왼쪽으로 밀린다. 단위를 아래로 내려
-          자릿수(78/100 등)가 바뀌어도 숫자가 항상 정중앙에 오게 한다. */}
-      <div className="mt-3 flex flex-col items-center">
-        <span className="text-5xl font-bold leading-none text-foreground">{value}</span>
-        <span className="mt-1.5 text-sm font-medium text-muted-foreground">{unit}</span>
+        <span className="flex-1 text-sm font-semibold text-foreground">{label}</span>
       </div>
 
       {/* 시간당 추이 (하루치).
           24시간을 폰 화면에 다 욱여넣으면 시각 숫자가 겹쳐서, 한 시간을 고정 폭으로 두고
           가로로 넘겨(스와이프) 보게 한다. 기록이 없는 시간도 축에는 그대로 나온다. */}
-      <div ref={scrollRef} className="mt-4 -mx-1 overflow-x-auto px-1 pb-1">
+      <div ref={scrollRef} className="mt-3 -mx-1 overflow-x-auto px-1 pb-1">
         <div className="h-36" style={{ width: HOUR_W * 24 }}>
           <AreaChart
             width={HOUR_W * 24}
@@ -252,27 +273,46 @@ export default function Home() {
           </button>
         )}
 
-        {/* Vitals - 위: 심박수 / 아래: 호흡수 (각각 현재값 + 시간당 추이) */}
-        <div className="space-y-4">
+        {/* 현재값 - 지금 상태를 좌우로 나란히 놓고 한눈에 비교 */}
+        <div className="space-y-3">
           <h2 className="text-sm font-semibold text-muted-foreground">실시간 생체신호</h2>
-          <VitalPanel
-            icon={<Heart size={18} aria-hidden />}
+          <div className="grid grid-cols-2 gap-3">
+            <VitalValueCard
+              icon={<Heart size={16} aria-hidden />}
+              label="심박수"
+              value={vitals.heartRate}
+              unit="bpm"
+              status={heartRateLevel(vitals.heartRate)}
+              color="#dc2626"
+            />
+            <VitalValueCard
+              icon={<Wind size={16} aria-hidden />}
+              label="호흡수"
+              value={vitals.respiration}
+              unit="회/분"
+              status={respirationLevel(vitals.respiration)}
+              color="#d76773"
+            />
+          </div>
+        </div>
+
+        {/* 시간별 추이 - 그래프는 아래로 모아 둔다 */}
+        <div className="space-y-3">
+          <h2 className="text-sm font-semibold text-muted-foreground">시간별 추이</h2>
+          <VitalTrendCard
+            icon={<Heart size={16} aria-hidden />}
             label="심박수"
-            value={vitals.heartRate}
             unit="bpm"
-            status={heartRateLevel(vitals.heartRate)}
             series={hourlyHeartRate}
             color="#dc2626"
             chartId="home-hr"
             fallbackDomain={[40, 140]}
             normalRange={HR_NORMAL}
           />
-          <VitalPanel
-            icon={<Wind size={18} aria-hidden />}
+          <VitalTrendCard
+            icon={<Wind size={16} aria-hidden />}
             label="호흡수"
-            value={vitals.respiration}
             unit="회/분"
-            status={respirationLevel(vitals.respiration)}
             series={hourlyRespiration}
             color="#d76773"
             chartId="home-rr"
@@ -280,7 +320,6 @@ export default function Home() {
             normalRange={RR_NORMAL}
           />
         </div>
-
       </div>
 
       <BottomNav />
