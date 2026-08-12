@@ -1,10 +1,12 @@
 from sqlalchemy.orm import Session
+from sqlalchemy import select
 
 from app.models.emergency_log import EmergencyLog
 from app.models.enums import VitalStatus
 from app.models.patient import Patient
 from app.models.vital_check import VitalCheck
 from app.models.vital_log import VitalLog
+from app.models.device import Device
 
 
 # 환자 조회
@@ -113,3 +115,36 @@ def create_vital_log(
     db.commit()
 
     return vital_log
+
+
+# 장치별 최신 생체 측정값 조회
+def get_latest_by_device_id(
+    db: Session,
+    device_id: int,
+):
+    stmt = (
+        select(
+            Device.status,
+            VitalLog.avg_heart_rate,
+            VitalLog.avg_resp_rate,
+            VitalLog.recorded_at,
+        )
+        .select_from(Device)
+        .join(
+            Patient,
+            Device.patient_id == Patient.patient_id,
+        )
+        .outerjoin(
+            VitalLog,
+            VitalLog.patient_id == Patient.patient_id,
+        )
+        .where(
+            Device.device_id == device_id,
+        )
+        .order_by(
+            VitalLog.recorded_at.desc(),
+        )
+        .limit(1)
+    )
+
+    return db.execute(stmt).first()

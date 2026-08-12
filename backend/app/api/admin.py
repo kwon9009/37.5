@@ -16,6 +16,7 @@ from app.schemas.admin.hospital_device_stats_response import (
 from app.schemas.admin.hospital_update_request import AdminHospitalUpdateRequest
 from app.schemas.admin.device_list_response import AdminDeviceListResponse
 from app.schemas.admin.device_detail_response import AdminDeviceDetailResponse
+from app.schemas.admin.device_vital_response import AdminDeviceVitalResponse
 from app.services import admin_service
 
 router = APIRouter(
@@ -159,6 +160,21 @@ def get_device_detail(
     db: Session = Depends(get_db),
 ):
     return admin_service.get_device_detail(
+        db=db,
+        device_id=device_id,
+    )
+
+
+# 관리자 장치 최신 생체 측정값 조회
+@router.get(
+    "/devices/{device_id}/vitals/latest",
+    response_model=AdminDeviceVitalResponse,
+)
+def get_device_latest_vital(
+    device_id: int,
+    db: Session = Depends(get_db),
+):
+    return admin_service.get_device_latest_vital(
         db=db,
         device_id=device_id,
     )
