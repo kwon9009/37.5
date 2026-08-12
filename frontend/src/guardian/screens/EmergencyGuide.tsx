@@ -1,6 +1,7 @@
 import { useNavigate } from "react-router-dom"
-import { Phone, PhoneCall, Briefcase, Users } from "lucide-react"
+import { PhoneCall, Briefcase, Users } from "lucide-react"
 import { Screen, TopBar } from "@/guardian/components/Screen"
+import { HospitalCallButton } from "@/guardian/components/HospitalCallButton"
 
 // 심박수·호흡수 이상 응급 대응 - 보호자는 환자와 떨어져 있고,
 // 병력·생체신호는 상주 의료진이 이미 파악·대응 중이므로
@@ -71,13 +72,7 @@ export default function EmergencyGuide() {
       </div>
 
       <div className="shrink-0 space-y-3 border-t border-border bg-card px-5 py-4">
-        <a
-          href="tel:0000000000"
-          className="flex h-14 w-full items-center justify-center gap-2 rounded-2xl bg-danger font-semibold text-danger-foreground"
-        >
-          <Phone size={20} aria-hidden />
-          병원 연락하기
-        </a>
+        <HospitalCallButton />
         {/* 이 화면은 응급 화면과 도움말 두 곳에서 들어온다.
             응급 화면으로 고정해두면, 도움말에서 열어본 사용자가 응급 상황도 아닌데
             경고음이 울리는 긴급 화면으로 튕긴다. 그래서 온 곳으로 되돌아가게 한다.

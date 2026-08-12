@@ -31,8 +31,8 @@ from app.models.hospital import Hospital
 
 # (병원코드, 지역, 병원명, 주소, 병상수, 전화번호)
 #
-# 전화번호는 hospitals 테이블에 아직 컬럼이 없어서 DB에 넣지 못한다.
-# 나중에 phone 컬럼이 생기면 바로 쓸 수 있도록 여기에 함께 적어둔다.
+# 전화번호는 hospitals.phone 에 그대로 들어가고, 보호자 앱의
+# "병원 연락하기" 버튼이 이 번호로 전화를 건다.
 MOCK_HOSPITALS = [
     # 서울특별시
     ("SU001", "서울특별시", "강남구립행복요양병원", "서울 강남구 헌릉로590길 60", 180, "02-6053-2114"),
@@ -70,7 +70,7 @@ def main():
         updated = 0
         unchanged = 0
 
-        for code, area, name, address, bed_count, _phone in MOCK_HOSPITALS:
+        for code, area, name, address, bed_count, phone in MOCK_HOSPITALS:
             hospital = by_code.get(code)
 
             if hospital is None:
@@ -81,6 +81,7 @@ def main():
                         address=address,
                         hospital_code=code,
                         bed_count=bed_count,
+                        phone=phone,
                     )
                 )
                 added += 1
@@ -88,15 +89,27 @@ def main():
                 continue
 
             # 이미 있는 병원은 내용이 달라졌을 때만 손댄다
-            if (hospital.name, hospital.area, hospital.address) == (name, area, address):
+            if (hospital.name, hospital.area, hospital.address, hospital.phone) == (
+                name,
+                area,
+                address,
+                phone,
+            ):
                 unchanged += 1
                 continue
 
             print(f"  수정  {code}  {hospital.name} → {name}")
-            print(f"        {hospital.address} → {address}")
+
+            if hospital.address != address:
+                print(f"        {hospital.address} → {address}")
+
+            if hospital.phone != phone:
+                print(f"        전화 {hospital.phone or '(없음)'} → {phone}")
+
             hospital.name = name
             hospital.area = area
             hospital.address = address
+            hospital.phone = phone
             updated += 1
 
         db.commit()
