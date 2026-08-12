@@ -4,7 +4,9 @@ from pydantic import BaseModel, ConfigDict
 
 
 class AdminDeviceListItem(BaseModel):
+    device_id: int
     serial_num: str
+    hospital_name: str
     ward: str
     room_num: int
     bed_num: int

@@ -22,6 +22,7 @@ from app.schemas.admin.device_list_response import (
     AdminDeviceListItem,
     AdminDeviceListResponse,
 )
+from app.schemas.admin.device_detail_response import AdminDeviceDetailResponse
 
 
 # 주소에서 "OO구" 추출
@@ -388,7 +389,9 @@ def get_device_list(
 
     items = [
         AdminDeviceListItem(
+            device_id=row.device_id,
             serial_num=row.serial_num,
+            hospital_name=row.hospital_name,
             ward=row.ward,
             room_num=row.room_num,
             bed_num=row.bed_num,
@@ -403,4 +406,34 @@ def get_device_list(
         total=total,
         page=page,
         page_size=page_size,
+    )
+
+
+# 관리자 장치 상세 조회
+def get_device_detail(
+    db: Session,
+    device_id: int,
+) -> AdminDeviceDetailResponse:
+
+    row = device_crud.get_device_detail_by_serial_num(
+        db=db,
+        device_id=device_id,
+    )
+
+    if row is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="존재하지 않는 장치입니다.",
+        )
+
+    return AdminDeviceDetailResponse(
+        serial_num=row.serial_num,
+        status=row.status,
+        ward=row.ward,
+        room_num=row.room_num,
+        bed_num=row.bed_num,
+        hospital_id=row.hospital_id,
+        hospital_name=row.hospital_name,
+        created_at=row.created_at,
+        updated_at=row.updated_at,
     )

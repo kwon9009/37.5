@@ -1,7 +1,9 @@
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
+from app.models.department import Department
 from app.models.device import Device
+from app.models.hospital import Hospital
 from app.models.patient import Patient
 
 
@@ -15,7 +17,9 @@ def get_device_list(
 ):
     stmt = (
         select(
+            Device.device_id,
             Device.serial_num,
+            Hospital.name.label("hospital_name"),
             Patient.ward,
             Patient.room_num,
             Patient.bed_num,
@@ -27,19 +31,30 @@ def get_device_list(
             Patient,
             Device.patient_id == Patient.patient_id,
         )
+        .join(
+            Department,
+            Patient.department_id == Department.department_id,
+        )
+        .join(
+            Hospital,
+            Department.hospital_id == Hospital.hospital_id,
+        )
     )
 
-    # 장치 ID 또는 병실 검색
+    # 장치 ID, 병원명, 병동 또는 병실 검색
     if search:
         search = search.strip()
 
-        stmt = stmt.where(
-            or_(
-                Device.serial_num.ilike(f"%{search}%"),
-                Patient.ward.ilike(f"%{search}%"),
-                Patient.room_num == int(search) if search.isdigit() else False,
-            )
-        )
+        conditions = [
+            Device.serial_num.ilike(f"%{search}%"),
+            Hospital.name.ilike(f"%{search}%"),
+            Patient.ward.ilike(f"%{search}%"),
+        ]
+
+        if search.isdigit():
+            conditions.append(Patient.room_num == int(search))
+
+        stmt = stmt.where(or_(*conditions))
 
     # 장치 상태 필터
     if status:
@@ -66,8 +81,11 @@ def get_device_list(
     )
 
     if search:
+        search = search.strip()
+
         count_conditions = [
             Device.serial_num.ilike(f"%{search}%"),
+            Hospital.name.ilike(f"%{search}%"),
             Patient.ward.ilike(f"%{search}%"),
         ]
 
@@ -84,3 +102,41 @@ def get_device_list(
     total = db.scalar(count_stmt) or 0
 
     return rows, total
+
+
+# 관리자 장치 상세 조회
+def get_device_detail_by_serial_num(
+    db: Session,
+    device_id: int,
+):
+    stmt = (
+        select(
+            Device.serial_num,
+            Device.status,
+            Patient.ward,
+            Patient.room_num,
+            Patient.bed_num,
+            Hospital.hospital_id,
+            Hospital.name.label("hospital_name"),
+            Device.created_at,
+            Device.updated_at,
+        )
+        .select_from(Device)
+        .join(
+            Patient,
+            Device.patient_id == Patient.patient_id,
+        )
+        .join(
+            Department,
+            Patient.department_id == Department.department_id,
+        )
+        .join(
+            Hospital,
+            Department.hospital_id == Hospital.hospital_id,
+        )
+        .where(
+            Device.device_id == device_id,
+        )
+    )
+
+    return db.execute(stmt).first()

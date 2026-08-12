@@ -15,6 +15,7 @@ from app.schemas.admin.hospital_device_stats_response import (
 )
 from app.schemas.admin.hospital_update_request import AdminHospitalUpdateRequest
 from app.schemas.admin.device_list_response import AdminDeviceListResponse
+from app.schemas.admin.device_detail_response import AdminDeviceDetailResponse
 from app.services import admin_service
 
 router = APIRouter(
@@ -145,4 +146,19 @@ def get_device_list(
         status=status,
         page=page,
         page_size=page_size,
+    )
+
+
+# 관리자 장치 상세 조회
+@router.get(
+    "/devices/{device_id}",
+    response_model=AdminDeviceDetailResponse,
+)
+def get_device_detail(
+    device_id: int,
+    db: Session = Depends(get_db),
+):
+    return admin_service.get_device_detail(
+        db=db,
+        device_id=device_id,
     )
