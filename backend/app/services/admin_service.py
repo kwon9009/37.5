@@ -3,7 +3,7 @@ import re
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
-from app.crud import admin_crud, hospital_crud, admin_hospital_crud
+from app.crud import admin_crud, hospital_crud, admin_hospital_crud, device_crud
 from app.models.enums import DeviceStatus
 from app.schemas.admin.hospital_list_response import AdminHospitalListItem
 from app.schemas.admin.admin_name_response import AdminNameResponse
@@ -18,6 +18,10 @@ from app.schemas.admin.hospital_device_stats_response import (
     AdminHospitalDeviceStatsResponse,
 )
 from app.schemas.admin.hospital_update_request import AdminHospitalUpdateRequest
+from app.schemas.admin.device_list_response import (
+    AdminDeviceListItem,
+    AdminDeviceListResponse,
+)
 
 
 # 주소에서 "OO구" 추출
@@ -363,3 +367,40 @@ def update_hospital(
     except Exception:
         db.rollback()
         raise
+
+
+# 관리자 장치 목록 조회
+def get_device_list(
+    db: Session,
+    search: str | None = None,
+    status: str | None = None,
+    page: int = 1,
+    page_size: int = 5,
+) -> AdminDeviceListResponse:
+
+    rows, total = device_crud.get_device_list(
+        db=db,
+        search=search,
+        status=status,
+        page=page,
+        page_size=page_size,
+    )
+
+    items = [
+        AdminDeviceListItem(
+            serial_num=row.serial_num,
+            ward=row.ward,
+            room_num=row.room_num,
+            bed_num=row.bed_num,
+            status=row.status,
+            updated_at=row.updated_at,
+        )
+        for row in rows
+    ]
+
+    return AdminDeviceListResponse(
+        items=items,
+        total=total,
+        page=page,
+        page_size=page_size,
+    )
