@@ -1,17 +1,13 @@
 import { useEffect, useRef, useState } from "react"
 import { useNavigate } from "react-router-dom"
-import { AlertTriangle, BookOpen, Heart, Wind, Volume2, VolumeX, FileText } from "lucide-react"
+import { AlertTriangle, BookOpen, Heart, Wind, Volume2, VolumeX } from "lucide-react"
 import { cn } from "@/guardian/lib/utils"
 import { Screen } from "@/guardian/components/Screen"
 import { useGuardianData } from "@/guardian/lib/api"
 
-// 백엔드 미연결 시에도 응급 상황(10초 타이머) 데모가 특이사항까지 보여주도록 하는 폴백
-const DEMO_SPECIAL_NOTE =
-  "고혈압·협심증 병력, 심장질환 관리 중이며 항혈전제·심장약 규칙적 복용 필요, 흉통 호소 여부 확인 요망."
-
 export default function Emergency() {
   const navigate = useNavigate()
-  const { patient, emergencyEvent, specialNote } = useGuardianData()
+  const { patient, emergencyEvent } = useGuardianData()
   const [countdown, setCountdown] = useState(5)
   const [muted, setMuted] = useState(false)
   // 브라우저 자동재생 정책으로 경고음이 막힌 상태
@@ -140,53 +136,78 @@ export default function Emergency() {
           심장질환 이력이 있는 환자입니다. 아래 생체신호를 확인하고 즉시 대응해 주세요.
         </p>
 
-        {/* 실시간 생체신호 확인 (심박 / 호흡 이상을 나눠서 강조) */}
+        {/* 실시간 생체신호 확인.
+            응급 화면에서 보호자가 병원에 알려야 할 값이라 화면에서 가장 크게 둔다.
+            숫자만 가운데 오도록 단위는 아래로 내렸다(자릿수가 바뀌어도 안 흔들림). */}
         <div className="mt-6 grid w-full grid-cols-2 gap-3">
           <div
             className={cn(
-              "flex flex-col items-center rounded-2xl p-4 transition",
+              "flex flex-col items-center rounded-2xl px-3 py-5 transition",
               emergencyEvent.heartAbnormal
                 ? "bg-danger-foreground text-danger ring-2 ring-danger-foreground"
                 : "bg-danger-foreground/15",
             )}
           >
-            <Heart size={22} aria-hidden />
-            <span className={cn("mt-1 text-xs", emergencyEvent.heartAbnormal ? "text-danger/70" : "text-danger-foreground/80")}>
-              심박수 {emergencyEvent.heartAbnormal && `· ${emergencyEvent.heartStatus}`}
+            <span className="flex items-center gap-1.5">
+              <Heart size={18} aria-hidden />
+              <span
+                className={cn(
+                  "text-sm font-semibold",
+                  emergencyEvent.heartAbnormal ? "text-danger/70" : "text-danger-foreground/80",
+                )}
+              >
+                심박수
+              </span>
             </span>
-            <span className="mt-0.5 text-2xl font-bold">
-              {emergencyEvent.heartRate}
-              <span className="ml-1 text-sm font-medium">bpm</span>
+            <span className="mt-2 text-5xl font-bold leading-none">{emergencyEvent.heartRate}</span>
+            <span
+              className={cn(
+                "mt-1.5 text-sm font-medium",
+                emergencyEvent.heartAbnormal ? "text-danger/70" : "text-danger-foreground/80",
+              )}
+            >
+              bpm
             </span>
+            {emergencyEvent.heartAbnormal && (
+              <span className="mt-2 rounded-full bg-danger px-2.5 py-0.5 text-xs font-bold text-danger-foreground">
+                {emergencyEvent.heartStatus}
+              </span>
+            )}
           </div>
           <div
             className={cn(
-              "flex flex-col items-center rounded-2xl p-4 transition",
+              "flex flex-col items-center rounded-2xl px-3 py-5 transition",
               emergencyEvent.respAbnormal
                 ? "bg-danger-foreground text-danger ring-2 ring-danger-foreground"
                 : "bg-danger-foreground/15",
             )}
           >
-            <Wind size={22} aria-hidden />
-            <span className={cn("mt-1 text-xs", emergencyEvent.respAbnormal ? "text-danger/70" : "text-danger-foreground/80")}>
-              호흡수 {emergencyEvent.respAbnormal && `· ${emergencyEvent.respStatus}`}
+            <span className="flex items-center gap-1.5">
+              <Wind size={18} aria-hidden />
+              <span
+                className={cn(
+                  "text-sm font-semibold",
+                  emergencyEvent.respAbnormal ? "text-danger/70" : "text-danger-foreground/80",
+                )}
+              >
+                호흡수
+              </span>
             </span>
-            <span className="mt-0.5 text-2xl font-bold">
-              {emergencyEvent.respiration}
-              <span className="ml-1 text-sm font-medium">회/분</span>
+            <span className="mt-2 text-5xl font-bold leading-none">{emergencyEvent.respiration}</span>
+            <span
+              className={cn(
+                "mt-1.5 text-sm font-medium",
+                emergencyEvent.respAbnormal ? "text-danger/70" : "text-danger-foreground/80",
+              )}
+            >
+              회/분
             </span>
+            {emergencyEvent.respAbnormal && (
+              <span className="mt-2 rounded-full bg-danger px-2.5 py-0.5 text-xs font-bold text-danger-foreground">
+                {emergencyEvent.respStatus}
+              </span>
+            )}
           </div>
-        </div>
-
-        {/* 환자 특이사항 */}
-        <div className="mt-4 w-full rounded-2xl bg-danger-foreground/15 p-4 text-left">
-          <p className="flex items-center gap-1.5 text-xs font-semibold text-danger-foreground/90">
-            <FileText size={14} aria-hidden />
-            환자 특이사항
-          </p>
-          <p className="mt-1 text-sm leading-relaxed text-danger-foreground/80">
-            {specialNote || DEMO_SPECIAL_NOTE}
-          </p>
         </div>
 
         {/* 경고음 음소거 토글 */}
