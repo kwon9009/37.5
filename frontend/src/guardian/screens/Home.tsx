@@ -216,11 +216,11 @@ export default function Home() {
   const hourlyHeartRate = useMemo(() => toHourlySeries(heartRateSeries), [heartRateSeries])
   const hourlyRespiration = useMemo(() => toHourlySeries(respirationSeries), [respirationSeries])
 
-  // [일시 비활성 - 개발용] 홈 화면에 상주한 지 10초가 지나면 응급 화면으로 자동 이동하는 데모 기능.
-  // 개발 중에는 홈에 10초만 머물러도 긴급 화면으로 튕겨서 작업이 어려우므로 잠시 꺼둔다.
+  // [일시 비활성 - 개발용] 홈 화면에 상주한 지 5초가 지나면 응급 화면으로 자동 이동하는 데모 기능.
+  // 개발 중에는 홈에 5초만 머물러도 긴급 화면으로 튕겨서 작업이 어려우므로 잠시 꺼둔다.
   // 시연/발표 때 다시 켜려면 아래 useEffect 의 주석만 풀면 된다.
   // useEffect(() => {
-  //   const timer = window.setTimeout(() => navigate("/guardian/emergency"), 10 * 1000)
+  //   const timer = window.setTimeout(() => navigate("/guardian/emergency"), 5 * 1000)
   //   return () => window.clearTimeout(timer)
   // }, [navigate])
 
