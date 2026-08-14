@@ -118,6 +118,8 @@ def create_vital_log(
 
 
 # 장치별 최신 생체 측정값 조회
+# 장치가 환자 미배정(재고) 상태면 Patient가 없어 측정값도 없다 - outer join으로
+# 두어 None을 자연스럽게 돌려주고(예외로 죽지 않게), 호출 쪽에서 없음을 처리한다.
 def get_latest_by_device_id(
     db: Session,
     device_id: int,
@@ -130,7 +132,7 @@ def get_latest_by_device_id(
             VitalLog.recorded_at,
         )
         .select_from(Device)
-        .join(
+        .outerjoin(
             Patient,
             Device.patient_id == Patient.patient_id,
         )

@@ -17,5 +17,6 @@ class AdminHospitalDetailResponse(BaseModel):
     area: str
     address: str
     bed_count: int
+    is_active: bool
     created_at: datetime
     manager: AdminHospitalManagerResponse | None

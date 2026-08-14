@@ -22,7 +22,7 @@ from fastapi import HTTPException, status as http_status
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
-from app.crud import alert_crud, vital_crud
+from app.crud import alert_crud, system_setting_crud, vital_crud
 from app.models.enums import VitalStatus
 from app.models.patient import Patient
 from app.schemas.vitals.vitals_ingest_request import VitalsIngestRequest
@@ -32,6 +32,21 @@ from app.services.anomaly_engine import engine as anomaly_engine
 # 1분 평균을 만들기 위한 환자별 임시 버퍼 (서버 메모리)
 _LOG_INTERVAL_SEC = 60
 _buffers: dict[int, dict] = {}
+
+# 조기경보 on/off, 응급 확정 지속시간은 매 측정마다(초당) DB를 안 찌르도록
+# 이 안에서 잠깐 캐시해서 쓴다. 관리자가 바꾸면 최대 _SETTINGS_CACHE_SEC 뒤에 반영된다.
+_SETTINGS_CACHE_SEC = 5.0
+_settings_cache: dict = {"value": None, "loaded_at": 0.0}
+
+
+def _get_settings(db: Session):
+    now = time.time()
+
+    if _settings_cache["value"] is None or now - _settings_cache["loaded_at"] > _SETTINGS_CACHE_SEC:
+        _settings_cache["value"] = system_setting_crud.get_or_create(db=db)
+        _settings_cache["loaded_at"] = now
+
+    return _settings_cache["value"]
 
 # 등급별 알림 문구 (NORMAL은 알림을 만들지 않는다)
 _ALERT_MESSAGES = {
@@ -66,15 +81,20 @@ _SCORE_TO_STATUS = {
 
 # 심박수 NEWS2 점수
 #   <=40:3  41~50:1  51~90:0  91~110:1  111~130:2  >=131:3
-def _heart_rate_score(heart_rate: int) -> int:
+# 응급(danger_low/danger_high) 경계만 설정으로 움직일 수 있다. WARNING(41~50,
+# 91~110)·ALERT(111~130) 구간은 NEWS2 표준 그대로 두되, danger 경계가 안쪽으로
+# 좁혀 들어오면 그만큼 잘려나가도록 min/max로 물려서 구간이 겹치지 않게 한다.
+def _heart_rate_score(heart_rate: int, danger_low: int, danger_high: int) -> int:
 
-    if heart_rate <= 40 or heart_rate >= 131:
+    if heart_rate <= danger_low or heart_rate >= danger_high:
         return 3
 
-    if 111 <= heart_rate <= 130:
+    if max(111, danger_low + 1) <= heart_rate <= min(130, danger_high - 1):
         return 2
 
-    if 41 <= heart_rate <= 50 or 91 <= heart_rate <= 110:
+    if (max(41, danger_low + 1) <= heart_rate <= 50) or (
+        91 <= heart_rate <= min(110, danger_high - 1)
+    ):
         return 1
 
     return 0
@@ -82,15 +102,16 @@ def _heart_rate_score(heart_rate: int) -> int:
 
 # 호흡수 NEWS2 점수
 #   <=8:3  9~11:1  12~20:0  21~24:2  >=25:3
-def _resp_rate_score(resp_rate: int) -> int:
+# 심박과 같은 방식으로 danger 경계만 조정 가능하다.
+def _resp_rate_score(resp_rate: int, danger_low: int, danger_high: int) -> int:
 
-    if resp_rate <= 8 or resp_rate >= 25:
+    if resp_rate <= danger_low or resp_rate >= danger_high:
         return 3
 
-    if 21 <= resp_rate <= 24:
+    if max(21, danger_low + 1) <= resp_rate <= min(24, danger_high - 1):
         return 2
 
-    if 9 <= resp_rate <= 11:
+    if max(9, danger_low + 1) <= resp_rate <= 11:
         return 1
 
     return 0
@@ -104,12 +125,16 @@ def _resp_rate_score(resp_rate: int) -> int:
 def judge_status(
     heart_rate: int,
     resp_rate: int | None = None,
+    heart_rate_danger_low: int = 40,
+    heart_rate_danger_high: int = 131,
+    resp_rate_danger_low: int = 8,
+    resp_rate_danger_high: int = 25,
 ) -> VitalStatus:
 
-    score = _heart_rate_score(heart_rate)
+    score = _heart_rate_score(heart_rate, heart_rate_danger_low, heart_rate_danger_high)
 
     if resp_rate is not None:
-        score = max(score, _resp_rate_score(resp_rate))
+        score = max(score, _resp_rate_score(resp_rate, resp_rate_danger_low, resp_rate_danger_high))
 
     return _SCORE_TO_STATUS[score]
 
@@ -235,7 +260,7 @@ def _raise_alert_if_changed(
         # 이번 구간은 이미 통보했다. 이어지는 동안 중복으로 만들지 않는다.
         return
 
-    if now - episode["since"] < settings.DANGER_SUSTAIN_SEC:
+    if now - episode["since"] < _get_settings(db).danger_sustain_sec:
         # 아직 기준 시간을 못 채웠다.
         return
 
@@ -491,9 +516,14 @@ def _apply(
 
     # 호흡을 못 믿을 때는 심박만으로 등급을 낸다.
     # 이어 쓴 옛날 호흡값으로 위험 판정을 내리면 가짜 응급이 만들어진다.
+    current_settings = _get_settings(db)
     news2_status = judge_status(
         heart_rate=heart_rate,
         resp_rate=resp_rate if resp_trusted else None,
+        heart_rate_danger_low=current_settings.heart_rate_danger_low,
+        heart_rate_danger_high=current_settings.heart_rate_danger_high,
+        resp_rate_danger_low=current_settings.resp_rate_danger_low,
+        resp_rate_danger_high=current_settings.resp_rate_danger_high,
     )
     vital_status = news2_status
 
@@ -502,7 +532,7 @@ def _apply(
     # 나오므로, 심박·호흡이 둘 다 이번에 실제로 믿을 수 있을 때만 돌린다.
     reason = None
     prediction = None
-    if settings.EARLY_WARNING_ENABLED and resp_trusted:
+    if current_settings.early_warning_enabled and resp_trusted:
         vital_status, reason, prediction = _apply_early_warning(
             news2_status=news2_status,
             patient_id=request.patient_id,

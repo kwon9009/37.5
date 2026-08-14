@@ -104,7 +104,7 @@ function DevComponentLibrary() {
       <Section title="AdminHeader" desc="src/components/admin-header — 관리자 콘솔 전용 상단바 (병원·장치·사용자 통합 검색)">
         <div className="overflow-x-auto rounded-lg border border-[#DCE3EC]">
           <div className="min-w-[720px]">
-            <AdminHeader notificationCount={5} />
+            <AdminHeader />
           </div>
         </div>
       </Section>

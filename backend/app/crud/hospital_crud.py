@@ -77,15 +77,14 @@ def list_areas(db: Session) -> list[str]:
 
 # 관리자 병원관리 목록 (병상수/연결 장치 수/담당 관리자까지 조인)
 def list_all_with_stats(db: Session):
+    # Device.hospital_id로 직접 센다 - 환자 미배정(재고) 장치도 포함되어야 한다.
     device_count_subq = (
         select(
-            Department.hospital_id.label("hospital_id"),
+            Device.hospital_id.label("hospital_id"),
             func.count(Device.device_id).label("device_count"),
         )
         .select_from(Device)
-        .join(Patient, Device.patient_id == Patient.patient_id)
-        .join(Department, Patient.department_id == Department.department_id)
-        .group_by(Department.hospital_id)
+        .group_by(Device.hospital_id)
         .subquery()
     )
 
@@ -167,6 +166,9 @@ def get_detail_by_id(
 
 
 # 관리자 병원별 병동 현황 조회
+# 병동별 정원(병상 수)을 별도로 관리하는 컬럼이 없어서,
+# 그 병동 환자들이 쓰는 room_num의 종류 수를 병상 수로 취급한다.
+# (환자가 배정된 적 없는 빈 방은 집계에서 빠진다)
 def get_wards_by_hospital_id(
     db: Session,
     hospital_id: int,
@@ -175,7 +177,7 @@ def get_wards_by_hospital_id(
         select(
             Department.department_id,
             Department.name,
-            Hospital.bed_count,
+            func.count(func.distinct(Patient.room_num)).label("bed_count"),
             func.count(
                 func.distinct(
                     case(
@@ -186,10 +188,6 @@ def get_wards_by_hospital_id(
             func.count(Device.device_id).label("devices"),
         )
         .select_from(Department)
-        .join(
-            Hospital,
-            Department.hospital_id == Hospital.hospital_id,
-        )
         .outerjoin(
             Patient,
             Patient.department_id == Department.department_id,
@@ -204,7 +202,6 @@ def get_wards_by_hospital_id(
         .group_by(
             Department.department_id,
             Department.name,
-            Hospital.bed_count,
         )
         .order_by(
             Department.department_id,
@@ -215,6 +212,8 @@ def get_wards_by_hospital_id(
 
 
 # 관리자 병원별 연결 장치 현황 조회
+# Device.hospital_id로 직접 필터링한다 - 환자 미배정(재고) 장치도 병원 소속이므로
+# 여기 포함되어야 한다(환자를 거쳐서 병원을 찾으면 미배정 장치가 빠진다).
 def get_device_stats_by_hospital_id(
     db: Session,
     hospital_id: int,
@@ -225,16 +224,8 @@ def get_device_stats_by_hospital_id(
             func.count(Device.device_id).label("device_count"),
         )
         .select_from(Device)
-        .join(
-            Patient,
-            Device.patient_id == Patient.patient_id,
-        )
-        .join(
-            Department,
-            Patient.department_id == Department.department_id,
-        )
         .where(
-            Department.hospital_id == hospital_id,
+            Device.hospital_id == hospital_id,
         )
         .group_by(
             Device.status,
@@ -260,6 +251,20 @@ def update(
     hospital.area = area
     hospital.address = address
     hospital.bed_count = bed_count
+
+    db.flush()
+
+    return hospital
+
+
+# 병원 활성/비활성 상태 변경
+def set_active(
+    db: Session,
+    hospital: Hospital,
+    is_active: bool,
+) -> Hospital:
+
+    hospital.is_active = is_active
 
     db.flush()
 

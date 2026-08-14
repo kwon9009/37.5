@@ -7,9 +7,9 @@ class AdminDeviceListItem(BaseModel):
     device_id: int
     serial_num: str
     hospital_name: str
-    ward: str
-    room_num: int
-    bed_num: int
+    ward: str | None
+    room_num: int | None
+    bed_num: int | None
     status: str
     updated_at: datetime
 
