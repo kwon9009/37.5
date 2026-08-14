@@ -18,6 +18,8 @@ function AdminHospitalManagement() {
   const [statusFilter, setStatusFilter] = useState("전체");
   const [page, setPage] = useState(1);
   const [pendingRequests, setPendingRequests] = useState([]);
+  const [areaOptions, setAreaOptions] = useState([]);
+  const [adminOptions, setAdminOptions] = useState([]);
 
   const loadHospitals = () => {
     apiClient
@@ -50,6 +52,14 @@ function AdminHospitalManagement() {
   useEffect(() => {
     loadHospitals();
     loadPendingRequests();
+    apiClient
+      .get("/hospitals/areas")
+      .then(({ data }) => setAreaOptions(data))
+      .catch(() => {});
+    apiClient
+      .get("/admin/names")
+      .then(({ data }) => setAdminOptions(data))
+      .catch(() => {});
   }, []);
 
   const handleApproveRequest = (request) => {
@@ -68,12 +78,10 @@ function AdminHospitalManagement() {
     [hospitals]
   );
 
-  const handleAddHospital = (form) => {
-    setHospitals((current) => [
-      { id: `${form.name}-${Date.now()}`, name: form.name, region: form.region, beds: form.beds, devices: 0, manager: form.manager || "-", active: true },
-      ...current,
-    ]);
-  };
+  const handleAddHospital = (form) =>
+    apiClient.post("/admin/hospitals", form).then(() => {
+      loadHospitals();
+    });
 
   const filteredHospitals = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
@@ -95,7 +103,7 @@ function AdminHospitalManagement() {
       <AdminSidebar active="hospitals" />
 
       <div className="flex min-h-screen w-full flex-col">
-        <AdminHeader notificationCount={5} />
+        <AdminHeader />
 
         <div className="flex flex-col gap-6 p-6">
           <div className="flex flex-wrap items-center justify-between gap-4">
@@ -319,7 +327,13 @@ function AdminHospitalManagement() {
         </div>
       </div>
 
-      <AddHospitalModal isOpen={isAddOpen} onClose={() => setIsAddOpen(false)} onSubmit={handleAddHospital} />
+      <AddHospitalModal
+        isOpen={isAddOpen}
+        onClose={() => setIsAddOpen(false)}
+        onSubmit={handleAddHospital}
+        areaOptions={areaOptions}
+        adminOptions={adminOptions}
+      />
     </div>
   );
 }

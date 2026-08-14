@@ -4,7 +4,9 @@ from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.core.security import decode_access_token
+from app.crud.admin_crud import get_admin_by_user_id
 from app.crud.user_crud import get_by_user_id
+from app.models.admin import Admin
 from app.models.enums import UserRole
 from app.models.user import User
 
@@ -60,3 +62,25 @@ def require_role(
         return current_user
 
     return role_checker
+
+
+# 로그인한 ADMIN 유저의 Admin 레코드를 가져온다.
+# 병원 접근 범위 확인(admin_hospitals)에 admin_id가 필요해서
+# require_role(ADMIN)만으로는 부족한 라우터에서 이걸 대신 쓴다.
+def get_current_admin(
+    current_user: User = Depends(require_role(UserRole.ADMIN)),
+    db: Session = Depends(get_db),
+) -> Admin:
+
+    admin = get_admin_by_user_id(
+        db=db,
+        user_id=current_user.user_id,
+    )
+
+    if admin is None:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="관리자 계정 정보를 찾을 수 없습니다.",
+        )
+
+    return admin

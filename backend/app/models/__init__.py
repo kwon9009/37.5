@@ -14,3 +14,4 @@ from app.models.vital_check import VitalCheck
 from app.models.vital_log import VitalLog
 from app.models.patient_link_request import PatientLinkRequest
 from app.models.admin_hospital import AdminHospital
+from app.models.system_setting import SystemSetting

@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 from datetime import datetime
 
-from sqlalchemy import String, BigInteger, UniqueConstraint, Integer, TIMESTAMP, func
+from sqlalchemy import String, BigInteger, UniqueConstraint, Integer, TIMESTAMP, Boolean, func, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
@@ -42,6 +42,13 @@ class Hospital(Base):
         TIMESTAMP,
         nullable=False,
         server_default=func.now(),
+    )
+
+    # 병원 계정 활성/비활성 상태. 관리자가 병원 상세 화면에서 토글한다.
+    is_active: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        server_default=text("true"),
     )
 
     # Relationship

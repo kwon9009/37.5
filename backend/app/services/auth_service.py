@@ -293,6 +293,12 @@ def login_user(
             detail="아이디 또는 비밀번호가 올바르지 않습니다.",
         )
 
+    if not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="비활성화된 계정입니다. 관리자에게 문의해 주세요.",
+        )
+
     access_token = _generate_access_token(user)
 
     return LoginResponse(

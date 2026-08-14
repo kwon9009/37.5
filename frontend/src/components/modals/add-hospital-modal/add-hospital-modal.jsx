@@ -1,33 +1,71 @@
 import { useEffect, useState } from "react";
 import Icon from "../../icon/icon.jsx";
 
-const REGION_OPTIONS = ["동구", "중구", "서구", "유성구", "대덕구"];
+const EMPTY_FORM = { name: "", hospital_code: "", area: "", address: "", bed_count: "", admin_id: "" };
 
-const EMPTY_FORM = { name: "", region: REGION_OPTIONS[0], beds: "", manager: "" };
-
-function AddHospitalModal({ isOpen, onClose, onSubmit, mode = "add", initialValues }) {
+function AddHospitalModal({
+  isOpen,
+  onClose,
+  onSubmit,
+  mode = "add",
+  initialValues,
+  areaOptions = [],
+  adminOptions = [],
+}) {
   const isEdit = mode === "edit";
   const [form, setForm] = useState(EMPTY_FORM);
   const [error, setError] = useState("");
+  const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
-    if (isOpen) {
-      setForm(isEdit && initialValues ? { ...EMPTY_FORM, ...initialValues } : EMPTY_FORM);
-      setError("");
-    }
-  }, [isOpen, isEdit, initialValues]);
+    if (!isOpen) return;
+    const defaults = {
+      ...EMPTY_FORM,
+      area: areaOptions[0] ?? "",
+      admin_id: adminOptions[0]?.admin_id ?? "",
+    };
+    setForm(isEdit && initialValues ? { ...defaults, ...initialValues } : defaults);
+    setError("");
+    setSubmitting(false);
+  }, [isOpen, isEdit, initialValues, areaOptions, adminOptions]);
 
   if (!isOpen) return null;
 
   const updateField = (field, value) => setForm((current) => ({ ...current, [field]: value }));
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!form.name.trim()) {
       setError("병원명을 입력해 주세요");
       return;
     }
-    onSubmit?.({ ...form, beds: Number(form.beds) || 0 });
-    onClose();
+    if (!form.hospital_code.trim()) {
+      setError("병원 코드를 입력해 주세요");
+      return;
+    }
+    if (!form.area) {
+      setError("지역을 선택해 주세요");
+      return;
+    }
+    if (!form.address.trim()) {
+      setError("주소를 입력해 주세요");
+      return;
+    }
+    if (!form.admin_id) {
+      setError("담당 관리자를 선택해 주세요");
+      return;
+    }
+
+    const payload = { ...form, bed_count: Number(form.bed_count) || 0, admin_id: Number(form.admin_id) };
+
+    setSubmitting(true);
+    try {
+      await onSubmit?.(payload);
+      onClose();
+    } catch (submitError) {
+      setError(submitError?.response?.data?.detail || submitError?.message || "저장에 실패했습니다");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -75,6 +113,35 @@ function AddHospitalModal({ isOpen, onClose, onSubmit, mode = "add", initialValu
           />
         </div>
 
+        <div className="flex flex-col gap-2">
+          <label htmlFor="hospitalCode" className="text-xs font-bold tracking-wide text-[#5A6B80]">
+            병원 코드
+          </label>
+          <input
+            id="hospitalCode"
+            type="text"
+            maxLength={10}
+            value={form.hospital_code}
+            onChange={(event) => updateField("hospital_code", event.target.value)}
+            placeholder="예: DJ-CENTRAL01"
+            className="h-11 rounded-lg border border-[#DCE3EC] bg-[#F5F7FA] px-[14px] font-mono text-sm text-[#1E2A3A] placeholder:font-sans placeholder:text-[#5A6B80] focus:outline-none"
+          />
+        </div>
+
+        <div className="flex flex-col gap-2">
+          <label htmlFor="hospitalAddress" className="text-xs font-bold tracking-wide text-[#5A6B80]">
+            주소
+          </label>
+          <input
+            id="hospitalAddress"
+            type="text"
+            value={form.address}
+            onChange={(event) => updateField("address", event.target.value)}
+            placeholder="예: 대전광역시 유성구 대학로 291"
+            className="h-11 rounded-lg border border-[#DCE3EC] bg-[#F5F7FA] px-[14px] text-sm text-[#1E2A3A] placeholder:text-[#5A6B80] focus:outline-none"
+          />
+        </div>
+
         <div className="flex gap-3">
           <div className="flex w-full flex-col gap-2">
             <label htmlFor="hospitalRegion" className="text-xs font-bold tracking-wide text-[#5A6B80]">
@@ -82,13 +149,14 @@ function AddHospitalModal({ isOpen, onClose, onSubmit, mode = "add", initialValu
             </label>
             <select
               id="hospitalRegion"
-              value={form.region}
-              onChange={(event) => updateField("region", event.target.value)}
+              value={form.area}
+              onChange={(event) => updateField("area", event.target.value)}
               className="h-11 rounded-lg border border-[#DCE3EC] bg-[#F5F7FA] px-[14px] text-sm text-[#1E2A3A] focus:outline-none"
             >
-              {REGION_OPTIONS.map((region) => (
-                <option key={region} value={region}>
-                  {region}
+              {areaOptions.length === 0 && <option value="">지역 목록을 불러오는 중</option>}
+              {areaOptions.map((area) => (
+                <option key={area} value={area}>
+                  {area}
                 </option>
               ))}
             </select>
@@ -101,8 +169,8 @@ function AddHospitalModal({ isOpen, onClose, onSubmit, mode = "add", initialValu
               id="hospitalBeds"
               type="number"
               min="0"
-              value={form.beds}
-              onChange={(event) => updateField("beds", event.target.value)}
+              value={form.bed_count}
+              onChange={(event) => updateField("bed_count", event.target.value)}
               placeholder="예: 300"
               className="h-11 rounded-lg border border-[#DCE3EC] bg-[#F5F7FA] px-[14px] text-sm text-[#1E2A3A] placeholder:text-[#5A6B80] focus:outline-none"
             />
@@ -113,14 +181,19 @@ function AddHospitalModal({ isOpen, onClose, onSubmit, mode = "add", initialValu
           <label htmlFor="hospitalManager" className="text-xs font-bold tracking-wide text-[#5A6B80]">
             담당 관리자
           </label>
-          <input
+          <select
             id="hospitalManager"
-            type="text"
-            value={form.manager}
-            onChange={(event) => updateField("manager", event.target.value)}
-            placeholder="담당자 이름"
-            className="h-11 rounded-lg border border-[#DCE3EC] bg-[#F5F7FA] px-[14px] text-sm text-[#1E2A3A] placeholder:text-[#5A6B80] focus:outline-none"
-          />
+            value={form.admin_id}
+            onChange={(event) => updateField("admin_id", event.target.value)}
+            className="h-11 rounded-lg border border-[#DCE3EC] bg-[#F5F7FA] px-[14px] text-sm text-[#1E2A3A] focus:outline-none"
+          >
+            {adminOptions.length === 0 && <option value="">관리자 목록을 불러오는 중</option>}
+            {adminOptions.map((admin) => (
+              <option key={admin.admin_id} value={admin.admin_id}>
+                {admin.name}
+              </option>
+            ))}
+          </select>
         </div>
 
         {error && <p className="text-xs font-semibold text-[#E0442E]">{error}</p>}
@@ -133,8 +206,13 @@ function AddHospitalModal({ isOpen, onClose, onSubmit, mode = "add", initialValu
           >
             취소
           </button>
-          <button type="button" onClick={handleSubmit} className="rounded-lg bg-[#2B6FE3] px-5 py-[10px] text-sm font-bold text-white">
-            {isEdit ? "저장" : "등록"}
+          <button
+            type="button"
+            onClick={handleSubmit}
+            disabled={submitting}
+            className="rounded-lg bg-[#2B6FE3] px-5 py-[10px] text-sm font-bold text-white disabled:opacity-60"
+          >
+            {submitting ? "저장 중..." : isEdit ? "저장" : "등록"}
           </button>
         </div>
       </div>
