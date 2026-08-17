@@ -8,8 +8,10 @@ import {
   useGuardianData,
   heartRateLevel,
   respirationLevel,
+  toHourlySeries,
   HR_NORMAL,
   RR_NORMAL,
+  type HourlyPoint,
   type VitalLevel,
 } from "@/guardian/lib/api"
 import { cn } from "@/guardian/lib/utils"
@@ -26,30 +28,6 @@ const LEVEL_STYLE: Record<VitalLevel, string> = {
   높음: "bg-accent/20 text-accent-foreground",
   "매우 높음": "bg-danger/15 text-danger",
   "기록 없음": "bg-muted text-muted-foreground",
-}
-
-/**
- * 서버가 주는 값은 1분 평균 로그라서 하루치면 1440개가 된다.
- * 그대로 그리면 점이 너무 많아 읽기 어렵고 "시간당"도 아니므로,
- * 같은 시(00~23)끼리 평균 내어 최대 24개(=하루치)로 줄인다.
- */
-function toHourlySeries(series: { t: string; value: number }[]) {
-  const sum = new Map<string, { total: number; count: number }>()
-  for (const point of series) {
-    if (point.value == null) continue
-    const acc = sum.get(point.t) ?? { total: 0, count: 0 }
-    acc.total += point.value
-    acc.count += 1
-    sum.set(point.t, acc)
-  }
-  // 00~23시 뼈대를 먼저 깔고 값을 채운다.
-  // 기록이 있는 시간만 넣으면 방금 켠 경우 점이 하나만 찍혀 "지금 시각"만 있는 것처럼 보인다.
-  // 기록이 없는 시간도 축에는 나와야 하루 흐름을 읽을 수 있다(값은 null → 선이 끊김).
-  return Array.from({ length: 24 }, (_, hour) => {
-    const t = String(hour).padStart(2, "0")
-    const acc = sum.get(t)
-    return { t, value: acc ? Math.round(acc.total / acc.count) : null }
-  })
 }
 
 /** 현재값 카드. 지금 상태를 좌우로 나란히 놓고 한눈에 비교하는 용도. */
@@ -107,7 +85,7 @@ function VitalTrendCard({
   label: string
   unit: string
   /** 00~23시 24칸. 기록이 없는 시간은 value 가 null 이라 선이 끊겨 그려진다. */
-  series: { t: string; value: number | null }[]
+  series: HourlyPoint[]
   color: string
   chartId: string
   /** 값이 하나도 없을 때 y축이 0~0 으로 뭉개지지 않도록 잡아 줄 기본 범위 */

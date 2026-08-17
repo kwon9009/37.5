@@ -1,3 +1,5 @@
+from datetime import date, datetime, time, timedelta
+
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
@@ -142,10 +144,15 @@ def update_patient_special_notes(
 
 
 # 환자 Vital Log 조회
+#
+# target_date를 주면 그 날 하루(00:00~24:00), 안 주면 최근 24시간을 준다.
+# 전부 주지 않는 이유: 1분 평균이라 하루에 1440행씩 쌓이는데, 화면들은
+# 몇 초마다 이 API를 다시 부른다. 며칠만 지나도 매번 수만 행을 보내게 된다.
 def get_patient_vital_logs(
     db: Session,
     patient_id: int,
     current_user: User,
+    target_date: date | None = None,
 ):
     permission_service.ensure_can_access_patient(
         db=db,
@@ -153,9 +160,18 @@ def get_patient_vital_logs(
         patient_id=patient_id,
     )
 
+    if target_date is None:
+        end = datetime.now()
+        start = end - timedelta(hours=24)
+    else:
+        start = datetime.combine(target_date, time.min)
+        end = start + timedelta(days=1)
+
     rows = patient_crud.get_patient_vital_logs(
         db=db,
         patient_id=patient_id,
+        start=start,
+        end=end,
     )
 
     response = []

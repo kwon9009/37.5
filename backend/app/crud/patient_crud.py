@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from sqlalchemy.orm import Session
 
 from app.models.alert import Alert
@@ -110,12 +112,19 @@ def get_patient_detail(
 def get_patient_vital_logs(
     db: Session,
     patient_id: int,
+    start: datetime,
+    end: datetime,
 ):
-
+    # start 이상 ~ end 미만. 그래프용이라 오래된 것부터(asc) 준다.
+    # desc로 주면 화면이 받은 순서대로 그려서 시간이 거꾸로 흐른다.
     rows = (
         db.query(VitalLog)
-        .filter(VitalLog.patient_id == patient_id)
-        .order_by(VitalLog.recorded_at.desc())
+        .filter(
+            VitalLog.patient_id == patient_id,
+            VitalLog.recorded_at >= start,
+            VitalLog.recorded_at < end,
+        )
+        .order_by(VitalLog.recorded_at.asc())
         .all()
     )
 

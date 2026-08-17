@@ -1,4 +1,6 @@
-from fastapi import APIRouter, Depends
+from datetime import date
+
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
@@ -75,6 +77,11 @@ def update_patient_special_notes(
 )
 def get_patient_vital_logs(
     patient_id: int,
+    target_date: date | None = Query(
+        None,
+        alias="date",
+        description="조회할 날짜(YYYY-MM-DD). 생략하면 최근 24시간",
+    ),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -82,6 +89,7 @@ def get_patient_vital_logs(
         db=db,
         patient_id=patient_id,
         current_user=current_user,
+        target_date=target_date,
     )
 
 

@@ -120,8 +120,54 @@ function shortDate(iso: string): string {
   return `${mm}.${dd} ${hh}:${mi}`
 }
 
+/**
+ * 기록 시각을 "HH"(00~23)로 바꾼다. 반드시 로컬 시각 기준이어야 한다.
+ *
+ * 서버는 시간대 표시가 없는 시각(예: 2026-08-17T17:30:01)을 주는데,
+ * 여기에 toISOString()을 쓰면 한국 시각을 UTC로 바꿔버려 9시간이 밀린다.
+ * (17시 기록이 "08"시로 표시되던 원인)
+ */
 function hourLabel(iso: string): string {
-  return new Date(iso).toISOString().slice(11, 13)
+  return String(new Date(iso).getHours()).padStart(2, "0")
+}
+
+/**
+ * 서버에 넘길 날짜 문자열(YYYY-MM-DD)을 로컬 기준으로 만든다.
+ * toISOString().slice(0,10) 을 쓰면 UTC 기준이라 한국 시간 오전 9시 이전에는
+ * 날짜가 하루 전으로 어긋난다.
+ */
+export function toDateParam(d: Date): string {
+  const year = d.getFullYear()
+  const month = String(d.getMonth() + 1).padStart(2, "0")
+  const day = String(d.getDate()).padStart(2, "0")
+  return `${year}-${month}-${day}`
+}
+
+export type HourlyPoint = { t: string; value: number | null }
+
+/**
+ * 서버가 주는 값은 1분 평균 로그라서 하루치면 1440개가 된다.
+ * 그대로 그리면 점이 너무 많아 읽기 어렵고 "시간당"도 아니므로,
+ * 같은 시(00~23)끼리 평균 내어 24개(=하루치)로 줄인다.
+ *
+ * 00~23시 뼈대를 먼저 깔고 값을 채운다. 기록이 있는 시간만 넣으면 방금 켠 경우
+ * 점이 하나만 찍혀 "지금 시각"만 있는 것처럼 보인다. 기록이 없는 시간도 축에는
+ * 나와야 하루 흐름을 읽을 수 있다(값은 null → 선이 끊김).
+ */
+export function toHourlySeries(series: { t: string; value: number }[]): HourlyPoint[] {
+  const sum = new Map<string, { total: number; count: number }>()
+  for (const point of series) {
+    if (point.value == null) continue
+    const acc = sum.get(point.t) ?? { total: 0, count: 0 }
+    acc.total += point.value
+    acc.count += 1
+    sum.set(point.t, acc)
+  }
+  return Array.from({ length: 24 }, (_, hour) => {
+    const t = String(hour).padStart(2, "0")
+    const acc = sum.get(t)
+    return { t, value: acc ? Math.round(acc.total / acc.count) : null }
+  })
 }
 
 const EMPTY: GuardianData = {
@@ -171,7 +217,11 @@ export function useGuardianData(): GuardianData {
 
         const [detailRes, vitalLogsRes, alertsRes, emergencyRes] = await Promise.all([
           apiClient.get(`/patients/${myPatient.patient_id}`),
-          apiClient.get(`/patients/${myPatient.patient_id}/vital-logs`),
+          // 홈 화면 그래프는 "오늘 00~23시"를 그리므로 오늘 하루치만 받는다.
+          // 날짜를 안 넘기면 최근 24시간이 와서 어제 저녁 값이 오늘 저녁 칸에 섞인다.
+          apiClient.get(`/patients/${myPatient.patient_id}/vital-logs`, {
+            params: { date: toDateParam(new Date()) },
+          }),
           apiClient.get(`/patients/${myPatient.patient_id}/alerts`),
           apiClient.get(`/patients/${myPatient.patient_id}/emergency-logs`),
         ])
@@ -308,4 +358,114 @@ export function useGuardianData(): GuardianData {
     vitals: liveVitals ?? data.vitals,
     emergencyEvent,
   }
+}
+
+/** 요약 문구에서 "그날 가장 나빴던 상태"를 고르기 위한 심각도 순위. 클수록 나쁘다. */
+const LEVEL_RANK: Record<VitalLevel, number> = {
+  "기록 없음": -1,
+  정상: 0,
+  낮음: 1,
+  높음: 1,
+  "매우 낮음": 2,
+  "매우 높음": 2,
+}
+
+export type DailyVitals = {
+  loading: boolean
+  /** 하루 중 기록이 한 건이라도 있었는지 */
+  hasData: boolean
+  /** 00~23시 24칸. 기록이 없는 시간은 value 가 null 이라 선이 끊겨 그려진다. */
+  heartRate: HourlyPoint[]
+  respiration: HourlyPoint[]
+  /** 그날 전체 평균. 기록이 없으면 null */
+  heartRateAvg: number | null
+  respirationAvg: number | null
+  /** 그날 기록 중 가장 나빴던 등급 (요약 문구에 쓴다) */
+  worstHeartLevel: VitalLevel
+  worstRespLevel: VitalLevel
+}
+
+const EMPTY_DAY: DailyVitals = {
+  loading: true,
+  hasData: false,
+  heartRate: toHourlySeries([]),
+  respiration: toHourlySeries([]),
+  heartRateAvg: null,
+  respirationAvg: null,
+  worstHeartLevel: "기록 없음",
+  worstRespLevel: "기록 없음",
+}
+
+function average(values: number[]): number | null {
+  if (values.length === 0) return null
+  return Math.round(values.reduce((sum, v) => sum + v, 0) / values.length)
+}
+
+/** 1분 평균들 중 가장 나빴던 등급. 시간당 평균으로 재면 짧은 이상이 묻힌다. */
+function worstLevel(values: number[], classify: (v: number) => VitalLevel): VitalLevel {
+  let worst: VitalLevel = "기록 없음"
+  for (const value of values) {
+    const level = classify(value)
+    if (LEVEL_RANK[level] > LEVEL_RANK[worst]) worst = level
+  }
+  return worst
+}
+
+/**
+ * 기록 화면 전용. 캘린더에서 고른 하루치 생체 로그만 서버에서 받아 온다.
+ *
+ * useGuardianData 와 나눠 둔 이유: 그 훅은 알림·응급기록까지 통째로 다시 불러오는데,
+ * 날짜만 바꿔 볼 때 그것들까지 다시 받을 필요가 없다. 여기서는 vital-logs 만 부른다.
+ */
+export function useDailyVitals(patientId: number | null, day: Date): DailyVitals {
+  const [state, setState] = useState<DailyVitals>(EMPTY_DAY)
+  // Date 객체는 매 렌더마다 새로 만들어져 그대로 의존성에 넣으면 무한히 다시 부른다.
+  // 날짜 문자열로 바꿔서 "같은 날이면 다시 부르지 않게" 한다.
+  const dateParam = toDateParam(day)
+
+  useEffect(() => {
+    if (patientId == null) return
+    let cancelled = false
+    setState((prev) => ({ ...prev, loading: true }))
+
+    apiClient
+      .get(`/patients/${patientId}/vital-logs`, { params: { date: dateParam } })
+      .then(({ data }) => {
+        if (cancelled) return
+        const logs = data.vital_logs as {
+          avg_heart_rate: number
+          avg_resp_rate: number
+          recorded_at: string
+        }[]
+
+        const heartValues = logs.map((v) => v.avg_heart_rate)
+        const respValues = logs.map((v) => v.avg_resp_rate)
+
+        setState({
+          loading: false,
+          hasData: logs.length > 0,
+          heartRate: toHourlySeries(
+            logs.map((v) => ({ t: hourLabel(v.recorded_at), value: v.avg_heart_rate })),
+          ),
+          respiration: toHourlySeries(
+            logs.map((v) => ({ t: hourLabel(v.recorded_at), value: v.avg_resp_rate })),
+          ),
+          heartRateAvg: average(heartValues),
+          respirationAvg: average(respValues),
+          worstHeartLevel: worstLevel(heartValues, heartRateLevel),
+          worstRespLevel: worstLevel(respValues, respirationLevel),
+        })
+      })
+      .catch(() => {
+        // 서버가 안 붙었거나 권한이 없으면 "기록 없음"으로 둔다.
+        // 지어낸 값을 보여주면 보호자가 없는 기록을 있는 것으로 오해한다.
+        if (!cancelled) setState({ ...EMPTY_DAY, loading: false })
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [patientId, dateParam])
+
+  return state
 }
