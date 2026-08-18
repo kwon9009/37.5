@@ -100,8 +100,12 @@ class SensorReader:
             self._vital_start_ts = now
 
     def _parse(self, raw):
+        # 신호마다 따로 검사한다(elif 금지). 펌웨어 로그가 개행 없이 이어붙어
+        # 한 줄에 심박과 호흡이 같이 담겨 오는 경우가 있는데, elif로 묶으면
+        # 먼저 걸린 심박만 살고 호흡이 통째로 버려진다.
         line = _ANSI.sub("", raw)
         now = time.time()
+
         if (m := _RE_HEART.search(line)):
             value = int(float(m.group(1)))
             # 센서는 사람을 놓치면 0을 보낸다 → '측정 실패' 신호이지 심박 0이 아니다
@@ -109,16 +113,19 @@ class SensorReader:
                 with self._lock:
                     self._mark_vital_arrived(now)
                     self._hr, self._hr_ts = value, now
-        elif (m := _RE_BREATH.search(line)):
+
+        if (m := _RE_BREATH.search(line)):
             value = int(float(m.group(1)))
             if value > 0:
                 with self._lock:
                     self._mark_vital_arrived(now)
                     self._br, self._br_ts = value, now
-        elif _RE_DIST.search(line):
+
+        if _RE_DIST.search(line):
             with self._lock:
                 self._dist_ts = now                   # 거리 신호 = 타깃 감지됨
-        elif (m := _RE_TARGET.search(line)):
+
+        if (m := _RE_TARGET.search(line)):
             with self._lock:
                 self._target = (m.group(1) == "ON")
                 self._target_ts = now

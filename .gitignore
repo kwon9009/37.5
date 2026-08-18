@@ -34,3 +34,6 @@ Thumbs.db
 
 # Claude Code 개인 메모 (팀 공유 X)
 CLAUDE.local.md
+
+# 실측 세션 기록 (VITAL_RECORD_PATH). 측정 원시 로그라 커밋하지 않는다.
+backend/data/*.ndjson

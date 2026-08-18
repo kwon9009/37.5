@@ -298,9 +298,23 @@ def _is_heart_rate_trustworthy(heart_rate: int | None) -> bool:
 # 호흡만 위험 구간인데 심박이 멀쩡하면 센서 오류를 의심한다.
 # 실제로 환자 상태가 나빠지면 심박·호흡이 함께 무너지므로,
 # 호흡만 튀는 경우는 레이더가 흉곽 움직임을 놓친 것으로 보는 편이 안전하다.
-def _is_resp_suspicious(heart_rate: int, resp_rate: int) -> bool:
+def _is_resp_suspicious(
+    heart_rate: int,
+    resp_rate: int,
+    heart_rate_danger_low: int,
+    heart_rate_danger_high: int,
+    resp_rate_danger_low: int,
+    resp_rate_danger_high: int,
+) -> bool:
 
-    return _resp_rate_score(resp_rate) == 3 and _heart_rate_score(heart_rate) == 0
+    resp_score = _resp_rate_score(
+        resp_rate, resp_rate_danger_low, resp_rate_danger_high
+    )
+    heart_score = _heart_rate_score(
+        heart_rate, heart_rate_danger_low, heart_rate_danger_high
+    )
+
+    return resp_score == 3 and heart_score == 0
 
 
 # 직전에 '믿은' 호흡값과 그 시각 (환자별). 급변 판정에만 쓴다.
@@ -336,6 +350,10 @@ def _is_resp_jump(
 def _is_resp_rate_trustworthy(
     heart_rate: int,
     resp_rate: int | None,
+    heart_rate_danger_low: int,
+    heart_rate_danger_high: int,
+    resp_rate_danger_low: int,
+    resp_rate_danger_high: int,
     patient_id: int | None = None,
     now: float | None = None,
 ) -> bool:
@@ -346,7 +364,14 @@ def _is_resp_rate_trustworthy(
     if not (settings.PLAUSIBLE_RR_MIN <= resp_rate <= settings.PLAUSIBLE_RR_MAX):
         return False
 
-    if _is_resp_suspicious(heart_rate=heart_rate, resp_rate=resp_rate):
+    if _is_resp_suspicious(
+        heart_rate=heart_rate,
+        resp_rate=resp_rate,
+        heart_rate_danger_low=heart_rate_danger_low,
+        heart_rate_danger_high=heart_rate_danger_high,
+        resp_rate_danger_low=resp_rate_danger_low,
+        resp_rate_danger_high=resp_rate_danger_high,
+    ):
         return False
 
     if patient_id is not None and now is not None:
@@ -493,9 +518,15 @@ def _apply(
     # 호흡은 심박과 따로 판단한다. 레이더가 흉곽 움직임을 놓치는 일이 잦은데,
     # 그때마다 멀쩡한 심박까지 버리면 화면에 아무 값도 뜨지 않는다.
     now = time.time()
+    # 경계값은 호흡 신뢰 판정에서도 쓰므로 여기서 미리 읽는다
+    current_settings = _get_settings(db)
     resp_trusted = _is_resp_rate_trustworthy(
         heart_rate=heart_rate,
         resp_rate=resp_rate,
+        heart_rate_danger_low=current_settings.heart_rate_danger_low,
+        heart_rate_danger_high=current_settings.heart_rate_danger_high,
+        resp_rate_danger_low=current_settings.resp_rate_danger_low,
+        resp_rate_danger_high=current_settings.resp_rate_danger_high,
         patient_id=request.patient_id,
         now=now,
     )
@@ -516,7 +547,6 @@ def _apply(
 
     # 호흡을 못 믿을 때는 심박만으로 등급을 낸다.
     # 이어 쓴 옛날 호흡값으로 위험 판정을 내리면 가짜 응급이 만들어진다.
-    current_settings = _get_settings(db)
     news2_status = judge_status(
         heart_rate=heart_rate,
         resp_rate=resp_rate if resp_trusted else None,
