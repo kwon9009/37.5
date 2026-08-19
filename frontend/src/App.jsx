@@ -22,6 +22,7 @@ import PersonalSettings from "./pages/personal-settings/personal-settings.jsx";
 import DevVitals from "./pages/dev-vitals/dev-vitals.jsx";
 import DevComponentLibrary from "./pages/dev-component-library/dev-component-library.jsx";
 
+import GuardianInvite from "./guardian/screens/Invite.tsx";
 import GuardianSplash from "./guardian/screens/Splash.tsx";
 import GuardianLogin from "./guardian/screens/Login.tsx";
 import GuardianTerms from "./guardian/screens/Terms.tsx";
@@ -44,6 +45,8 @@ import RequireLinkedPatient from "./guardian/components/RequireLinkedPatient.tsx
 import DevHospitalMap from "./pages/dev-hospital-map/dev-hospital-map.tsx";
 // 개발용: 목업 병원으로 쓸 실제 요양병원을 카카오에서 찾아온다 (개발 모드에서만 동작)
 import DevHospitalFind from "./pages/dev-hospital-find/dev-hospital-find.tsx";
+// 개발용: 보호자에게 문자로 보낼 초대 링크를 만든다 (개발 모드에서만 동작)
+import DevInviteLink from "./pages/dev-invite-link/dev-invite-link.tsx";
 
 function App() {
   return (
@@ -58,6 +61,7 @@ function App() {
       {/* 개발용 점검 화면. 로그인 없이 열 수 있게 두되, 화면 자체가 개발 모드에서만 동작한다 */}
       <Route path="/dev/hospital-map" element={<DevHospitalMap />} />
       <Route path="/dev/hospital-find" element={<DevHospitalFind />} />
+      <Route path="/dev/invite-link" element={<DevInviteLink />} />
 
       {/* 병원 스태프 전용 (role: DEPARTMENT, ADMIN) */}
       <Route element={<RequireRole allow={["DEPARTMENT", "ADMIN"]} />}>
@@ -80,6 +84,9 @@ function App() {
       </Route>
 
       {/* 보호자 회원가입 온보딩 (로그인 전, 공개) */}
+      {/* 문자로 받은 초대 링크가 여는 화면. 주소의 토큰(?k=)을 풀어 병원 코드를 저장하고
+          "홈 화면에 추가"(웹앱 설치)를 안내한다 */}
+      <Route path="/guardian/invite" element={<GuardianInvite />} />
       <Route path="/guardian" element={<GuardianSplash />} />
       <Route path="/guardian/login" element={<GuardianLogin />} />
       <Route path="/guardian/terms" element={<GuardianTerms />} />

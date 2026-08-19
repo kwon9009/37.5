@@ -2,8 +2,19 @@
 <html lang="ko">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>37.5℃</title>
+
+    <!-- 보호자 앱을 "홈 화면에 추가"해서 앱처럼 쓸 수 있게 하는 설정.
+         manifest 의 scope 가 /guardian 이라 병원 대시보드(/)는 설치 대상이 아니다. -->
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <meta name="theme-color" content="#f9cdc4" />
+    <!-- 아이폰(사파리)은 manifest 를 거의 안 보고 아래 태그들을 본다 -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="37.5°C" />
+    <link rel="apple-touch-icon" href="/icons/guardian-apple-180.png" />
   </head>
   <body>
     <div id="root"></div>

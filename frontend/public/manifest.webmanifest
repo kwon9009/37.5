@@ -1,0 +1,35 @@
+{
+  "name": "37.5°C 보호자",
+  "short_name": "37.5°C",
+  "description": "환자의 심박·호흡 상태를 실시간으로 확인하고 이상 시 알림을 받는 보호자 앱",
+  "lang": "ko",
+  "dir": "ltr",
+  "start_url": "/guardian",
+  "scope": "/guardian",
+  "id": "/guardian",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#fff8f6",
+  "theme_color": "#f9cdc4",
+  "categories": ["health", "medical"],
+  "icons": [
+    {
+      "src": "/icons/guardian-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/guardian-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/guardian-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}

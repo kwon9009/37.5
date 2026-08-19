@@ -1,4 +1,5 @@
 import { apiClient } from "@/api/client.js"
+import { readInviteCode } from "@/guardian/lib/invite-link"
 
 /**
  * 병원 정보.
@@ -70,16 +71,17 @@ export async function fetchHospitalByCode(code: string): Promise<HospitalInfo | 
 const INVITE_KEY = "37.5-guardian-invite-code"
 
 /**
- * 초대 링크(...?code=DJ001)로 들어온 병원 코드를 저장한다.
- * 회원가입은 여러 화면을 거치는데 그 사이 주소창의 ?code= 는 사라지므로,
- * 앱에 처음 들어온 순간 한 번 저장해 두고 환자 정보 화면에서 꺼내 쓴다.
+ * 초대 링크(...invite?k=…)로 들어온 병원 코드를 저장한다.
+ * 회원가입은 여러 화면을 거치는데 그 사이 주소창의 ?k= 는 사라지고,
+ * 앱을 홈 화면에 설치해서 열면 아예 처음부터 없다. 그래서 앱에 처음 들어온
+ * 순간 한 번 저장해 두고 환자 정보 화면에서 꺼내 쓴다.
  * (앱 설치 후 새로 열어도 남아 있어야 해서 sessionStorage 가 아닌 localStorage 사용)
  */
 export function captureInviteCode(search: string) {
-  const code = new URLSearchParams(search).get("code")
+  const code = readInviteCode(search)
   if (!code) return
   try {
-    localStorage.setItem(INVITE_KEY, code.trim().toUpperCase())
+    localStorage.setItem(INVITE_KEY, code)
   } catch {
     // 저장이 막힌 환경에서는 무시 (수동 입력으로 진행)
   }
@@ -88,14 +90,12 @@ export function captureInviteCode(search: string) {
 /**
  * 초대 링크로 받은 병원 코드. 링크 없이 들어왔으면 null.
  *
- * 주소창의 ?code= 를 먼저 본다. captureInviteCode 는 화면이 그려진 뒤(useEffect)에
+ * 주소창의 토큰을 먼저 푼다. captureInviteCode 는 화면이 그려진 뒤(useEffect)에
  * 저장되므로, 저장값만 보면 이전에 들어온 옛날 코드를 읽어버린다.
  */
 export function getInviteCode(): string | null {
   try {
-    const fromUrl = new URLSearchParams(window.location.search).get("code")
-    if (fromUrl) return fromUrl.trim().toUpperCase()
-    return localStorage.getItem(INVITE_KEY)
+    return readInviteCode(window.location.search) ?? localStorage.getItem(INVITE_KEY)
   } catch {
     return null
   }

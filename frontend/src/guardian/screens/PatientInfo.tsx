@@ -104,7 +104,8 @@ export default function PatientInfo() {
   const [pnameShake, setPnameShake] = useState(false)
 
   // 병원 코드 등록.
-  // 초대 링크(...?code=DJ1003)로 들어왔으면 코드가 미리 채워지고 병원도 바로 확인된다.
+  // 초대 링크(/guardian/invite?k=…)로 들어왔으면 코드가 미리 채워지고 병원도 바로 확인된다.
+  // (링크의 토큰은 앱에 들어온 순간 풀려서 저장되므로, 여기서는 그 값을 꺼내 쓰기만 한다)
   const inviteCode = getInviteCode()
   const [code, setCode] = useState(inviteCode ?? "")
   const [hospital, setHospital] = useState<HospitalInfo | null>(null)

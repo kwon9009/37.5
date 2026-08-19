@@ -55,7 +55,7 @@ function OfflineNotice() {
 
 /** Centered mobile frame wrapper used by every screen. */
 export function Screen({ children, className }: ScreenProps) {
-  // 초대 링크(...?code=DJ001)로 들어왔다면 병원 코드를 저장해 둔다.
+  // 초대 링크(/guardian/invite?k=…)로 들어왔다면 토큰을 풀어 병원 코드를 저장해 둔다.
   // 모든 보호자 화면이 Screen 을 쓰므로, 어느 주소로 처음 들어와도 한 번은 잡힌다.
   useEffect(() => {
     captureInviteCode(window.location.search)
