@@ -1,13 +1,25 @@
 # Frontend (React + Vite)
 
-## 처음 한 번: Vite 앱 생성
-이 폴더(frontend/)에서:
-npm create vite@latest . -- --template react
+## 처음 받았을 때
+
+```bash
 npm install
-npm install axios zustand chart.js react-chartjs-2
-# Tailwind: https://tailwindcss.com/docs/guides/vite 공식 가이드 따라 설정
-cp .env.example .env
+cp .env.example .env     # 윈도우 PowerShell: copy .env.example .env
 npm run dev
+```
+
+`.env` 를 만들지 않으면 **지도가 뜨지 않습니다.** 카카오맵 키를 못 읽어 주소만 보이는
+대체 화면으로 넘어갑니다. `.env` 는 git 에 올리지 않으므로 저장소를 새로 받을 때마다 만들어야 합니다.
+
+| 환경변수 | 용도 | 없으면 |
+|---|---|---|
+| `VITE_API_URL` | 백엔드 주소 (기본 `http://localhost:8000`) | 로그인·데이터 요청 실패 |
+| `VITE_KAKAO_MAP_KEY` | 카카오맵 JavaScript 키 | 지도 대신 주소만 표시 |
+
+**Vite 는 `.env` 를 서버가 시작할 때 한 번만 읽습니다.** 값을 고쳤으면 `npm run dev` 를
+껐다 켜야 반영됩니다.
+
+백엔드도 같이 띄워야 화면에 데이터가 들어옵니다. `backend/README.md` 를 참고하세요.
 
 ## 실시간 값 받아오기 (SSE)
 센서 값은 폴링(N초마다 다시 물어보기)이 아니라 서버가 값을 받는 즉시 밀어줍니다.

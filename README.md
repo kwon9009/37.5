@@ -225,6 +225,15 @@ hardware/.env
 - RPI 재부팅, Docker 재시작, 펌웨어 변경 전 담당자에게 알립니다.
 - 기능별 브랜치에서 작업한 뒤 Pull Request로 병합합니다.
 
+## 문서
+
+| 문서 | 위치 |
+|---|---|
+| ERD · DDL | [Notion](https://app.notion.com/p/ERD-DDL-d081848ce48082f5835901a3a3c9daba?p=3bc1848ce480806aafa6fb3b09c696ea&pm=s) · 저장소 반영본은 [docs/DDL.sql](docs/DDL.sql) |
+| API 명세 | 백엔드 실행 후 http://localhost:8000/docs (자동 생성) |
+| 프로젝트 상세 배경 | [docs/PROJECT.md](docs/PROJECT.md) |
+| 문서 전체 목록 | [docs/README.md](docs/README.md) |
+
 자세한 실행 방법은 각 폴더의 README를 참고하세요.
 
 - `backend/README.md`
