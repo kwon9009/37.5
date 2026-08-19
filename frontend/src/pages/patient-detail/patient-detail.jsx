@@ -10,6 +10,7 @@ import SpecialNoteChips from "../../components/special-note-chips/special-note-c
 import { apiClient } from "../../api/client.js";
 import { useVitalStream, pollInterval } from "../../api/use-vital-stream.js";
 import { composeSpecialNotes, parseSpecialNotes, splitForEditing } from "../../lib/special-notes.js";
+import { getErrorMessage } from "../../api/client.js";
 
 const RANGE_OPTIONS = ["1시간", "6시간", "24시간"];
 const RANGE_WINDOW_MS = { "1시간": 60 * 60 * 1000, "6시간": 6 * 60 * 60 * 1000, "24시간": 24 * 60 * 60 * 1000 };
@@ -178,6 +179,9 @@ function PatientDetail() {
   const [noteOtherText, setNoteOtherText] = useState("");
   const [noteSaveError, setNoteSaveError] = useState("");
   const [isSavingNotes, setIsSavingNotes] = useState(false);
+  const [isConfirmingDischarge, setIsConfirmingDischarge] = useState(false);
+  const [isDischarging, setIsDischarging] = useState(false);
+  const [dischargeError, setDischargeError] = useState("");
   // 스트림으로 들어온 현재 생체값. 주기 조회 결과가 덮어쓰지 않도록 따로 들고 있는다.
   const [liveVital, setLiveVital] = useState(null);
 
@@ -289,6 +293,23 @@ function PatientDetail() {
       setNoteSaveError("특이사항 저장에 실패했습니다. 다시 시도해 주세요.");
     } finally {
       setIsSavingNotes(false);
+    }
+  };
+
+  const confirmDischarge = async () => {
+    setIsDischarging(true);
+    setDischargeError("");
+    try {
+      await apiClient.patch(`/patients/${patientId}/discharge`);
+      setDetail((current) => ({
+        ...current,
+        patient: { ...current.patient, status: "DISCHARGED", is_present: false },
+      }));
+      setIsConfirmingDischarge(false);
+    } catch (err) {
+      setDischargeError(getErrorMessage(err, "퇴원 처리에 실패했습니다. 다시 시도해 주세요."));
+    } finally {
+      setIsDischarging(false);
     }
   };
 
@@ -456,6 +477,43 @@ function PatientDetail() {
                     <span className="text-[13px] text-[#5A6B80]">재실 여부</span>
                     <PresenceBadge label={patient.is_present ? "재실중" : "부재중"} />
                   </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-[13px] text-[#5A6B80]">입퇴원 상태</span>
+                    {patient.status === "DISCHARGED" ? (
+                      <span className="text-[13px] font-semibold text-[#5A6B80]">퇴원 완료</span>
+                    ) : !isConfirmingDischarge ? (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setDischargeError("");
+                          setIsConfirmingDischarge(true);
+                        }}
+                        className="text-[12px] font-bold text-[#E0442E]"
+                      >
+                        퇴원 처리
+                      </button>
+                    ) : (
+                      <div className="flex items-center gap-[6px]">
+                        <button
+                          type="button"
+                          onClick={() => setIsConfirmingDischarge(false)}
+                          disabled={isDischarging}
+                          className="rounded-md border border-[#DCE3EC] bg-white px-[10px] py-1 text-[12px] font-semibold text-[#1E2A3A]"
+                        >
+                          취소
+                        </button>
+                        <button
+                          type="button"
+                          onClick={confirmDischarge}
+                          disabled={isDischarging}
+                          className="rounded-md bg-[#E0442E] px-[10px] py-1 text-[12px] font-bold text-white disabled:opacity-60"
+                        >
+                          {isDischarging ? "처리 중..." : "정말 퇴원 처리"}
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                  {dischargeError && <p className="text-[12px] font-semibold text-[#E0442E]">{dischargeError}</p>}
                   <div className="flex items-center justify-between">
                     <span className="text-[13px] text-[#5A6B80]">담당 병원</span>
                     <span className="text-[13px] font-semibold text-[#1E2A3A]">{patient.hospital}</span>

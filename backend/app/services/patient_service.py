@@ -22,6 +22,9 @@ from app.schemas.patient.patient_create import (
 from app.schemas.patient.patient_detail_response import (
     PatientDetailResponse,
 )
+from app.schemas.patient.patient_discharge_response import (
+    PatientDischargeResponse,
+)
 from app.schemas.patient.patient_special_notes_update import (
     PatientSpecialNotesUpdateResponse,
 )
@@ -82,6 +85,43 @@ def create_patient(
         patient_id=patient.patient_id,
         patient_no=patient.patient_no,
         name=patient.name,
+    )
+
+
+# 환자 퇴원 처리
+def discharge_patient(
+    db: Session,
+    patient_id: int,
+    current_user: User,
+) -> PatientDischargeResponse:
+
+    if current_user.role == UserRole.GUARDIAN:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="보호자 계정은 퇴원 처리를 할 수 없습니다.",
+        )
+
+    patient = permission_service.ensure_can_access_patient(
+        db=db,
+        current_user=current_user,
+        patient_id=patient_id,
+    )
+
+    if patient.status == PatientStatus.DISCHARGED:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="이미 퇴원 처리된 환자입니다.",
+        )
+
+    patient = patient_crud.discharge_patient(
+        db=db,
+        patient_id=patient_id,
+    )
+
+    return PatientDischargeResponse(
+        patient_id=patient.patient_id,
+        status=patient.status,
+        discharge_date=patient.discharge_date,
     )
 
 

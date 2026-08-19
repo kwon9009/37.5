@@ -14,6 +14,9 @@ from app.schemas.patient.patient_create import (
 from app.schemas.patient.patient_detail_response import (
     PatientDetailResponse,
 )
+from app.schemas.patient.patient_discharge_response import (
+    PatientDischargeResponse,
+)
 from app.schemas.patient.patient_vital_logs_response import (
     PatientVitalLogsResponse,
 )
@@ -67,6 +70,23 @@ def get_patient_detail(
     db: Session = Depends(get_db),
 ):
     return patient_service.get_patient_detail(
+        db=db,
+        patient_id=patient_id,
+        current_user=current_user,
+    )
+
+
+# 환자 퇴원 처리
+@router.patch(
+    "/{patient_id}/discharge",
+    response_model=PatientDischargeResponse,
+)
+def discharge_patient(
+    patient_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    return patient_service.discharge_patient(
         db=db,
         patient_id=patient_id,
         current_user=current_user,
