@@ -9,6 +9,7 @@ import { useAuthStore } from "@/store/auth-store.js"
 import "@/guardian/verify.css"
 
 // 데모용 정답 인증번호 (실제 문자 발송 수단이 없어 화면 흐름만 재현한다)
+// 화면에는 노출하지 않는다. 시연할 때는 이 값을 입력하면 된다.
 const DEMO_CODE = "123456"
 
 // 본인인증용 통신사 목록
@@ -466,9 +467,6 @@ export default function Signup() {
                   <CheckCircle2 size={14} aria-hidden />
                   인증이 완료되었습니다.
                 </p>
-              )}
-              {!verified && !codeWarning && (
-                <p className="mt-1.5 text-xs text-muted-foreground">데모 인증번호: {DEMO_CODE}</p>
               )}
             </div>
           )}
