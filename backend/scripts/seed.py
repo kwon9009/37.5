@@ -435,8 +435,14 @@ def create_devices(db: Session):
 
     for i, patient in enumerate(patients):
 
+        department = db.get(Department, patient.department_id)
+
+        if department is None:
+            continue
+
         devices.append(
             Device(
+                hospital_id=department.hospital_id,
                 patient_id=patient.patient_id,
                 hospital_id=patient.department.hospital_id,
                 serial_num=f"DEV-{20260001+i}",

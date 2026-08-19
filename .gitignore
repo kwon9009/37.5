@@ -43,3 +43,6 @@ CLAUDE.local.md
 
 # 실측 세션 기록 (VITAL_RECORD_PATH). 측정 원시 로그라 커밋하지 않는다.
 backend/data/*.ndjson
+
+# 프로필 사진
+uploads/

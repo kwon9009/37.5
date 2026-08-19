@@ -12,6 +12,7 @@ import app.models
 
 from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.schemas.vitals.vitals_ingest_request import VitalsIngestRequest
@@ -49,6 +50,12 @@ app.add_middleware(
     allow_origins=["*"],
     allow_methods=["*"],
     allow_headers=["*"],
+)
+
+app.mount(
+    "/uploads",
+    StaticFiles(directory="uploads"),
+    name="uploads",
 )
 
 
