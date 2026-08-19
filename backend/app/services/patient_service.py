@@ -5,7 +5,8 @@ from sqlalchemy.orm import Session
 
 from app.crud import patient_crud
 
-from app.models.enums import UserRole, VitalStatus
+from app.models.enums import PatientStatus, UserRole, VitalStatus
+from app.models.patient import Patient
 from app.models.user import User
 from app.services import permission_service
 
@@ -13,6 +14,10 @@ from app.schemas.patient.common import (
     CurrentVitalResponse,
     GuardianResponse,
     PatientInfoResponse,
+)
+from app.schemas.patient.patient_create import (
+    PatientCreateRequest,
+    PatientCreateResponse,
 )
 from app.schemas.patient.patient_detail_response import (
     PatientDetailResponse,
@@ -36,6 +41,48 @@ from app.schemas.patient.patient_list_respoonse import (
     PatientListItemResponse,
     PatientListResponse,
 )
+
+
+# 환자 등록
+def create_patient(
+    db: Session,
+    body: PatientCreateRequest,
+    current_user: User,
+) -> PatientCreateResponse:
+
+    department = permission_service.get_department_or_403(
+        db=db,
+        user_id=current_user.user_id,
+    )
+
+    patient = patient_crud.create_patient(
+        db=db,
+        patient=Patient(
+            department_id=department.department_id,
+            patient_no="",  # patient_id 확정 후 채움
+            name=body.name,
+            birthdate=body.birth_date,
+            gender=body.gender,
+            ward=body.ward,
+            room_num=body.room_num,
+            bed_num=body.bed_num,
+            special_notes=body.special_notes,
+            status=PatientStatus.ADMITTED,
+            is_present=True,
+            admission_date=date.today(),
+        ),
+    )
+
+    patient.patient_no = f"P-{date.today().year}-{patient.patient_id:04d}"
+
+    db.commit()
+    db.refresh(patient)
+
+    return PatientCreateResponse(
+        patient_id=patient.patient_id,
+        patient_no=patient.patient_no,
+        name=patient.name,
+    )
 
 
 # 환자 상세 조회

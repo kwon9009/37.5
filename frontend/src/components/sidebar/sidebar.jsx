@@ -2,10 +2,12 @@ import { Link } from "react-router-dom";
 import Icon from "../icon/icon.jsx";
 import logo from "../icon/37.5.png";
 import { useUnreadAlertCount } from "../../hooks/use-unread-alert-count.js";
+import { usePendingLinkRequestCount } from "../../hooks/use-pending-link-request-count.js";
 import { useAuthStore } from "../../store/auth-store.js";
 
 function Sidebar({ active = "dashboard" }) {
   const unreadCount = useUnreadAlertCount();
+  const pendingLinkRequestCount = usePendingLinkRequestCount();
   const role = useAuthStore((state) => state.role);
 
   const NAV_ITEMS = [
@@ -13,7 +15,13 @@ function Sidebar({ active = "dashboard" }) {
     { key: "patients", to: "/patients", icon: "users", label: "환자 목록" },
     { key: "monitoring", to: "/monitoring", icon: "activity", label: "실시간 모니터링" },
     { key: "notifications", to: "/notifications", icon: "bell", label: "알림", badge: unreadCount > 0 ? unreadCount : null },
-    { key: "integration", to: "/integration-requests", icon: "user-check", label: "연동 요청", badge: 3 },
+    {
+      key: "integration",
+      to: "/integration-requests",
+      icon: "user-check",
+      label: "연동 요청",
+      badge: pendingLinkRequestCount > 0 ? pendingLinkRequestCount : null,
+    },
   ];
 
   return (

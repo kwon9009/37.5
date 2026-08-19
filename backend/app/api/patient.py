@@ -7,6 +7,10 @@ from app.core.database import get_db
 from app.dependencies.auth import get_current_user
 from app.models.enums import VitalStatus
 from app.models.user import User
+from app.schemas.patient.patient_create import (
+    PatientCreateRequest,
+    PatientCreateResponse,
+)
 from app.schemas.patient.patient_detail_response import (
     PatientDetailResponse,
 )
@@ -32,6 +36,24 @@ router = APIRouter(
     prefix="/patients",
     tags=["Patient"],
 )
+
+
+# 환자 등록
+@router.post(
+    "",
+    response_model=PatientCreateResponse,
+    status_code=201,
+)
+def create_patient(
+    body: PatientCreateRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    return patient_service.create_patient(
+        db=db,
+        body=body,
+        current_user=current_user,
+    )
 
 
 # 환자 상세 조회

@@ -15,6 +15,18 @@ from app.models.vital_log import VitalLog
 from app.models.enums import VitalStatus
 
 
+# 환자 등록
+def create_patient(
+    db: Session,
+    patient: Patient,
+) -> Patient:
+
+    db.add(patient)
+    db.flush()
+
+    return patient
+
+
 # 환자 단건 조회 (권한 검사용)
 def get_by_id(
     db: Session,

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Sidebar from "../../components/sidebar/sidebar.jsx";
 import Header from "../../components/header/header.jsx";
@@ -6,7 +6,7 @@ import Icon from "../../components/icon/icon.jsx";
 import PresenceBadge from "../../components/presence-badge/presence-badge.jsx";
 import StatusBadge from "../../components/status-badge/status-badge.jsx";
 import PatientRegisterModal from "../../components/modals/patient-register-modal/patient-register-modal.jsx";
-import { apiClient } from "../../api/client.js";
+import { apiClient, getErrorMessage } from "../../api/client.js";
 import { useVitalStream, pollInterval } from "../../api/use-vital-stream.js";
 
 const SEVERITY_CHIPS = [
@@ -24,6 +24,7 @@ const VITAL_STATUS_TO_SEVERITY = {
 };
 
 const GENDER_LABEL = { MALE: "남", FEMALE: "여" };
+const GENDER_VALUE = { 남: "MALE", 여: "FEMALE" };
 
 const PRESENT = { label: "재실중", color: "#2FA35C" };
 const ABSENT = { label: "부재중", color: "#5A6B80" };
@@ -82,16 +83,19 @@ function PatientList() {
     },
   });
 
+  const loadPatients = useCallback(() => {
+    return apiClient.get("/patients").then(({ data }) => data.patients.map(toPatientRow));
+  }, []);
+
   // 스트림으로 오지 않는 것(환자 등록/퇴원 등)을 따라잡기 위한 주기 갱신.
   // 스트림이 끊기면 이 주기가 빨라져 폴링만으로도 화면이 돈다.
   useEffect(() => {
     let cancelled = false;
 
     function load() {
-      apiClient
-        .get("/patients")
-        .then(({ data }) => {
-          if (!cancelled) setPatients(data.patients.map(toPatientRow));
+      loadPatients()
+        .then((rows) => {
+          if (!cancelled) setPatients(rows);
         })
         .catch(() => {});
     }
@@ -102,7 +106,7 @@ function PatientList() {
       cancelled = true;
       clearInterval(timer);
     };
-  }, [realtime]);
+  }, [realtime, loadPatients]);
 
   const roomTabs = useMemo(() => ["전체", ...Array.from(new Set(patients.map((patient) => patient.room)))], [patients]);
 
@@ -112,26 +116,21 @@ function PatientList() {
     );
   };
 
-  const handleRegisterPatient = (form) => {
-    const room = form.room.trim() || "미배정";
-    setPatients((current) => [
-      {
-        id: `${form.name}-${Date.now()}`,
-        name: form.name,
-        gender: form.gender,
-        birthDate: form.birthDate || "-",
-        room,
-        discharged: false,
-        presence: PRESENT,
-        severity: "normal",
-        heartRate: "--",
-        respirationRate: "--",
-        nurse: "-",
-        lastUpdate: toClock(new Date()),
-        specialNotes: form.special_notes || "",
-      },
-      ...current,
-    ]);
+  const handleRegisterPatient = async (form) => {
+    try {
+      await apiClient.post("/patients", {
+        name: form.name.trim(),
+        gender: GENDER_VALUE[form.gender] ?? form.gender,
+        birth_date: form.birthDate,
+        ward: form.ward,
+        room_num: Number(form.room),
+        bed_num: Number(form.bed),
+        special_notes: form.special_notes || "",
+      });
+      await loadPatients().then(setPatients);
+    } catch (err) {
+      throw new Error(getErrorMessage(err, "환자 등록 중 오류가 발생했습니다"));
+    }
   };
 
   const filteredPatients = useMemo(() => {
