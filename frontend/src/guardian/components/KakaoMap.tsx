@@ -92,8 +92,11 @@ export function KakaoMap({ address, name, className }: Props) {
   // 지도 칸은 항상 화면에 두고, 실패했을 때만 그 위에 주소 안내를 덮어씌운다.
   // (실패 화면으로 통째로 바꿔버리면 지도 칸이 사라져서, 다음 병원을 조회할 때
   //  지도를 그릴 자리를 찾지 못해 빈 흰 칸이 남는다.)
+  // isolate: 아래 안내의 z-999 를 이 상자 안에서만 통하게 가둔다.
+  // 없으면 999 가 앱 전체와 경쟁해서, 지도가 실패한 상태로 "확인하기"를 누르면
+  // 확인 다이얼로그(z-50) 위에 지도 안내가 덮여 버린다.
   return (
-    <div className={`relative ${className ?? ""}`}>
+    <div className={`relative isolate ${className ?? ""}`}>
       <div
         ref={boxRef}
         className="h-full w-full"
