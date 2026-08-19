@@ -41,6 +41,12 @@ class User(BaseModel):
         nullable=False,
     )
 
+    # 프로필 사진 주소. 안 올린 계정이 대부분이라 nullable
+    profile_image_url: Mapped[str | None] = mapped_column(
+        String(500),
+        nullable=True,
+    )
+
     role: Mapped[UserRole] = mapped_column(
         Enum(UserRole),
         nullable=False,

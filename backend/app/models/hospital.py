@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from sqlalchemy import String, BigInteger, UniqueConstraint, Integer
+from sqlalchemy import String, BigInteger, Boolean, UniqueConstraint, Integer, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
@@ -32,6 +32,18 @@ class Hospital(Base):
     hospital_code: Mapped[str] = mapped_column(String(10), unique=True, nullable=False)
 
     bed_count: Mapped[int] = mapped_column(Integer, nullable=False)
+
+    # 병원 대표 전화번호. 보호자 앱의 "병원 연락하기" 버튼이 이 번호로 건다.
+    # 폐업·개명 등으로 번호를 못 구한 병원이 있어 nullable (그 병원은 버튼이 비활성된다)
+    phone: Mapped[str | None] = mapped_column(String(20), nullable=True)
+
+    # 병원 계정 활성/비활성. 관리자가 병원 상세 화면에서 토글한다.
+    is_active: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=True,
+        server_default=text("1"),
+    )
 
     # Relationship
     departments: Mapped[list["Department"]] = relationship(

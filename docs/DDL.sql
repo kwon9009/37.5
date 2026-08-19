@@ -1,13 +1,18 @@
 -- =====================================================================
 -- 37.5 SmartCare DDL
--- 최종 수정: 2026-08-05
+-- 최종 수정: 2026-08-19
 --
--- 2026-08-05 변경 요약 (5건)
---   1) hospitals.area                    추가        <- 이번에 새로 추가
---   2) hospitals.address                 VARCHAR(50) -> VARCHAR(255)
---   3) hospital_requests.bed_count       추가
---   4) patient_link_requests.updated_at  추가
---   5) patient_link_requests             UNIQUE 제약 제거 + 조회 인덱스 2개 추가
+-- 2026-08-19 변경 요약 (6건)
+--   1) users.profile_image_url        추가
+--   2) hospitals.phone                추가 (보호자 앱 "병원 연락하기")
+--   3) hospitals.is_active            추가 (관리자가 병원 활성/비활성 토글)
+--   4) admins.is_super_admin          추가 (전체 병원 접근 권한)
+--   5) devices.hospital_id            추가 + patient_id NULL 허용(재고 → 배정 분리)
+--   6) system_settings                신설 (조기경보·응급 경계값을 화면에서 조정)
+--
+-- 주의: 이 스크립트는 CREATE DATABASE IF NOT EXISTS 로 시작한다.
+--       이미 테이블이 있는 DB에 다시 돌리면 실패한다. 처음부터 다시 만들려면
+--       DROP DATABASE human_exe; 를 먼저 실행할 것(데이터가 전부 사라진다).
 -- =====================================================================
 
 CREATE DATABASE IF NOT EXISTS human_exe
@@ -22,6 +27,9 @@ area VARCHAR(20) NOT NULL, -- 2026-08-05 추가: 시·도 단위 지역명(예: 
 address VARCHAR(255) NOT NULL, -- 2026-08-05 수정: VARCHAR(50) -> VARCHAR(255). 대전 45개 병원 실측 최대 47자로 한도에 3자밖에 안 남아 입력 실패 위험
 hospital_code VARCHAR(10) NOT NULL UNIQUE, -- 보호자에게 문자로 전달하는 병원 코드. 지역별 접두사(대전 DJ, 서울 SU, 경기 GG, 부산 BS, 대구 DG)
 bed_count INT NOT NULL,
+phone VARCHAR(20) NULL, -- 2026-08-12 추가: 병원 대표 전화번호. 보호자 앱의 "병원 연락하기" 버튼이 이 번호로 건다. 폐업·개명 등으로 못 구한 병원이 있어 NULL 허용(그 병원은 버튼이 비활성된다)
+created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+is_active BOOLEAN NOT NULL DEFAULT TRUE, -- 2026-08-14 추가: 병원 계정 활성/비활성 상태. 관리자가 병원 상세 화면에서 토글한다
 UNIQUE KEY uk_hospital_name_address (name, address)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
@@ -42,6 +50,7 @@ user_id BIGINT AUTO_INCREMENT PRIMARY KEY,
 login_id VARCHAR(50) NOT NULL UNIQUE,
 email VARCHAR(100) NULL UNIQUE, -- 2026-07-16 추가: 부서 계정 비밀번호 찾기용. 보호자 등은 아직 없어서 nullable
 password VARCHAR(255) NOT NULL,
+profile_image_url VARCHAR(500) NULL, -- 2026-08-19 추가: 프로필 사진 주소
 is_active BOOLEAN NOT NULL DEFAULT TRUE,
 role ENUM('ADMIN','DEPARTMENT','GUARDIAN') NOT NULL,
 created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -54,6 +63,7 @@ user_id BIGINT NOT NULL UNIQUE,
 name VARCHAR(20) NOT NULL,
 email VARCHAR(50) NOT NULL,
 phone VARCHAR(20) NOT NULL,
+is_super_admin BOOLEAN NOT NULL DEFAULT FALSE, -- 2026-08-14 추가: 전체 병원을 보는 슈퍼관리자인지. admin_hospitals는 "담당자 표시"용이라 접근 범위 판단에 못 씀
 created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
 updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
 CONSTRAINT fk_admin_user FOREIGN KEY(user_id) REFERENCES users(user_id) ON DELETE CASCADE
@@ -145,12 +155,14 @@ FOREIGN KEY(guardian_id) REFERENCES guardians(guardian_id) ON DELETE CASCADE
 
 CREATE TABLE devices (
 device_id BIGINT AUTO_INCREMENT PRIMARY KEY,
-patient_id BIGINT NOT NULL,
+hospital_id BIGINT NOT NULL, -- 2026-08-14 추가: 장치는 재고 등록 시점부터 병원 소속이 정해진다(환자 배정과 분리)
+patient_id BIGINT NULL, -- 2026-08-14 수정: NOT NULL -> NULL. 관리자가 재고 등록만 하고, 병원이 환자에게 나중에 배정하는 흐름 지원
 status ENUM('ACTIVE','OFFLINE','ERROR') NOT NULL,
 serial_num VARCHAR(20) NOT NULL UNIQUE,
 created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
 updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-FOREIGN KEY(patient_id) REFERENCES patients(patient_id) ON DELETE CASCADE
+FOREIGN KEY(hospital_id) REFERENCES hospitals(hospital_id) ON DELETE CASCADE,
+FOREIGN KEY(patient_id) REFERENCES patients(patient_id) ON DELETE SET NULL -- 2026-08-14 수정: ON DELETE CASCADE -> SET NULL. 환자가 삭제돼도 장치는 재고로 남아야 한다
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE vital_checks (
@@ -181,6 +193,23 @@ resp_rate INT NOT NULL,
 event_type VARCHAR(50) NOT NULL,
 created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
 FOREIGN KEY(patient_id) REFERENCES patients(patient_id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- 2026-08-14 추가: 시스템 전역 설정. 딱 한 행만 쓴다.
+-- .env(EARLY_WARNING_ENABLED, DANGER_SUSTAIN_SEC)에 있던 값을 관리자가
+-- 서버 재시작 없이 화면에서 바꿀 수 있도록 DB로 옮긴 것.
+CREATE TABLE system_settings (
+system_setting_id BIGINT AUTO_INCREMENT PRIMARY KEY,
+early_warning_enabled BOOLEAN NOT NULL DEFAULT FALSE,
+danger_sustain_sec INT NOT NULL DEFAULT 10,
+-- 2026-08-14 추가: NEWS2 응급(DANGER) 판정 경계값. WARNING/ALERT 세부 기준은 NEWS2 표준 그대로 두고
+-- 이 바깥쪽 경계만 의료진이 조정 가능(서버가 NEWS2 기본값 근처로만 허용)
+heart_rate_danger_low INT NOT NULL DEFAULT 40,
+heart_rate_danger_high INT NOT NULL DEFAULT 131,
+resp_rate_danger_low INT NOT NULL DEFAULT 8,
+resp_rate_danger_high INT NOT NULL DEFAULT 25,
+created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE alerts (

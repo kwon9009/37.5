@@ -19,6 +19,7 @@ from app.models.patient_guardian import PatientGuardian
 from app.models.device import Device
 from app.models.vital_check import VitalCheck
 from app.models.vital_log import VitalLog
+from app.models.system_setting import SystemSetting
 from app.models.alert import Alert
 from app.models.emergency_log import EmergencyLog
 from app.models.admin import Admin
@@ -437,6 +438,9 @@ def create_devices(db: Session):
 
         devices.append(
             Device(
+                # 장치는 병원 소속으로 등록된 뒤 환자에게 배정된다.
+                # 환자 -> 부서 -> 병원 순으로 거슬러 올라가 소속 병원을 찾는다.
+                hospital_id=patient.department.hospital_id,
                 patient_id=patient.patient_id,
                 serial_num=f"DEV-{20260001+i}",
                 status=status_list[i % len(status_list)],
@@ -629,6 +633,26 @@ def create_emergency_logs(db: Session):
 # --------------------------------------------------
 
 
+# --------------------------------------------------
+# System Settings
+# --------------------------------------------------
+
+
+def create_system_settings(db: Session):
+    """
+    전역 설정은 딱 한 행만 쓴다. 값은 모델의 기본값(NEWS2 기준)을 그대로 쓴다.
+    행이 없으면 관리자 화면이 설정을 읽지 못하므로 시드에서 만들어 둔다.
+    """
+
+    if db.query(SystemSetting).first():
+        return
+
+    db.add(SystemSetting())
+    db.commit()
+
+    log("System Settings")
+
+
 def main():
 
     db = SessionLocal()
@@ -654,6 +678,7 @@ def main():
         create_alerts(db)
         create_vital_logs(db)
         create_emergency_logs(db)
+        create_system_settings(db)
 
         print("\n==============================")
         print(" Seed Completed Successfully ")
