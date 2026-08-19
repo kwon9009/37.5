@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, File, UploadFile
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
@@ -49,3 +49,22 @@ def change_department_password_api(
     )
 
     return {"message": "비밀번호가 변경되었습니다."}
+
+
+# 프로필 이미지 변경
+@router.post("/me/profile-image")
+async def change_department_profile_image(
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role(UserRole.DEPARTMENT)),
+):
+    profile_image_url = await department_service.change_profile_image(
+        db=db,
+        user=current_user,
+        file=file,
+    )
+
+    return {
+        "message": "프로필 이미지가 변경되었습니다.",
+        "profile_image_url": profile_image_url,
+    }

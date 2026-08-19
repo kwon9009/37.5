@@ -1,8 +1,12 @@
-from fastapi import HTTPException, status
+import os
+import uuid
+from pathlib import Path
+
+from fastapi import HTTPException, UploadFile, status
 from sqlalchemy.orm import Session
 
 from app.core.security import hash_password, verify_password
-from app.crud.user_crud import update_password
+from app.crud.user_crud import update_password, update_profile_image
 from app.models.user import User
 from app.schemas.department.department_me_response import DepartmentMeResponse
 from app.services import permission_service
@@ -47,3 +51,61 @@ def change_password(
         user=user,
         password=hashed_password,
     )
+
+
+# 프로필 이미지 변경
+async def change_profile_image(
+    db: Session,
+    user: User,
+    file: UploadFile,
+) -> str:
+    allowed_content_types = {
+        "image/jpeg",
+        "image/png",
+        "image/webp",
+    }
+
+    if file.content_type not in allowed_content_types:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="JPG, PNG, WEBP 이미지만 업로드할 수 있습니다.",
+        )
+
+    max_size = 5 * 1024 * 1024
+
+    file_data = await file.read()
+
+    if len(file_data) > max_size:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="프로필 이미지는 5MB 이하만 업로드할 수 있습니다.",
+        )
+
+    extension = {
+        "image/jpeg": ".jpg",
+        "image/png": ".png",
+        "image/webp": ".webp",
+    }[file.content_type]
+
+    filename = f"{user.user_id}_{uuid.uuid4().hex}{extension}"
+
+    upload_dir = Path("uploads/profile")
+    upload_dir.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
+
+    file_path = upload_dir / filename
+
+    with open(file_path, "wb") as image_file:
+        image_file.write(file_data)
+
+    profile_image_url = f"/uploads/profile/{filename}"
+
+    update_profile_image(
+        db=db,
+        user=user,
+        profile_image_url=profile_image_url,
+    )
+
+    return profile_image_url

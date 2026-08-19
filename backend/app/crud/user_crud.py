@@ -173,3 +173,17 @@ def update_password(
     db.refresh(user)
 
     return user
+
+
+# 프로필 이미지 경로 변경
+def update_profile_image(
+    db: Session,
+    user: User,
+    profile_image_url: str,
+) -> User:
+    user.profile_image_url = profile_image_url
+
+    db.commit()
+    db.refresh(user)
+
+    return user
