@@ -438,6 +438,7 @@ def create_devices(db: Session):
         devices.append(
             Device(
                 patient_id=patient.patient_id,
+                hospital_id=patient.department.hospital_id,
                 serial_num=f"DEV-{20260001+i}",
                 status=status_list[i % len(status_list)],
             )
