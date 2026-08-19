@@ -34,3 +34,6 @@ Thumbs.db
 
 # Claude Code 개인 메모 (팀 공유 X)
 CLAUDE.local.md
+
+# 로컬 개발용 SQLite DB (MySQL 대신 임시로 쓰는 파일)
+*.db
