@@ -6,12 +6,13 @@ from fastapi import HTTPException, UploadFile, status
 from sqlalchemy.orm import Session
 
 from app.core.security import hash_password, verify_password
-from app.crud.user_crud import update_password, update_profile_image
+from app.crud import user_crud
 from app.models.user import User
 from app.schemas.department.department_me_response import DepartmentMeResponse
 from app.services import permission_service
 
 
+# 로그인한 부서 계정 정보 조회
 # 로그인한 부서 계정 정보 조회
 def get_my_department(
     db: Session,
@@ -23,11 +24,18 @@ def get_my_department(
         user_id=user_id,
     )
 
+    user = user_crud.get_by_user_id(
+        db=db,
+        user_id=user_id,
+    )
+
     return DepartmentMeResponse(
         department_id=department.department_id,
         department_name=department.name,
         hospital_id=department.hospital_id,
         hospital_name=department.hospital.name,
+        email=user.email,
+        profile_image_url=user.profile_image_url,
     )
 
 
@@ -46,7 +54,7 @@ def change_password(
 
     hashed_password = hash_password(new_password)
 
-    update_password(
+    user_crud.update_password(
         db=db,
         user=user,
         password=hashed_password,
@@ -102,10 +110,21 @@ async def change_profile_image(
 
     profile_image_url = f"/uploads/profile/{filename}"
 
-    update_profile_image(
+    # 기존 프로필 이미지 경로 저장
+    old_profile_image_url = user.profile_image_url
+
+    # DB의 프로필 이미지 경로 변경
+    user_crud.update_profile_image(
         db=db,
         user=user,
         profile_image_url=profile_image_url,
     )
+
+    # 기존 프로필 이미지 삭제
+    if old_profile_image_url:
+        old_file_path = Path(old_profile_image_url.lstrip("/"))
+
+        if old_file_path.exists():
+            old_file_path.unlink()
 
     return profile_image_url
