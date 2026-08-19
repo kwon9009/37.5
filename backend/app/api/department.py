@@ -6,7 +6,10 @@ from app.dependencies.auth import require_role
 from app.models.enums import UserRole
 from app.models.user import User
 from app.schemas.department.department_me_response import DepartmentMeResponse
-from app.services import permission_service
+from app.schemas.department.department_password_change_request import (
+    DepartmentPasswordChangeRequest,
+)
+from app.services import department_service
 
 router = APIRouter(
     prefix="/departments",
@@ -24,15 +27,25 @@ def get_my_department(
     current_user: User = Depends(require_role(UserRole.DEPARTMENT)),
     db: Session = Depends(get_db),
 ) -> DepartmentMeResponse:
-
-    department = permission_service.get_department_or_403(
+    return department_service.get_my_department(
         db=db,
         user_id=current_user.user_id,
     )
 
-    return DepartmentMeResponse(
-        department_id=department.department_id,
-        department_name=department.name,
-        hospital_id=department.hospital_id,
-        hospital_name=department.hospital.name,
+
+# 비밀번호 변경 API
+@router.patch("/me/password")
+def change_department_password_api(
+    request: DepartmentPasswordChangeRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role(UserRole.DEPARTMENT)),
+):
+    # 비밀번호 변경
+    department_service.change_password(
+        db=db,
+        user=current_user,
+        current_password=request.current_password,
+        new_password=request.new_password,
     )
+
+    return {"message": "비밀번호가 변경되었습니다."}

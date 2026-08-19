@@ -159,3 +159,17 @@ def list_guardian_rows(db: Session):
     )
 
     return db.execute(stmt).all()
+
+
+# 비밀번호 변경
+def update_password(
+    db: Session,
+    user: User,
+    password: str,
+) -> User:
+    user.password = password
+
+    db.commit()
+    db.refresh(user)
+
+    return user
