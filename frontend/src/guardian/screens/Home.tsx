@@ -8,7 +8,8 @@ import {
   useGuardianData,
   heartRateLevel,
   respirationLevel,
-  toHourlySeries,
+  toChartSeries,
+  bucketTooltipLabel,
   HR_NORMAL,
   RR_NORMAL,
   type HourlyPoint,
@@ -19,6 +20,15 @@ import { cn } from "@/guardian/lib/utils"
 /** 그래프에서 한 시간이 차지하는 가로 폭(px).
  *  24시간을 폰 화면에 다 넣으면 시각 숫자가 겹치므로, 폭을 고정하고 가로 스크롤로 넘겨 본다. */
 const HOUR_W = 46
+
+/**
+ * 응급 화면(전체 화면 경고)으로 자동으로 넘어가는 조건.
+ * 시연이 끝나면 "vitals" 로 되돌려 두는 것이 맞다.
+ */
+const EMERGENCY_TRIGGER: "vitals" | "timer" | "off" = "timer"
+
+/** timer 모드에서 홈에 머문 뒤 응급 화면으로 넘어가기까지의 시간 */
+const EMERGENCY_DEMO_DELAY_MS = 5 * 1000
 
 /** 등급별 배지 색. 정상은 초록, 한 단계 벗어나면 주황, 두 단계면 빨강. */
 const LEVEL_STYLE: Record<VitalLevel, string> = {
@@ -57,7 +67,7 @@ function VitalValueCard({
 
       {/* 단위를 숫자 옆이 아니라 아래에 둔다. 옆에 두면 "숫자+단위" 덩어리가
           가운데 정렬돼서 자릿수(78→100)가 바뀔 때 숫자가 좌우로 흔들린다. */}
-      <span className="mt-3 text-4xl font-bold leading-none text-foreground">{value}</span>
+      <span className="mt-3 text-4xl font-bold leading-none text-foreground">{value || "--"}</span>
       <span className="mt-1 text-xs font-medium text-muted-foreground">{unit}</span>
 
       <span className={cn("mt-3 rounded-full px-2.5 py-1 text-xs font-bold", LEVEL_STYLE[status])}>
@@ -172,9 +182,11 @@ function VitalTrendCard({
             <Tooltip
               contentStyle={{ borderRadius: 12, border: "1px solid #f1d6d0", fontSize: 12 }}
               formatter={(v) => [v == null ? "기록 없음" : `${v} ${unit}`, ""]}
-              labelFormatter={(l) => `${l}시`}
+              labelFormatter={(l) => bucketTooltipLabel(String(l))}
             />
-            <Area type="monotone" dataKey="value" stroke={color} strokeWidth={2.5} fill={`url(#${chartId})`} />
+            {/* linear: 점을 직선으로 잇는다. monotone(곡선 보간)은 매끈해서
+                생체신호처럼 안 보인다. */}
+            <Area type="linear" dataKey="value" stroke={color} strokeWidth={2.5} fill={`url(#${chartId})`} />
           </AreaChart>
         </div>
       </div>
@@ -191,16 +203,43 @@ export default function Home() {
   const urgentCount = notifItems.filter((n) => n.type === "urgent").length
 
   // 1분 단위 로그를 시간당(최대 24개)으로 묶어 그래프에 넘긴다.
-  const hourlyHeartRate = useMemo(() => toHourlySeries(heartRateSeries), [heartRateSeries])
-  const hourlyRespiration = useMemo(() => toHourlySeries(respirationSeries), [respirationSeries])
+  const hourlyHeartRate = useMemo(() => toChartSeries(heartRateSeries), [heartRateSeries])
+  const hourlyRespiration = useMemo(() => toChartSeries(respirationSeries), [respirationSeries])
 
-  // [일시 비활성 - 개발용] 홈 화면에 상주한 지 5초가 지나면 응급 화면으로 자동 이동하는 데모 기능.
-  // 개발 중에는 홈에 5초만 머물러도 긴급 화면으로 튕겨서 작업이 어려우므로 잠시 꺼둔다.
-  // 시연/발표 때 다시 켜려면 아래 useEffect 의 주석만 풀면 된다.
-  // useEffect(() => {
-  //   const timer = window.setTimeout(() => navigate("/guardian/emergency"), 5 * 1000)
-  //   return () => window.clearTimeout(timer)
-  // }, [navigate])
+  // 응급 화면(전체 화면 경고)으로 넘어가는 조건.
+  //
+  //   "vitals" : 심박·호흡이 위험 구간에 들어가면 이동한다. 실제 제품 동작.
+  //   "timer"  : 홈에 EMERGENCY_DEMO_DELAY_MS 만큼 머물면 무조건 이동한다.
+  //              시연 녹화처럼 위험 상황을 만들 수 없을 때 쓴다.
+  //   "off"    : 자동 이동 안 함. 개발 중 화면이 튕기지 않게 할 때.
+  //
+  // 설정은 파일 위쪽 EMERGENCY_TRIGGER 한 줄만 바꾸면 된다.
+  // 위험 구간인가. NEWS2 에서 가장 위험한 칸(매우 낮음/매우 높음)을 응급으로 본다.
+  const heartLevel = heartRateLevel(vitals.heartRate)
+  const respLevel = respirationLevel(vitals.respiration)
+  const inDanger = heartLevel.startsWith("매우") || respLevel.startsWith("매우")
+
+  // 한 번 넘어간 뒤에는 정상으로 돌아올 때까지 다시 넘기지 않는다.
+  // (값이 경계를 오갈 때마다 화면이 튕기면 보호자가 앱을 쓸 수 없다)
+  const alreadyNavigated = useRef(false)
+
+  useEffect(() => {
+    if (EMERGENCY_TRIGGER === "off") return
+
+    if (EMERGENCY_TRIGGER === "timer") {
+      const timer = window.setTimeout(() => navigate("/guardian/emergency"), EMERGENCY_DEMO_DELAY_MS)
+      return () => window.clearTimeout(timer)
+    }
+
+    // EMERGENCY_TRIGGER === "vitals"
+    if (!inDanger) {
+      alreadyNavigated.current = false
+      return
+    }
+    if (alreadyNavigated.current) return
+    alreadyNavigated.current = true
+    navigate("/guardian/emergency")
+  }, [inDanger, navigate])
 
   return (
     <Screen>

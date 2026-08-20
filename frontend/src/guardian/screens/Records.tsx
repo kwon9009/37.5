@@ -10,7 +10,13 @@ import {
 import { AlertTriangle, Bell } from "lucide-react"
 import { Screen, TopBar } from "@/guardian/components/Screen"
 import { BottomNav } from "@/guardian/components/BottomNav"
-import { useGuardianData, useDailyVitals, type HourlyPoint, type VitalLevel } from "@/guardian/lib/api"
+import {
+  useGuardianData,
+  useDailyVitals,
+  bucketTooltipLabel,
+  type HourlyPoint,
+  type VitalLevel,
+} from "@/guardian/lib/api"
 import { cn } from "@/guardian/lib/utils"
 
 type Tab = "vitals" | "history"
@@ -53,9 +59,9 @@ function Chart({
           <Tooltip
             contentStyle={{ borderRadius: 12, border: "1px solid #f1d6d0", fontSize: 12 }}
             formatter={(v) => [v == null ? "기록 없음" : `${v} ${unit}`, ""]}
-            labelFormatter={(l) => `${l}시`}
+            labelFormatter={(l) => bucketTooltipLabel(String(l))}
           />
-          <Area type="monotone" dataKey="value" stroke={color} strokeWidth={2.5} fill={`url(#g-${color})`} />
+          <Area type="linear" dataKey="value" stroke={color} strokeWidth={2.5} fill={`url(#g-${color})`} />
         </AreaChart>
       </ResponsiveContainer>
     </div>

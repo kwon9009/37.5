@@ -30,7 +30,8 @@ from app.services import stream_service, vital_recorder
 from app.services.anomaly_engine import engine as anomaly_engine
 
 # 1분 평균을 만들기 위한 환자별 임시 버퍼 (서버 메모리)
-_LOG_INTERVAL_SEC = 60
+# 기본 60초(1분 평균). 시연용으로 줄이려면 .env 의 VITAL_LOG_INTERVAL_SEC 를 쓴다.
+_LOG_INTERVAL_SEC = settings.VITAL_LOG_INTERVAL_SEC
 _buffers: dict[int, dict] = {}
 
 # 조기경보 on/off, 응급 확정 지속시간은 매 측정마다(초당) DB를 안 찌르도록
@@ -69,6 +70,10 @@ _last_status: dict[int, VitalStatus] = {}
 # 현재 진행 중인 DANGER 구간 (환자별). {"since": 시작시각, "notified": 통보했는지}
 # DANGER가 끊기거나 사람이 자리를 비우면 지운다 = 처음부터 다시 센다.
 _danger_episodes: dict[int, dict] = {}
+
+# 주의/경고 구간. 잠깐 튄 것과 실제로 이어지는 상태를 구분하기 위해
+# 언제 시작했는지와 이미 알렸는지를 환자별로 들고 있는다.
+_warn_episodes: dict[int, dict] = {}
 
 # NEWS2 점수 -> 우리 등급
 _SCORE_TO_STATUS = {
@@ -209,7 +214,7 @@ def _apply_early_warning(
     return predicted_status, reason, prediction
 
 
-# 등급이 이전과 달라졌을 때만 알림을 만든다(매초 중복 생성 방지).
+# 등급이 일정 시간 이어졌을 때만 알림을 만든다(매초 중복 생성 방지).
 #
 # DANGER는 곧바로 통보하지 않고 DANGER_SUSTAIN_SEC(기본 10초) 이상 이어질 때만
 # 응급으로 본다. 센서가 한 번 튀어 1초만 DANGER가 나오는 일이 잦은데(실측상
@@ -236,8 +241,27 @@ def _raise_alert_if_changed(
     if status != VitalStatus.DANGER:
         _danger_episodes.pop(patient_id, None)
 
-        if status == VitalStatus.NORMAL or status == previous_status:
+        if status == VitalStatus.NORMAL:
+            # 정상으로 돌아왔으면 주의/경고 구간도 끝난 것으로 본다
+            _warn_episodes.pop(patient_id, None)
             return
+
+        episode = _warn_episodes.get(patient_id)
+
+        # 등급이 바뀌면(주의->경고 등) 새 구간으로 다시 센다
+        if episode is None or episode["status"] != status:
+            _warn_episodes[patient_id] = {"status": status, "since": now, "notified": False}
+            return
+
+        if episode["notified"]:
+            # 이번 구간은 이미 알렸다. 이어지는 동안 중복으로 만들지 않는다.
+            return
+
+        if now - episode["since"] < settings.ALERT_SUSTAIN_SEC:
+            # 아직 기준 시간을 못 채웠다. 잠깐 튄 것일 수 있다.
+            return
+
+        episode["notified"] = True
 
         alert_crud.create_alert(
             db=db,

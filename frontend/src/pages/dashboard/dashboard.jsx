@@ -3,12 +3,51 @@ import { useNavigate } from "react-router-dom";
 import Sidebar from "../../components/sidebar/sidebar.jsx";
 import Header from "../../components/header/header.jsx";
 import PatientCard from "../../components/patient-card/patient-card.jsx";
+import { useMockTick } from "../../hooks/use-mock-tick.js";
+import { isMockPatient, mockCurrent, mockSeries } from "../../lib/mock-vitals.js";
+import { severityFromVitals } from "../../lib/vital-severity.js";
+import { withoutStaleVitals } from "../../lib/vital-freshness.js";
 import Icon from "../../components/icon/icon.jsx";
 import EmergencyScreeningOverlay from "../../components/emergency-screening-overlay/emergency-screening-overlay.jsx";
 import { apiClient } from "../../api/client.js";
 import { useVitalStream, pollInterval } from "../../api/use-vital-stream.js";
 
 const SEVERITY_ORDER = { emergency: 0, warning: 1, caution: 2, normal: 3 };
+
+/**
+ * 응급 스크리닝(전체 화면 경고) 스위치.
+ * 시연에서 보여줄 때만 true 로 둔다. 개발 중에는 화면을 가려서 방해된다.
+ */
+const SHOW_EMERGENCY_SCREENING = false;
+const SCREENING_DELAY_MS = 10000;
+
+/**
+ * 실측 센서가 없는 환자에게 시연용 목업 값을 입힌다.
+ * 크게 뜨는 숫자와 미니 그래프를 같은 tick 에서 뽑아야 둘이 어긋나지 않는다.
+ */
+function withDisplayVitals(patient, tick) {
+  if (!isMockPatient(patient.id)) {
+    // 실측 환자: 배지는 화면에 보이는 숫자에서 뽑고,
+    // 측정을 멈췄으면 마지막 값을 현재값처럼 띄우지 않는다.
+    return withoutStaleVitals(
+      {
+        ...patient,
+        severity:
+          severityFromVitals(patient.heartRate, patient.respirationRate) ?? patient.severity,
+      },
+      patient.measuredAt,
+    );
+  }
+  const heartRate = mockCurrent(patient.id, "heart", tick);
+  const respirationRate = mockCurrent(patient.id, "resp", tick);
+  return {
+    ...patient,
+    heartRate,
+    respirationRate,
+    severity: severityFromVitals(heartRate, respirationRate),
+    heartRateHistory: mockSeries(patient.id, "heart", HEART_RATE_HISTORY_LIMIT, tick),
+  };
+}
 
 // 카드 미니 그래프에 보여줄 최근 심박값 개수
 const HEART_RATE_HISTORY_LIMIT = 20;
@@ -87,6 +126,8 @@ function Dashboard() {
   const [activeFilter, setActiveFilter] = useState("all");
   const [emergencyDismissed, setEmergencyDismissed] = useState(false);
   const [screeningEnabled, setScreeningEnabled] = useState(false);
+  // 목업 파형을 1초마다 한 칸씩 밀기 위한 카운터
+  const mockTick = useMockTick();
   const [summary, setSummary] = useState(null);
   const [patients, setPatients] = useState([]);
   const [alerts, setAlerts] = useState([]);
@@ -115,6 +156,7 @@ function Dashboard() {
                   severity: SEVERITY_BY_STATUS[payload.status] ?? patient.severity,
                   presenceLabel: payload.presence ? "재실중" : "부재중",
                   timestamp: toClockString(payload.measured_at),
+                  measuredAt: payload.measured_at,
                   earlyWarning: Boolean(payload.early_warning),
                   heartRateHistory:
                     payload.heart_rate == null
@@ -158,6 +200,8 @@ function Dashboard() {
                 respirationRate: patient.respiration_rate,
                 sensorStatus: patient.sensor_status,
                 timestamp: toClockString(patient.timestamp),
+                // 신선도 판단에는 원본 시각이 필요하다(표시용 문자열로는 계산 불가)
+                measuredAt: patient.timestamp,
                 specialNotes: patient.notes,
                 earlyWarning: false,
                 // 폴링마다 배열을 새로 만들면 SSE로 쌓아온 히스토리가 매번 리셋되니,
@@ -194,14 +238,19 @@ function Dashboard() {
   useEffect(() => {
     // 실시간 감지 이벤트를 흉내내기 위한 지연 (실제로는 SSE로 응급 이벤트 수신 시 즉시 트리거)
     // 시연용으로 10초 지연 (요청 사항)
-    const timeout = setTimeout(() => setScreeningEnabled(true), 10000);
+    if (!SHOW_EMERGENCY_SCREENING) return undefined;
+    const timeout = setTimeout(() => setScreeningEnabled(true), SCREENING_DELAY_MS);
     return () => clearTimeout(timeout);
   }, []);
 
   // 등급별 인원은 화면에 떠 있는 환자 카드에서 직접 센다.
   // 스트림으로 등급이 바뀌었을 때 KPI 숫자와 카드 목록이 어긋나지 않게 하려는 것.
   // (전체 인원은 센서가 없는 환자도 포함하므로 서버 요약값을 그대로 쓴다)
-  const severityCounts = patients.reduce((acc, patient) => {
+  // 목업/신선도를 여기서 한 번에 입힌다. 카드에서만 바꾸면 KPI 숫자·필터·응급
+  // 목록이 서버가 준 옛 등급으로 계산돼 화면끼리 어긋난다.
+  const shownPatients = patients.map((patient) => withDisplayVitals(patient, mockTick));
+
+  const severityCounts = shownPatients.reduce((acc, patient) => {
     acc[patient.severity] = (acc[patient.severity] ?? 0) + 1;
     return acc;
   }, {});
@@ -210,11 +259,11 @@ function Dashboard() {
     ...meta,
     value:
       meta.key === "all"
-        ? (summary?.total_patients ?? patients.length)
+        ? (summary?.total_patients ?? shownPatients.length)
         : (severityCounts[meta.key] ?? 0),
   }));
 
-  const emergencyEvents = patients
+  const emergencyEvents = shownPatients
     .filter((patient) => patient.severity === "emergency")
     .map((patient) => ({
       name: `${patient.name} · ${patient.room}`,
@@ -224,11 +273,13 @@ function Dashboard() {
     }));
 
   const visiblePatients =
-    activeFilter === "all" ? patients : patients.filter((patient) => patient.severity === activeFilter);
+    activeFilter === "all"
+      ? shownPatients
+      : shownPatients.filter((patient) => patient.severity === activeFilter);
 
   const screeningPatient =
     screeningEnabled && !emergencyDismissed
-      ? patients.find((patient) => patient.severity === "emergency")
+      ? shownPatients.find((patient) => patient.severity === "emergency")
       : undefined;
 
   const handleAcknowledge = () => {

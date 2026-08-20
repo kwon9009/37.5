@@ -8,6 +8,10 @@ import StatusBadge from "../../components/status-badge/status-badge.jsx";
 import PatientRegisterModal from "../../components/modals/patient-register-modal/patient-register-modal.jsx";
 import { apiClient, getErrorMessage } from "../../api/client.js";
 import { useVitalStream, pollInterval } from "../../api/use-vital-stream.js";
+import { useMockTick } from "../../hooks/use-mock-tick.js";
+import { isMockPatient, mockCurrent } from "../../lib/mock-vitals.js";
+import { severityFromVitals } from "../../lib/vital-severity.js";
+import { isVitalFresh } from "../../lib/vital-freshness.js";
 
 const SEVERITY_CHIPS = [
   { key: "normal", label: "정상", color: "#2FA35C" },
@@ -50,12 +54,16 @@ function toPatientRow(item) {
     respirationRate: item.resp_rate ?? "--",
     nurse: item.department_name,
     lastUpdate: item.updated_at ? toClock(item.updated_at) : "-",
+    // 신선도 판단용 원본 시각
+    measuredAt: item.updated_at,
   };
 }
 
 function PatientList() {
   const navigate = useNavigate();
   const [patients, setPatients] = useState([]);
+  // 목업 환자의 심박·호흡을 1초마다 갱신하기 위한 카운터
+  const mockTick = useMockTick();
   const [query, setQuery] = useState("");
   const [activeSeverities, setActiveSeverities] = useState([]);
   const [roomTab, setRoomTab] = useState("전체");
@@ -77,6 +85,7 @@ function PatientList() {
                 severity: VITAL_STATUS_TO_SEVERITY[payload.status] ?? patient.severity,
                 presence: patient.discharged ? DISCHARGED : payload.presence ? PRESENT : ABSENT,
                 lastUpdate: toClock(payload.measured_at),
+                measuredAt: payload.measured_at,
               },
         ),
       );
@@ -133,16 +142,51 @@ function PatientList() {
     }
   };
 
+  // 목업 값을 여기서 한 번에 입힌다. 표시할 때만 바꾸면 등급 필터가
+  // 서버가 준 옛 등급으로 걸러서 "정상인데 경고 필터에 잡히는" 일이 생긴다.
+  const shownPatients = useMemo(
+    () =>
+      patients.map((patient) => {
+        if (!isMockPatient(patient.id)) {
+          // 측정 중이 아니면 마지막 값을 현재값처럼 보여주지 않는다
+          if (!isVitalFresh(patient.measuredAt)) {
+            // 재실은 센서가 감지해야 아는 값이라, 측정이 멈추면 재실로 둘 수 없다
+            return {
+              ...patient,
+              heartRate: "--",
+              respirationRate: "--",
+              severity: "offline",
+              presence: patient.presence === DISCHARGED ? DISCHARGED : ABSENT,
+            };
+          }
+          return {
+            ...patient,
+            severity:
+              severityFromVitals(patient.heartRate, patient.respirationRate) ?? patient.severity,
+          };
+        }
+        const heartRate = mockCurrent(patient.id, "heart", mockTick);
+        const respirationRate = mockCurrent(patient.id, "resp", mockTick);
+        return {
+          ...patient,
+          heartRate,
+          respirationRate,
+          severity: severityFromVitals(heartRate, respirationRate),
+        };
+      }),
+    [patients, mockTick],
+  );
+
   const filteredPatients = useMemo(() => {
     const normalizedQuery = query.trim();
-    return patients.filter((patient) => {
+    return shownPatients.filter((patient) => {
       const matchesRoom = roomTab === "전체" || patient.room === roomTab;
       const matchesSeverity = activeSeverities.length === 0 || activeSeverities.includes(patient.severity);
       const matchesQuery =
         normalizedQuery === "" || patient.name.includes(normalizedQuery) || patient.room.includes(normalizedQuery);
       return matchesRoom && matchesSeverity && matchesQuery;
     });
-  }, [patients, query, activeSeverities, roomTab]);
+  }, [shownPatients, query, activeSeverities, roomTab]);
 
   return (
     <div className="patient-list flex min-h-screen bg-[#F5F7FA]">
@@ -249,7 +293,7 @@ function PatientList() {
               </colgroup>
               <thead>
                 <tr className="h-12 bg-[#EDF1F6]">
-                  {["환자", "성별", "생년월일", "병실", "재실", "상태", "심박", "호흡", "담당", "마지막 업데이트", "상세"].map(
+                  {["환자", "성별", "생년월일", "병실", "재실", "상태", "심박", "호흡", "담당", "상세"].map(
                     (heading) => (
                       <th
                         key={heading}
@@ -278,7 +322,6 @@ function PatientList() {
                     <td className="px-4 text-[15px] font-bold text-[#1E2A3A]">{patient.heartRate}</td>
                     <td className="px-4 text-[15px] font-bold text-[#1E2A3A]">{patient.respirationRate}</td>
                     <td className="px-4 text-[15px] text-[#1E2A3A]">{patient.nurse}</td>
-                    <td className="px-4 text-[13px] text-[#5A6B80]">{patient.lastUpdate}</td>
                     <td className="px-4">
                       <button
                         type="button"

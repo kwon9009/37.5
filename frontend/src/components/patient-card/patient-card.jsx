@@ -74,7 +74,6 @@ function PatientCard({
   heartRate,
   respirationRate,
   sensorStatus = "연결됨",
-  timestamp,
   presenceLabel = "재실중",
   notes = [],
   earlyWarning,
@@ -136,14 +135,14 @@ function PatientCard({
           <div className="flex w-full flex-col gap-1">
             <p className="text-[11px] font-bold tracking-wide text-[#5A6B80]">심박</p>
             <div className="flex items-end gap-1">
-              <span className="font-mono text-[22px] font-extrabold text-[#1E2A3A]">{heartRate}</span>
+              <span className="font-mono text-[22px] font-extrabold text-[#1E2A3A]">{heartRate ?? "--"}</span>
               <span className="pb-[2px] text-[11px] text-[#5A6B80]">bpm</span>
             </div>
           </div>
           <div className="flex w-full flex-col gap-1">
             <p className="text-[11px] font-bold tracking-wide text-[#5A6B80]">호흡</p>
             <div className="flex items-end gap-1">
-              <span className="font-mono text-[22px] font-extrabold text-[#1E2A3A]">{respirationRate}</span>
+              <span className="font-mono text-[22px] font-extrabold text-[#1E2A3A]">{respirationRate ?? "--"}</span>
               <span className="pb-[2px] text-[11px] text-[#5A6B80]">회/분</span>
             </div>
           </div>
@@ -153,12 +152,10 @@ function PatientCard({
           <HeartRateSparkline history={heartRateHistory} color={severityColor} />
         </div>
 
-        <div className="patient-card__bottom flex items-center justify-between border-t border-[#DCE3EC] pt-2">
-          <div className="flex items-center gap-[6px]">
-            <span className="h-[6px] w-[6px] rounded-full" style={{ backgroundColor: sensorColor }} />
-            <span className="text-[11px] text-[#5A6B80]">{sensorStatus}</span>
-          </div>
-          <span className="font-mono text-[11px] text-[#5A6B80]">{timestamp}</span>
+        {/* 측정 시각은 화면 오른쪽 위에 이미 크게 떠 있어 카드마다 반복하지 않는다 */}
+        <div className="patient-card__bottom flex items-center gap-[6px] border-t border-[#DCE3EC] pt-2">
+          <span className="h-[6px] w-[6px] rounded-full" style={{ backgroundColor: sensorColor }} />
+          <span className="text-[11px] text-[#5A6B80]">{sensorStatus}</span>
         </div>
       </div>
     </div>

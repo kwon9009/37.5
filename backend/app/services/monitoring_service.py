@@ -72,6 +72,7 @@ def get_realtime_monitoring(
                 resp_rate=vital.resp_rate,
                 device_status=device.status,
                 is_present=patient.is_present,
+                measured_at=vital.updated_at,
             )
         )
 
