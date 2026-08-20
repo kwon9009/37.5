@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import date, datetime
 
 from sqlalchemy.orm import Session
 
@@ -12,7 +12,19 @@ from app.models.patient import Patient
 from app.models.patient_guardian import PatientGuardian
 from app.models.vital_check import VitalCheck
 from app.models.vital_log import VitalLog
-from app.models.enums import VitalStatus
+from app.models.enums import PatientStatus, VitalStatus
+
+
+# 환자 등록
+def create_patient(
+    db: Session,
+    patient: Patient,
+) -> Patient:
+
+    db.add(patient)
+    db.flush()
+
+    return patient
 
 
 # 환자 단건 조회 (권한 검사용)
@@ -22,6 +34,26 @@ def get_by_id(
 ) -> Patient | None:
 
     return db.query(Patient).filter(Patient.patient_id == patient_id).first()
+
+
+# 환자 퇴원 처리
+def discharge_patient(
+    db: Session,
+    patient_id: int,
+) -> Patient | None:
+
+    patient = db.query(Patient).filter(Patient.patient_id == patient_id).first()
+
+    if patient is None:
+        return None
+
+    patient.status = PatientStatus.DISCHARGED
+    patient.is_present = False
+    patient.discharge_date = date.today()
+    db.commit()
+    db.refresh(patient)
+
+    return patient
 
 
 # 환자 특이사항 수정

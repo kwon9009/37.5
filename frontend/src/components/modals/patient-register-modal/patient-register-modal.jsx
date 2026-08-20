@@ -20,12 +20,14 @@ function PatientRegisterModal({ isOpen, onClose, onSubmit }) {
   const [form, setForm] = useState(INITIAL_FORM);
   const [selectedNotes, setSelectedNotes] = useState(["allergy"]);
   const [error, setError] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
       setForm(INITIAL_FORM);
       setSelectedNotes(["allergy"]);
       setError("");
+      setIsSubmitting(false);
     }
   }, [isOpen]);
 
@@ -37,17 +39,38 @@ function PatientRegisterModal({ isOpen, onClose, onSubmit }) {
     setSelectedNotes((current) => (current.includes(key) ? current.filter((item) => item !== key) : [...current, key]));
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!form.name.trim()) {
       setError("환자 이름을 입력해 주세요");
       return;
     }
-    onSubmit?.({
-      ...form,
-      notes: selectedNotes,
-      special_notes: composeSpecialNotes(selectedNotes, form.otherNotes),
-    });
-    onClose();
+    if (!form.birthDate.trim()) {
+      setError("생년월일을 입력해 주세요");
+      return;
+    }
+    if (!form.ward) {
+      setError("병동을 선택해 주세요");
+      return;
+    }
+    if (!form.room.trim() || !form.bed.trim()) {
+      setError("병실과 병상을 숫자로 입력해 주세요");
+      return;
+    }
+
+    setError("");
+    setIsSubmitting(true);
+    try {
+      await onSubmit?.({
+        ...form,
+        notes: selectedNotes,
+        special_notes: composeSpecialNotes(selectedNotes, form.otherNotes),
+      });
+      onClose();
+    } catch (err) {
+      setError(err?.message || "환자 등록 중 오류가 발생했습니다");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -160,10 +183,11 @@ function PatientRegisterModal({ isOpen, onClose, onSubmit }) {
             </label>
             <input
               id="patientRoom"
-              type="text"
+              type="number"
+              min="0"
               value={form.room}
               onChange={(event) => updateField("room", event.target.value)}
-              placeholder="예: 302호"
+              placeholder="예: 302"
               className="h-11 rounded-lg border border-[#DCE3EC] bg-[#F5F7FA] px-[14px] text-sm text-[#1E2A3A] placeholder:text-[#5A6B80] focus:outline-none"
             />
           </div>
@@ -173,10 +197,11 @@ function PatientRegisterModal({ isOpen, onClose, onSubmit }) {
             </label>
             <input
               id="patientBed"
-              type="text"
+              type="number"
+              min="0"
               value={form.bed}
               onChange={(event) => updateField("bed", event.target.value)}
-              placeholder="예: A-2"
+              placeholder="예: 2"
               className="h-11 rounded-lg border border-[#DCE3EC] bg-[#F5F7FA] px-[14px] text-sm text-[#1E2A3A] placeholder:text-[#5A6B80] focus:outline-none"
             />
           </div>
@@ -214,12 +239,18 @@ function PatientRegisterModal({ isOpen, onClose, onSubmit }) {
           <button
             type="button"
             onClick={onClose}
-            className="rounded-lg border border-[#DCE3EC] bg-white px-5 py-[10px] text-sm font-semibold text-[#1E2A3A]"
+            disabled={isSubmitting}
+            className="rounded-lg border border-[#DCE3EC] bg-white px-5 py-[10px] text-sm font-semibold text-[#1E2A3A] disabled:cursor-not-allowed disabled:opacity-60"
           >
             취소
           </button>
-          <button type="button" onClick={handleSubmit} className="rounded-lg bg-[#2B6FE3] px-5 py-[10px] text-sm font-bold text-white">
-            등록
+          <button
+            type="button"
+            onClick={handleSubmit}
+            disabled={isSubmitting}
+            className="rounded-lg bg-[#2B6FE3] px-5 py-[10px] text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {isSubmitting ? "등록 중..." : "등록"}
           </button>
         </div>
       </div>

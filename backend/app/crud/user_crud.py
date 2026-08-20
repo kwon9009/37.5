@@ -159,3 +159,31 @@ def list_guardian_rows(db: Session):
     )
 
     return db.execute(stmt).all()
+
+
+# 비밀번호 변경
+def update_password(
+    db: Session,
+    user: User,
+    password: str,
+) -> User:
+    user.password = password
+
+    db.commit()
+    db.refresh(user)
+
+    return user
+
+
+# 프로필 이미지 경로 변경
+def update_profile_image(
+    db: Session,
+    user: User,
+    profile_image_url: str,
+) -> User:
+    user.profile_image_url = profile_image_url
+
+    db.commit()
+    db.refresh(user)
+
+    return user

@@ -16,27 +16,55 @@ const SENSOR_COLOR = {
   "신호 이상": "#E0442E",
 };
 
-/**
- * 값 배열을 꺾은선 path 로 바꾼다. 곡선 보간을 쓰지 않고 점을 직선으로 잇는다
- * (생체신호는 매끈한 곡선보다 뾰족한 꺾은선이 실제에 가깝다).
- * 세로는 배열 안의 최소~최대에 맞춰 늘려서, 값이 좁게 움직여도 파형이 보이게 한다.
- */
-function sparklinePath(series) {
-  // 값이 없으면 아무것도 그리지 않는다. 예전에는 고정된 지그재그를 그려서
-  // 측정을 안 하는 환자도 파형이 있는 것처럼 보였다.
-  if (!Array.isArray(series) || series.length < 2) return null;
-  const min = Math.min(...series);
-  const max = Math.max(...series);
-  const span = max - min || 1;
-  const stepX = 120 / (series.length - 1);
-  return series
-    .map((value, index) => {
-      const x = Math.round(index * stepX * 10) / 10;
-      // 위아래 4px 여백을 남겨 선이 카드 경계에 붙지 않게 한다
-      const y = Math.round((28 - ((value - min) / span) * 24) * 10) / 10;
-      return `${index === 0 ? "M" : "L"}${x} ${y}`;
-    })
-    .join(" ");
+// 심박수 스파크라인 배경 구간. 백엔드 NEWS2 판정 기본 경계(vital_service.py의
+// judge_status 기본값: danger 40/131, WARNING 41~50·91~110, ALERT 111~130)와
+// 맞춘 것 - 병원이 danger 경계를 설정에서 바꿔도 이 미니 그래프까지 실시간으로
+// 반영하진 않는다(카드 하나에 그정도 정밀도는 과함). 정상 대비 지금 값이
+// "대충 어느 구간"에 있는지 한눈에 보여주는 용도.
+const HR_DOMAIN = [30, 170];
+const HR_BANDS = [
+  { from: 30, to: 40, color: "#E0442E" }, // <=40 danger
+  { from: 40, to: 50, color: "#E8A13B" }, // 41~50 caution
+  { from: 50, to: 90, color: "#2FA35C" }, // 51~90 normal
+  { from: 90, to: 110, color: "#E8A13B" }, // 91~110 caution
+  { from: 110, to: 130, color: "#E8762B" }, // 111~130 warning
+  { from: 130, to: 170, color: "#E0442E" }, // >=131 danger
+];
+
+function HeartRateSparkline({ history = [], color }) {
+  const width = 120;
+  const height = 32;
+  const [domainMin, domainMax] = HR_DOMAIN;
+
+  const valueToY = (value) => {
+    const clamped = Math.min(domainMax, Math.max(domainMin, value));
+    return height - ((clamped - domainMin) / (domainMax - domainMin)) * height;
+  };
+
+  const points = history.map((value, index) => [
+    history.length > 1 ? (index / (history.length - 1)) * width : width / 2,
+    valueToY(value),
+  ]);
+  const linePath = points.map(([x, y], index) => `${index === 0 ? "M" : "L"}${x} ${y}`).join(" ");
+  const lastPoint = points[points.length - 1];
+
+  return (
+    <svg viewBox={`0 0 ${width} ${height}`} width="100%" height="30" preserveAspectRatio="none">
+      {HR_BANDS.map((band) => (
+        <rect
+          key={band.from}
+          x="0"
+          y={valueToY(band.to)}
+          width={width}
+          height={Math.max(0, valueToY(band.from) - valueToY(band.to))}
+          fill={band.color}
+          fillOpacity="0.12"
+        />
+      ))}
+      {points.length > 1 && <path d={linePath} fill="none" stroke="#1E2A3A" strokeWidth="1.5" />}
+      {lastPoint && <circle cx={lastPoint[0]} cy={lastPoint[1]} r="2.5" fill={color} />}
+    </svg>
+  );
 }
 
 function PatientCard({
@@ -49,12 +77,11 @@ function PatientCard({
   presenceLabel = "재실중",
   notes = [],
   earlyWarning,
-  series,
+  heartRateHistory = [],
   onClick,
 }) {
   const severityColor = SEVERITY_COLOR[severity] ?? SEVERITY_COLOR.normal;
   const sensorColor = SENSOR_COLOR[sensorStatus] ?? SEVERITY_COLOR.normal;
-  const sparkPath = sparklinePath(series);
 
   return (
     <div
@@ -122,13 +149,7 @@ function PatientCard({
         </div>
 
         <div className="patient-card__sparkline h-[30px] w-full overflow-hidden">
-          <svg viewBox="0 0 120 32" width="100%" height="30" preserveAspectRatio="none">
-            {sparkPath ? (
-              <path d={sparkPath} fill="none" stroke={severityColor} strokeWidth="1.5" />
-            ) : (
-              <line x1="0" y1="16" x2="120" y2="16" stroke="#DCE3EC" strokeWidth="1" strokeDasharray="3 3" />
-            )}
-          </svg>
+          <HeartRateSparkline history={heartRateHistory} color={severityColor} />
         </div>
 
         {/* 측정 시각은 화면 오른쪽 위에 이미 크게 떠 있어 카드마다 반복하지 않는다 */}

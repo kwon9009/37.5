@@ -7,7 +7,7 @@ import { useAuthStore } from "../../store/auth-store.js";
 
 function Sidebar({ active = "dashboard" }) {
   const unreadCount = useUnreadAlertCount();
-  const pendingLinkCount = usePendingLinkRequestCount();
+  const pendingLinkRequestCount = usePendingLinkRequestCount();
   const role = useAuthStore((state) => state.role);
 
   const NAV_ITEMS = [
@@ -20,7 +20,7 @@ function Sidebar({ active = "dashboard" }) {
       to: "/integration-requests",
       icon: "user-check",
       label: "연동 요청",
-      badge: pendingLinkCount > 0 ? pendingLinkCount : null,
+      badge: pendingLinkRequestCount > 0 ? pendingLinkRequestCount : null,
     },
   ];
 

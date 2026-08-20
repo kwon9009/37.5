@@ -33,6 +33,7 @@ user_id BIGINT AUTO_INCREMENT PRIMARY KEY,
 login_id VARCHAR(50) NOT NULL UNIQUE,
 email VARCHAR(100) NULL UNIQUE, -- 2026-07-16 추가: 부서 계정 비밀번호 찾기용. 보호자 등은 아직 없어서 nullable
 password VARCHAR(255) NOT NULL,
+profile_image_url VARCHAR(500) NULL, -- 2026-08-20 추가: 부서 계정 프로필 사진 경로(/uploads/profile/...). 다른 역할은 아직 없어서 nullable
 is_active BOOLEAN NOT NULL DEFAULT TRUE,
 role ENUM('ADMIN','DEPARTMENT','GUARDIAN') NOT NULL,
 created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,

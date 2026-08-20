@@ -40,7 +40,10 @@ class User(BaseModel):
         String(255),
         nullable=False,
     )
-
+    profile_image_url = mapped_column(
+        String(500),
+        nullable=True,
+    )
     role: Mapped[UserRole] = mapped_column(
         Enum(UserRole),
         nullable=False,

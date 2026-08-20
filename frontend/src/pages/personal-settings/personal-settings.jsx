@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Sidebar from "../../components/sidebar/sidebar.jsx";
 import Header from "../../components/header/header.jsx";
 import Icon from "../../components/icon/icon.jsx";
+import { apiClient, getErrorMessage } from "../../api/client.js";
 
 const NOTIFICATION_TOGGLES = [
   { key: "emergencyAlerts", label: "담당 환자 응급 알림", desc: "담당 환자에게 응급 상황이 발생하면 즉시 알림을 받습니다", default: true },
@@ -22,7 +23,7 @@ function ToggleSwitch({ checked, onChange, label }) {
       role="switch"
       aria-checked={checked}
       aria-label={label}
-      onClick={() => onChange(!checked)}
+      onClick={() => onChange?.(!checked)}
       className="flex h-6 w-11 shrink-0 items-center rounded-full p-[3px] transition-colors"
       style={{ backgroundColor: checked ? "#2B6FE3" : "#DCE3EC", justifyContent: checked ? "flex-end" : "flex-start" }}
     >
@@ -32,36 +33,85 @@ function ToggleSwitch({ checked, onChange, label }) {
 }
 
 function PersonalSettings() {
-  const [name, setName] = useState("김간호");
-  const [email, setEmail] = useState("kim.hana@vitalguard.io");
-  const [phone, setPhone] = useState("010-4471-2298");
+  const [me, setMe] = useState(null);
+  const [loadError, setLoadError] = useState("");
+
+  const fileInputRef = useRef(null);
+  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
+  const [photoError, setPhotoError] = useState("");
 
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [passwordMessage, setPasswordMessage] = useState(null);
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
+
+  const [name, setName] = useState("김간호");
+  const [phone, setPhone] = useState("010-4471-2298");
+  const [savedFlash, setSavedFlash] = useState(false);
 
   const [notifications, setNotifications] = useState(
     Object.fromEntries(NOTIFICATION_TOGGLES.map((item) => [item.key, item.default]))
   );
   const [twoFactorEnabled, setTwoFactorEnabled] = useState(true);
-  const [savedFlash, setSavedFlash] = useState(false);
-
-  const handleChangePassword = () => {
-    if (!currentPassword || newPassword.length < 8 || newPassword !== confirmPassword) {
-      setPasswordMessage({ type: "error", text: "현재 비밀번호를 입력하고, 새 비밀번호는 8자 이상 · 동일하게 입력해 주세요" });
-      return;
-    }
-    setPasswordMessage({ type: "success", text: "비밀번호가 변경되었습니다" });
-    setCurrentPassword("");
-    setNewPassword("");
-    setConfirmPassword("");
-  };
 
   const handleSave = () => {
     setSavedFlash(true);
     setTimeout(() => setSavedFlash(false), 2000);
   };
+
+  useEffect(() => {
+    apiClient
+      .get("/departments/me")
+      .then(({ data }) => setMe(data))
+      .catch((err) => setLoadError(getErrorMessage(err, "계정 정보를 불러오지 못했습니다")));
+  }, []);
+
+  const handleChangePassword = async () => {
+    if (!currentPassword || newPassword.length < 4 || newPassword !== confirmPassword) {
+      setPasswordMessage({ type: "error", text: "현재 비밀번호를 입력하고, 새 비밀번호는 4자 이상 · 동일하게 입력해 주세요" });
+      return;
+    }
+    setIsChangingPassword(true);
+    setPasswordMessage(null);
+    try {
+      await apiClient.patch("/departments/me/password", {
+        current_password: currentPassword,
+        new_password: newPassword,
+      });
+      setPasswordMessage({ type: "success", text: "비밀번호가 변경되었습니다" });
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+    } catch (err) {
+      setPasswordMessage({ type: "error", text: getErrorMessage(err, "비밀번호 변경에 실패했습니다") });
+    } finally {
+      setIsChangingPassword(false);
+    }
+  };
+
+  const handlePhotoButtonClick = () => fileInputRef.current?.click();
+
+  const handlePhotoChange = async (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+
+    setIsUploadingPhoto(true);
+    setPhotoError("");
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const { data } = await apiClient.post("/departments/me/profile-image", formData);
+      setMe((current) => (current ? { ...current, profile_image_url: data.profile_image_url } : current));
+    } catch (err) {
+      setPhotoError(getErrorMessage(err, "프로필 이미지 업로드에 실패했습니다"));
+    } finally {
+      setIsUploadingPhoto(false);
+    }
+  };
+
+  const initial = name.charAt(0);
 
   return (
     <div className="personal-settings flex min-h-screen bg-[#F5F7FA]">
@@ -86,6 +136,8 @@ function PersonalSettings() {
             </button>
           </div>
 
+          {loadError && <p className="text-sm font-semibold text-[#E0442E]">{loadError}</p>}
+
           <div className="flex flex-col gap-6 xl:flex-row">
             <div className="flex w-full flex-col gap-5">
               <div className="overflow-hidden rounded-xl border border-[#DCE3EC] bg-white shadow-[0_2px_3px_rgba(30,42,58,0.08)]">
@@ -94,25 +146,69 @@ function PersonalSettings() {
                 </div>
                 <div className="flex flex-col gap-5 p-5">
                   <div className="flex flex-wrap items-center gap-4">
-                    <span className="flex h-[72px] w-[72px] shrink-0 items-center justify-center rounded-full bg-[#1E2A3A] text-2xl font-extrabold text-[#2B6FE3]">
-                      {name.charAt(0)}
-                    </span>
+                    {me?.profile_image_url ? (
+                      <img
+                        src={me.profile_image_url}
+                        alt="프로필 사진"
+                        className="h-[72px] w-[72px] shrink-0 rounded-full object-cover"
+                      />
+                    ) : (
+                      <span className="flex h-[72px] w-[72px] shrink-0 items-center justify-center rounded-full bg-[#1E2A3A] text-2xl font-extrabold text-[#2B6FE3]">
+                        {initial}
+                      </span>
+                    )}
                     <div className="flex flex-1 flex-col gap-[6px]">
-                      <p className="text-lg font-bold text-[#1E2A3A]">{name}</p>
-                      <span className="w-fit rounded px-2 py-[3px] font-mono text-[11px] font-bold text-[#2B6FE3]" style={{ backgroundColor: "#2B6FE333" }}>
-                        간호사 · RN
+                      <p className="text-lg font-bold text-[#1E2A3A]">{me?.department_name ?? "-"}</p>
+                      <span
+                        className="w-fit rounded px-2 py-[3px] font-mono text-[11px] font-bold text-[#2B6FE3]"
+                        style={{ backgroundColor: "#2B6FE333" }}
+                      >
+                        {me?.hospital_name ?? "-"}
                       </span>
                     </div>
-                    <button
-                      type="button"
-                      className="flex shrink-0 items-center gap-[6px] rounded-lg bg-[#EDF1F6] px-[14px] py-2 text-xs font-semibold text-[#5A6B80]"
-                    >
-                      <Icon name="camera" size={14} className="text-[#5A6B80]" />
-                      사진 변경
-                    </button>
+                    <div className="flex shrink-0 flex-col items-end gap-1">
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept="image/jpeg,image/png,image/webp"
+                        onChange={handlePhotoChange}
+                        className="hidden"
+                      />
+                      <button
+                        type="button"
+                        onClick={handlePhotoButtonClick}
+                        disabled={isUploadingPhoto}
+                        className="flex items-center gap-[6px] rounded-lg bg-[#EDF1F6] px-[14px] py-2 text-xs font-semibold text-[#5A6B80] disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        <Icon name="camera" size={14} className="text-[#5A6B80]" />
+                        {isUploadingPhoto ? "업로드 중..." : "사진 변경"}
+                      </button>
+                      {photoError && <p className="max-w-[180px] text-right text-[11px] font-semibold text-[#E0442E]">{photoError}</p>}
+                    </div>
                   </div>
 
                   <div className="h-px bg-[#DCE3EC]" />
+
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <div className="flex flex-col gap-2">
+                      <label htmlFor="settingsEmail" className="text-xs font-bold tracking-wide text-[#5A6B80]">
+                        이메일
+                      </label>
+                      <input
+                        id="settingsEmail"
+                        type="email"
+                        value={me?.email ?? ""}
+                        readOnly
+                        className="h-11 rounded-lg border border-[#DCE3EC] bg-[#EDF1F6] px-[14px] text-sm text-[#1E2A3A] focus:outline-none"
+                      />
+                    </div>
+                    <div className="flex flex-col gap-2">
+                      <span className="text-xs font-bold tracking-wide text-[#5A6B80]">소속</span>
+                      <div className="flex h-11 items-center rounded-lg border border-[#DCE3EC] bg-[#EDF1F6] px-[14px] text-sm text-[#5A6B80]">
+                        {me ? `${me.hospital_name} · ${me.department_name}` : "-"}
+                      </div>
+                    </div>
+                  </div>
 
                   <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                     <div className="flex flex-col gap-2">
@@ -128,21 +224,6 @@ function PersonalSettings() {
                       />
                     </div>
                     <div className="flex flex-col gap-2">
-                      <label htmlFor="settingsEmail" className="text-xs font-bold tracking-wide text-[#5A6B80]">
-                        이메일
-                      </label>
-                      <input
-                        id="settingsEmail"
-                        type="email"
-                        value={email}
-                        onChange={(event) => setEmail(event.target.value)}
-                        className="h-11 rounded-lg border border-[#DCE3EC] bg-[#F5F7FA] px-[14px] text-sm text-[#1E2A3A] focus:outline-none"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                    <div className="flex flex-col gap-2">
                       <label htmlFor="settingsPhone" className="text-xs font-bold tracking-wide text-[#5A6B80]">
                         연락처
                       </label>
@@ -153,12 +234,6 @@ function PersonalSettings() {
                         onChange={(event) => setPhone(event.target.value)}
                         className="h-11 rounded-lg border border-[#DCE3EC] bg-[#F5F7FA] px-[14px] font-mono text-sm text-[#1E2A3A] focus:outline-none"
                       />
-                    </div>
-                    <div className="flex flex-col gap-2">
-                      <span className="text-xs font-bold tracking-wide text-[#5A6B80]">소속</span>
-                      <div className="flex h-11 items-center rounded-lg border border-[#DCE3EC] bg-[#EDF1F6] px-[14px] text-sm text-[#5A6B80]">
-                        우송대학교병원 · 3병동 간호스테이션
-                      </div>
                     </div>
                   </div>
                 </div>
@@ -192,7 +267,7 @@ function PersonalSettings() {
                         type="password"
                         value={newPassword}
                         onChange={(event) => setNewPassword(event.target.value)}
-                        placeholder="8자 이상 입력"
+                        placeholder="4자 이상 입력"
                         className="h-11 rounded-lg border border-[#DCE3EC] bg-[#F5F7FA] px-[14px] text-sm text-[#1E2A3A] placeholder:text-[#5A6B80] focus:outline-none"
                       />
                     </div>
@@ -220,9 +295,10 @@ function PersonalSettings() {
                   <button
                     type="button"
                     onClick={handleChangePassword}
-                    className="h-[42px] w-fit rounded-lg bg-[#2B6FE3] px-6 text-sm font-bold text-white"
+                    disabled={isChangingPassword}
+                    className="h-[42px] w-fit rounded-lg bg-[#2B6FE3] px-6 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-60"
                   >
-                    비밀번호 변경
+                    {isChangingPassword ? "변경 중..." : "비밀번호 변경"}
                   </button>
                 </div>
               </div>
@@ -259,7 +335,7 @@ function PersonalSettings() {
                 <Icon name="shield-check" size={32} className="text-[#2B6FE3]" />
                 <div className="flex flex-col gap-[2px]">
                   <p className="text-lg font-bold text-white">{name}</p>
-                  <p className="font-mono text-[11px] font-bold text-[#8B8FA3]">간호사 · RN</p>
+                  <p className="font-mono text-[11px] font-bold text-[#8B8FA3]">{me?.department_name ?? "-"} · {me?.hospital_name ?? "-"}</p>
                 </div>
                 <div className="h-px bg-white/10" />
                 <div className="flex items-center justify-between">

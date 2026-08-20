@@ -7,8 +7,15 @@ from app.core.database import get_db
 from app.dependencies.auth import get_current_user
 from app.models.enums import VitalStatus
 from app.models.user import User
+from app.schemas.patient.patient_create import (
+    PatientCreateRequest,
+    PatientCreateResponse,
+)
 from app.schemas.patient.patient_detail_response import (
     PatientDetailResponse,
+)
+from app.schemas.patient.patient_discharge_response import (
+    PatientDischargeResponse,
 )
 from app.schemas.patient.patient_vital_logs_response import (
     PatientVitalLogsResponse,
@@ -34,6 +41,24 @@ router = APIRouter(
 )
 
 
+# 환자 등록
+@router.post(
+    "",
+    response_model=PatientCreateResponse,
+    status_code=201,
+)
+def create_patient(
+    body: PatientCreateRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    return patient_service.create_patient(
+        db=db,
+        body=body,
+        current_user=current_user,
+    )
+
+
 # 환자 상세 조회
 @router.get(
     "/{patient_id}",
@@ -45,6 +70,23 @@ def get_patient_detail(
     db: Session = Depends(get_db),
 ):
     return patient_service.get_patient_detail(
+        db=db,
+        patient_id=patient_id,
+        current_user=current_user,
+    )
+
+
+# 환자 퇴원 처리
+@router.patch(
+    "/{patient_id}/discharge",
+    response_model=PatientDischargeResponse,
+)
+def discharge_patient(
+    patient_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    return patient_service.discharge_patient(
         db=db,
         patient_id=patient_id,
         current_user=current_user,
