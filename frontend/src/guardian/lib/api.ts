@@ -3,6 +3,8 @@ import { apiClient } from "@/api/client.js"
 import { openVitalStream } from "@/api/vital-stream.js"
 import { pollInterval } from "@/api/use-vital-stream.js"
 import type { NotiType } from "./schema-view"
+import { toDisplayTime } from "@/lib/demo-time.js"
+import { isVitalFresh } from "@/lib/vital-freshness.js"
 
 export type Noti = {
   id: number
@@ -121,14 +123,50 @@ function shortDate(iso: string): string {
 }
 
 /**
- * 기록 시각을 "HH"(00~23)로 바꾼다. 반드시 로컬 시각 기준이어야 한다.
+ * 시연용 시간 압축 스위치.
+ *
+ * 화면은 평소와 똑같다 — 가로축은 그대로 00~23시 24칸이고 라벨도 "16시"다.
+ * 다른 것은 "기록을 어느 칸에 넣느냐" 하나뿐이다.
+ *
+ *   평소        1시간 전 기록  ->  한 칸 왼쪽
+ *   시연 모드   30초  전 기록  ->  한 칸 왼쪽   (30초를 1시간처럼 취급)
+ *
+ * 즉 12분만 측정해도 하루치 그래프가 채워진다(실제 30초 = 화면 1시간). 시연 영상을 찍을 때 두세 시간씩
+ * 측정할 수 없어서 두는 장치이며 .env 의 VITE_CHART_BUCKET=minute 로 켠다.
+ * 값을 비우면(기본) 실제 시각 그대로 그린다.
+ */
+export const CHART_BUCKET: "hour" | "minute" =
+  import.meta.env.VITE_CHART_BUCKET === "minute" ? "minute" : "hour"
+
+/** 가로축 칸 수. 두 모드 모두 하루 24칸으로 같다. */
+const BUCKET_COUNT = 24
+
+/**
+ * 기록 시각을 가로축 칸(00~23)으로 바꾼다. 반드시 로컬 시각 기준이어야 한다.
  *
  * 서버는 시간대 표시가 없는 시각(예: 2026-08-17T17:30:01)을 주는데,
  * 여기에 toISOString()을 쓰면 한국 시각을 UTC로 바꿔버려 9시간이 밀린다.
  * (17시 기록이 "08"시로 표시되던 원인)
+ *
+ * 시연 모드에서는 "몇 분 전인가"를 "몇 시간 전인가"로 바꿔 칸을 정한다.
+ * 방금 잰 값이 지금 시각 칸에, 1분 전 값이 한 칸 왼쪽에 놓인다.
  */
-function hourLabel(iso: string): string {
-  return String(new Date(iso).getHours()).padStart(2, "0")
+function bucketLabel(iso: string): string {
+  const now = Date.now()
+  const shown = toDisplayTime(iso, now)
+
+  // 하루를 한 바퀴 넘긴 기록은 최근 값과 같은 칸에 겹치므로 축에서 뺀다
+  if (now - shown.getTime() >= 24 * 60 * 60 * 1000) return ""
+
+  return String(shown.getHours()).padStart(2, "0")
+}
+
+/**
+ * x축 뼈대(00~23시). 기록이 있는 칸만 넣으면 방금 켠 경우 점이 하나만 찍혀
+ * "지금"만 있는 것처럼 보이므로, 빈 칸도 축에는 남긴다(값은 null → 선이 끊김).
+ */
+function bucketSkeleton(): string[] {
+  return Array.from({ length: BUCKET_COUNT }, (_, h) => String(h).padStart(2, "0"))
 }
 
 /**
@@ -143,18 +181,22 @@ export function toDateParam(d: Date): string {
   return `${year}-${month}-${day}`
 }
 
+/** 툴팁에 쓸 시각 표기. 두 모드 모두 축이 시간 단위라 표기도 같다. */
+export function bucketTooltipLabel(t: string): string {
+  return `${t}시`
+}
+
+// 그래프에 쓸 실시간 표본 상한. 1초에 하나씩 들어오므로 20분치다.
+const LIVE_SAMPLE_LIMIT = 1200
+
 export type HourlyPoint = { t: string; value: number | null }
 
 /**
  * 서버가 주는 값은 1분 평균 로그라서 하루치면 1440개가 된다.
- * 그대로 그리면 점이 너무 많아 읽기 어렵고 "시간당"도 아니므로,
- * 같은 시(00~23)끼리 평균 내어 24개(=하루치)로 줄인다.
- *
- * 00~23시 뼈대를 먼저 깔고 값을 채운다. 기록이 있는 시간만 넣으면 방금 켠 경우
- * 점이 하나만 찍혀 "지금 시각"만 있는 것처럼 보인다. 기록이 없는 시간도 축에는
- * 나와야 하루 흐름을 읽을 수 있다(값은 null → 선이 끊김).
+ * 그대로 그리면 점이 너무 많아 읽기 어려우므로 같은 눈금끼리 평균 내어 줄인다.
+ * 눈금 단위는 CHART_BUCKET 이 정한다(평소 1시간, 시연 시 1분).
  */
-export function toHourlySeries(series: { t: string; value: number }[]): HourlyPoint[] {
+export function toChartSeries(series: { t: string; value: number }[]): HourlyPoint[] {
   const sum = new Map<string, { total: number; count: number }>()
   for (const point of series) {
     if (point.value == null) continue
@@ -163,8 +205,7 @@ export function toHourlySeries(series: { t: string; value: number }[]): HourlyPo
     acc.count += 1
     sum.set(point.t, acc)
   }
-  return Array.from({ length: 24 }, (_, hour) => {
-    const t = String(hour).padStart(2, "0")
+  return bucketSkeleton().map((t) => {
     const acc = sum.get(t)
     return { t, value: acc ? Math.round(acc.total / acc.count) : null }
   })
@@ -199,8 +240,18 @@ export function useGuardianData(): GuardianData {
   // 화면에 돌려줄 때 합친다.
   const [liveVitals, setLiveVitals] = useState<GuardianData["vitals"] | null>(null)
   const [realtime, setRealtime] = useState(false)
+  // 그래프용 실시간 표본.
+  // vital_logs 는 평균이라 30초에 한 행씩만 쌓여서, 측정을 시작해도 한동안
+  // 그래프가 비어 있다. 숫자만 1초마다 바뀌고 그래프는 멈춘 것처럼 보이므로
+  // 들어오는 값을 모아 함께 그린다.
+  const [liveSamples, setLiveSamples] = useState<
+    { recorded_at: string; avg_heart_rate: number | null; avg_resp_rate: number | null }[]
+  >([])
   // 스트림 값이 아직 없을 때 기준으로 삼을 마지막 폴링값
   const polledVitals = useRef(EMPTY.vitals)
+  // 측정 시각. 이게 오래됐으면 마지막 값을 현재값처럼 보여주지 않는다
+  const polledMeasuredAt = useRef<string | null>(null)
+  const liveMeasuredAt = useRef<string | null>(null)
   const patientId = data.patient.patientId
 
   useEffect(() => {
@@ -273,6 +324,7 @@ export function useGuardianData(): GuardianData {
           respiration: detail.current_vital?.resp_rate ?? 0,
           present: myPatient.is_present,
         }
+        polledMeasuredAt.current = detail.current_vital?.measured_at ?? null
 
         setData({
           loading: false,
@@ -297,8 +349,8 @@ export function useGuardianData(): GuardianData {
           },
           notifications,
           specialNote: detail.patient.special_notes ?? "",
-          heartRateSeries: vitalLogs.map((v) => ({ t: hourLabel(v.recorded_at), value: v.avg_heart_rate })),
-          respirationSeries: vitalLogs.map((v) => ({ t: hourLabel(v.recorded_at), value: v.avg_resp_rate })),
+          heartRateSeries: vitalLogs.map((v) => ({ t: bucketLabel(v.recorded_at), value: v.avg_heart_rate })),
+          respirationSeries: vitalLogs.map((v) => ({ t: bucketLabel(v.recorded_at), value: v.avg_resp_rate })),
           historyLog,
         })
       } catch {
@@ -333,6 +385,21 @@ export function useGuardianData(): GuardianData {
             present: payload.presence,
           }
         })
+        liveMeasuredAt.current = payload.measured_at ?? null
+
+        // 값이 실제로 들어온 초만 그래프 표본으로 쓴다(null 은 "이번엔 값 없음")
+        if (payload.heart_rate != null || payload.resp_rate != null) {
+          setLiveSamples((prev) =>
+            [
+              ...prev,
+              {
+                recorded_at: payload.measured_at ?? new Date().toISOString(),
+                avg_heart_rate: payload.heart_rate ?? null,
+                avg_resp_rate: payload.resp_rate ?? null,
+              },
+            ].slice(-LIVE_SAMPLE_LIMIT),
+          )
+        }
       },
       onConnectionChange: setRealtime,
     })
@@ -352,10 +419,27 @@ export function useGuardianData(): GuardianData {
       }
     : data.emergencyEvent
 
+  // 저장된 평균(vital_logs)과 지금 들어오는 값을 합쳐 그린다.
+  // 평균은 과거 구간을, 실시간 표본은 방금 몇 분을 채운다.
+  const liveHeart = liveSamples
+    .filter((v) => v.avg_heart_rate != null)
+    .map((v) => ({ t: bucketLabel(v.recorded_at), value: v.avg_heart_rate as number }))
+  const liveResp = liveSamples
+    .filter((v) => v.avg_resp_rate != null)
+    .map((v) => ({ t: bucketLabel(v.recorded_at), value: v.avg_resp_rate as number }))
+
   return {
     ...data,
     realtime,
-    vitals: liveVitals ?? data.vitals,
+    heartRateSeries: liveHeart.length > 0 ? [...data.heartRateSeries, ...liveHeart] : data.heartRateSeries,
+    respirationSeries: liveResp.length > 0 ? [...data.respirationSeries, ...liveResp] : data.respirationSeries,
+    // 측정을 멈추면 서버에 마지막 값이 남는다. 그걸 현재값처럼 띄우면
+    // 멈춘 센서를 정상 작동으로 오해하므로, 오래된 값은 0(=기록 없음)으로 둔다.
+    // 재실도 센서가 감지해야 아는 값이라 함께 내린다(아무도 없는데 "재실"로
+    // 보이면 보호자가 환자가 병상에 있다고 잘못 안다).
+    vitals: isVitalFresh(liveMeasuredAt.current ?? polledMeasuredAt.current)
+      ? (liveVitals ?? data.vitals)
+      : { ...(liveVitals ?? data.vitals), heartRate: 0, respiration: 0, present: false },
     emergencyEvent,
   }
 }
@@ -388,8 +472,8 @@ export type DailyVitals = {
 const EMPTY_DAY: DailyVitals = {
   loading: true,
   hasData: false,
-  heartRate: toHourlySeries([]),
-  respiration: toHourlySeries([]),
+  heartRate: toChartSeries([]),
+  respiration: toChartSeries([]),
   heartRateAvg: null,
   respirationAvg: null,
   worstHeartLevel: "기록 없음",
@@ -444,11 +528,11 @@ export function useDailyVitals(patientId: number | null, day: Date): DailyVitals
         setState({
           loading: false,
           hasData: logs.length > 0,
-          heartRate: toHourlySeries(
-            logs.map((v) => ({ t: hourLabel(v.recorded_at), value: v.avg_heart_rate })),
+          heartRate: toChartSeries(
+            logs.map((v) => ({ t: bucketLabel(v.recorded_at), value: v.avg_heart_rate })),
           ),
-          respiration: toHourlySeries(
-            logs.map((v) => ({ t: hourLabel(v.recorded_at), value: v.avg_resp_rate })),
+          respiration: toChartSeries(
+            logs.map((v) => ({ t: bucketLabel(v.recorded_at), value: v.avg_resp_rate })),
           ),
           heartRateAvg: average(heartValues),
           respirationAvg: average(respValues),

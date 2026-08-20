@@ -76,6 +76,17 @@ class Settings(BaseSettings):
     # 실측할 때만 켠다:  VITAL_RECORD_PATH=records/session1.ndjson
     VITAL_RECORD_PATH: str = ""
 
+    # vital_logs 에 평균값을 append 하는 주기(초).
+    # 기본 60초(1분 평균)이며, 시연 영상처럼 짧게 재서 그래프를 채워야 할 때만
+    # 30초로 줄인다. 줄이면 그만큼 DB 행이 두 배로 쌓인다.
+    VITAL_LOG_INTERVAL_SEC: int = 60
+
+    # 주의/경고 알림을 만들기 전에 그 상태가 이어져야 하는 시간(초).
+    # 센서 호흡값이 자주 튀어서 등급이 NORMAL<->WARNING 을 오가는데,
+    # 바뀔 때마다 알림을 만들면 몇 분 만에 수십 건이 쌓여 정작 중요한
+    # 알림이 묻힌다. 응급(DANGER)은 별도로 danger_sustain_sec 를 쓴다.
+    ALERT_SUSTAIN_SEC: int = 15
+
     # CORS
 
     model_config = SettingsConfigDict(

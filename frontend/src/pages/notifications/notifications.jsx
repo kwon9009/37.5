@@ -3,22 +3,14 @@ import Sidebar from "../../components/sidebar/sidebar.jsx";
 import Header from "../../components/header/header.jsx";
 import Icon from "../../components/icon/icon.jsx";
 import { apiClient } from "../../api/client.js";
+import { formatRelative } from "../../lib/datetime.js";
 
 const FILTERS = [
   { key: "all", label: "전체" },
   { key: "unread", label: "읽지 않음" },
 ];
 
-function formatRelative(iso) {
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return "";
-  const diffMin = Math.round((Date.now() - date.getTime()) / 60000);
-  if (diffMin < 1) return "방금";
-  if (diffMin < 60) return `${diffMin}분 전`;
-  const diffHour = Math.round(diffMin / 60);
-  if (diffHour < 24) return `${diffHour}시간 전`;
-  return date.toLocaleDateString("ko-KR");
-}
+// 하루가 넘은 알림은 날짜와 시각을 함께 보여준다(공용 포맷터).
 
 function Notifications() {
   const [notifications, setNotifications] = useState([]);

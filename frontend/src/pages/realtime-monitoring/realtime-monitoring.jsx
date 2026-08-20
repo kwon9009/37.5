@@ -6,6 +6,10 @@ import Icon from "../../components/icon/icon.jsx";
 import StatusBadge from "../../components/status-badge/status-badge.jsx";
 import { apiClient } from "../../api/client.js";
 import { useVitalStream, pollInterval } from "../../api/use-vital-stream.js";
+import { useMockTick } from "../../hooks/use-mock-tick.js";
+import { isMockPatient, mockCurrent } from "../../lib/mock-vitals.js";
+import { severityFromVitals } from "../../lib/vital-severity.js";
+import { isVitalFresh } from "../../lib/vital-freshness.js";
 
 const LEGEND = [
   { label: "응급", color: "#E0442E" },
@@ -38,6 +42,7 @@ function toMonitorCard(item) {
     onlineSeverity: severity,
     heartRate: item.heart_rate,
     respirationRate: item.resp_rate,
+    measuredAt: item.measured_at,
     present: item.is_present,
     connected,
     battery: null, // 장치 배터리는 아직 서버가 내려주지 않는다
@@ -54,6 +59,33 @@ function formatWardClock(date) {
   const datePart = new Intl.DateTimeFormat("ko-KR", { year: "numeric", month: "long", day: "numeric", weekday: "short" }).format(date);
   const timePart = date.toLocaleTimeString("ko-KR", { hour12: false, hour: "2-digit", minute: "2-digit" });
   return `${datePart} · ${timePart}`;
+}
+
+/**
+ * 실측 센서가 없는 환자에게 목업 값을 입힌다.
+ * 대시보드·환자목록과 같은 생성기를 쓰므로 세 화면의 숫자가 항상 일치한다.
+ * 센서가 끊긴(offline) 카드는 손대지 않는다 - 값 대신 "센서 확인 필요"를 보여야 한다.
+ */
+function withMockVitals(patient, tick) {
+  // 센서가 끊긴 카드는 값 대신 "센서 확인 필요"를 보여야 하므로 손대지 않는다.
+  if (patient.severity === "offline") return patient;
+
+  if (!isMockPatient(patient.id)) {
+    // 측정 중이 아니면 마지막 값을 현재값처럼 보여주지 않는다
+    if (!isVitalFresh(patient.measuredAt)) {
+      // 재실은 센서가 감지해야 아는 값이다
+      return { ...patient, heartRate: null, respirationRate: null, severity: "offline", present: false };
+    }
+    // 실측 환자도 배지는 화면에 보이는 숫자에서 뽑는다.
+    const severity =
+      severityFromVitals(patient.heartRate, patient.respirationRate) ?? patient.severity;
+    return { ...patient, severity, onlineSeverity: severity };
+  }
+
+  const heartRate = mockCurrent(patient.id, "heart", tick);
+  const respirationRate = mockCurrent(patient.id, "resp", tick);
+  const severity = severityFromVitals(heartRate, respirationRate);
+  return { ...patient, heartRate, respirationRate, severity, onlineSeverity: severity };
 }
 
 function MonitorCard({ patient }) {
@@ -141,6 +173,8 @@ function RealtimeMonitoring() {
   const [activeWard, setActiveWard] = useState("전체");
   const [wards, setWards] = useState([]);
   const [patients, setPatients] = useState([]);
+  // 목업 값을 1초마다 갱신하기 위한 카운터
+  const mockTick = useMockTick();
   const [now, setNow] = useState(() => new Date());
   const [error, setError] = useState("");
 
@@ -162,6 +196,7 @@ function RealtimeMonitoring() {
                 // null이면 이번엔 갱신할 값이 없다는 뜻이라 직전 값을 유지한다
                 heartRate: payload.heart_rate ?? patient.heartRate,
                 respirationRate: payload.resp_rate ?? patient.respirationRate,
+                measuredAt: payload.measured_at ?? patient.measuredAt,
                 onlineSeverity: SEVERITY_BY_STATUS[payload.status] ?? patient.onlineSeverity,
                 severity: patient.connected
                   ? (SEVERITY_BY_STATUS[payload.status] ?? patient.severity)
@@ -200,14 +235,24 @@ function RealtimeMonitoring() {
     };
   }, [realtime]);
 
-  const wardTabs = useMemo(() => [{ name: "전체", count: patients.length }, ...wards], [patients, wards]);
+  // 목업 값을 여기서 한 번에 입힌다. 카드에서만 바꾸면 위험도 정렬과
+  // 병동별 인원수가 예전 등급을 기준으로 계산돼 화면이 서로 어긋난다.
+  const shownPatients = useMemo(
+    () => patients.map((patient) => withMockVitals(patient, mockTick)),
+    [patients, mockTick],
+  );
+
+  const wardTabs = useMemo(
+    () => [{ name: "전체", count: shownPatients.length }, ...wards],
+    [shownPatients, wards],
+  );
 
   const visiblePatients = useMemo(
     () =>
-      patients
+      shownPatients
         .filter((patient) => activeWard === "전체" || patient.ward === activeWard)
         .sort((a, b) => SEVERITY_ORDER[a.severity] - SEVERITY_ORDER[b.severity]),
-    [patients, activeWard],
+    [shownPatients, activeWard],
   );
 
   return (

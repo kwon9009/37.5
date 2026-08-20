@@ -37,3 +37,6 @@ CLAUDE.local.md
 
 # 실측 세션 기록 (VITAL_RECORD_PATH). 측정 원시 로그라 커밋하지 않는다.
 backend/data/*.ndjson
+
+# 운영 중 남긴 DB 백업 덤프(환자 알림 등). 원시 데이터라 커밋하지 않는다.
+backend/data/deleted-*.json
