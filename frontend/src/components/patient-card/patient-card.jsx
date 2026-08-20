@@ -16,6 +16,57 @@ const SENSOR_COLOR = {
   "신호 이상": "#E0442E",
 };
 
+// 심박수 스파크라인 배경 구간. 백엔드 NEWS2 판정 기본 경계(vital_service.py의
+// judge_status 기본값: danger 40/131, WARNING 41~50·91~110, ALERT 111~130)와
+// 맞춘 것 - 병원이 danger 경계를 설정에서 바꿔도 이 미니 그래프까지 실시간으로
+// 반영하진 않는다(카드 하나에 그정도 정밀도는 과함). 정상 대비 지금 값이
+// "대충 어느 구간"에 있는지 한눈에 보여주는 용도.
+const HR_DOMAIN = [30, 170];
+const HR_BANDS = [
+  { from: 30, to: 40, color: "#E0442E" }, // <=40 danger
+  { from: 40, to: 50, color: "#E8A13B" }, // 41~50 caution
+  { from: 50, to: 90, color: "#2FA35C" }, // 51~90 normal
+  { from: 90, to: 110, color: "#E8A13B" }, // 91~110 caution
+  { from: 110, to: 130, color: "#E8762B" }, // 111~130 warning
+  { from: 130, to: 170, color: "#E0442E" }, // >=131 danger
+];
+
+function HeartRateSparkline({ history = [], color }) {
+  const width = 120;
+  const height = 32;
+  const [domainMin, domainMax] = HR_DOMAIN;
+
+  const valueToY = (value) => {
+    const clamped = Math.min(domainMax, Math.max(domainMin, value));
+    return height - ((clamped - domainMin) / (domainMax - domainMin)) * height;
+  };
+
+  const points = history.map((value, index) => [
+    history.length > 1 ? (index / (history.length - 1)) * width : width / 2,
+    valueToY(value),
+  ]);
+  const linePath = points.map(([x, y], index) => `${index === 0 ? "M" : "L"}${x} ${y}`).join(" ");
+  const lastPoint = points[points.length - 1];
+
+  return (
+    <svg viewBox={`0 0 ${width} ${height}`} width="100%" height="30" preserveAspectRatio="none">
+      {HR_BANDS.map((band) => (
+        <rect
+          key={band.from}
+          x="0"
+          y={valueToY(band.to)}
+          width={width}
+          height={Math.max(0, valueToY(band.from) - valueToY(band.to))}
+          fill={band.color}
+          fillOpacity="0.12"
+        />
+      ))}
+      {points.length > 1 && <path d={linePath} fill="none" stroke="#1E2A3A" strokeWidth="1.5" />}
+      {lastPoint && <circle cx={lastPoint[0]} cy={lastPoint[1]} r="2.5" fill={color} />}
+    </svg>
+  );
+}
+
 function PatientCard({
   name,
   room,
@@ -27,6 +78,7 @@ function PatientCard({
   presenceLabel = "재실중",
   notes = [],
   earlyWarning,
+  heartRateHistory = [],
   onClick,
 }) {
   const severityColor = SEVERITY_COLOR[severity] ?? SEVERITY_COLOR.normal;
@@ -98,14 +150,7 @@ function PatientCard({
         </div>
 
         <div className="patient-card__sparkline h-[30px] w-full overflow-hidden">
-          <svg viewBox="0 0 120 32" width="100%" height="30" preserveAspectRatio="none">
-            <path
-              d="M0 20 L10 22 L20 12 L30 24 L40 8 L50 18 L60 10 L70 22 L80 14 L90 20 L100 6 L110 16 L120 12"
-              fill="none"
-              stroke={severityColor}
-              strokeWidth="1.5"
-            />
-          </svg>
+          <HeartRateSparkline history={heartRateHistory} color={severityColor} />
         </div>
 
         <div className="patient-card__bottom flex items-center justify-between border-t border-[#DCE3EC] pt-2">

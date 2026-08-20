@@ -10,6 +10,9 @@ import { useVitalStream, pollInterval } from "../../api/use-vital-stream.js";
 
 const SEVERITY_ORDER = { emergency: 0, warning: 1, caution: 2, normal: 3 };
 
+// 카드 미니 그래프에 보여줄 최근 심박값 개수
+const HEART_RATE_HISTORY_LIMIT = 20;
+
 // 서버 등급(NEWS2 판정 결과) -> 화면 심각도
 const SEVERITY_BY_STATUS = {
   NORMAL: "normal",
@@ -113,6 +116,10 @@ function Dashboard() {
                   presenceLabel: payload.presence ? "재실중" : "부재중",
                   timestamp: toClockString(payload.measured_at),
                   earlyWarning: Boolean(payload.early_warning),
+                  heartRateHistory:
+                    payload.heart_rate == null
+                      ? patient.heartRateHistory
+                      : [...(patient.heartRateHistory ?? []), payload.heart_rate].slice(-HEART_RATE_HISTORY_LIMIT),
                 },
           ),
         ),
@@ -136,23 +143,31 @@ function Dashboard() {
         setError("");          // 일시적 오류 뒤 복구되면 경고를 지운다
         setSummary(summaryRes.data);
 
-        setPatients(
-          sortBySeverity(
-            patientsRes.data.map((patient) => ({
-              id: patient.patient_id,
-              name: patient.name,
-              room: patient.room,
-              presenceLabel: patient.presence_label,
-              severity: patient.severity,
-              heartRate: patient.heart_rate,
-              respirationRate: patient.respiration_rate,
-              sensorStatus: patient.sensor_status,
-              timestamp: toClockString(patient.timestamp),
-              specialNotes: patient.notes,
-              earlyWarning: false,
-            })),
-          ),
-        );
+        setPatients((current) => {
+          const previousById = new Map(current.map((patient) => [patient.id, patient]));
+          return sortBySeverity(
+            patientsRes.data.map((patient) => {
+              const previous = previousById.get(patient.patient_id);
+              return {
+                id: patient.patient_id,
+                name: patient.name,
+                room: patient.room,
+                presenceLabel: patient.presence_label,
+                severity: patient.severity,
+                heartRate: patient.heart_rate,
+                respirationRate: patient.respiration_rate,
+                sensorStatus: patient.sensor_status,
+                timestamp: toClockString(patient.timestamp),
+                specialNotes: patient.notes,
+                earlyWarning: false,
+                // 폴링마다 배열을 새로 만들면 SSE로 쌓아온 히스토리가 매번 리셋되니,
+                // 이미 갖고 있던 히스토리는 그대로 이어간다.
+                heartRateHistory:
+                  previous?.heartRateHistory ?? (patient.heart_rate != null ? [patient.heart_rate] : []),
+              };
+            }),
+          );
+        });
 
         setAlerts(
           alertsRes.data.map((alert) => ({
